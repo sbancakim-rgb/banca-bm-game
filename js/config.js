@@ -416,10 +416,6 @@ const DIFF_XP = { 1: 10, 2: 16, 3: 25 };
 const DIFF_LABEL = { 1: '쉬움', 2: '보통', 3: '어려움' };
 
 /* 사내 복지관: 외모 변경 비용 */
-const BEAUTY = {
-  salon: { name: '미용실', icon: '💇', price: 1500, desc: '헤어스타일 · 머리색 · 안경' },
-  clinic: { name: '성형외과', icon: '🏥', price: 3000, desc: '얼굴형 · 눈매 · 피부톤 · 나이대' }
-};
 
 /* 최우수BM 보상 */
 const BEST_BM = { week: { honor: 500, cash: 5000, label: '주간' }, month: { honor: 1500, cash: 15000, label: '월간' } };

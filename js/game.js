@@ -1216,15 +1216,12 @@
       <div class="box row" style="justify-content:space-between"><div><div class="muted">보유 활동비</div><b style="font-size:22px">💰 ${won(S.money)}</b></div>
         <div class="muted" style="text-align:right">정답 1개 30~80원<br>퍼펙트 +200원 · 보스 승리 보상</div></div>
       <button class="btn blue full" id="sendMoney" style="margin-bottom:6px">💸 동료에게 활동비 보내기</button>
-      <h4 class="sec">🏬 사내 복지관</h4>
-      <div class="hub">${Object.entries(BEAUTY).map(([k, b]) => `<button class="hubtile" data-beauty="${k}"><span>${b.icon}</span><b>${b.name}</b><small>${b.desc}<br>${won(b.price)}</small></button>`).join('')}</div>
       <h4 class="sec">🛍️ 아이템</h4>
       <div class="shop">${ITEMS.map((it) => `<div class="sitem">
         <div class="si">${it.icon}</div><div class="sn"><b>${it.name}</b><small>${esc(it.desc)}</small><span class="own">보유 ${S.items[it.id] || 0}개</span></div>
         <button class="btn mini ${S.money >= it.price ? '' : 'ghost'}" data-buy="${it.id}">${won(it.price)}</button></div>`).join('')}</div>
       <p class="muted">💡 문제용 아이템은 퀴즈 중 선택지 위 아이템 바에서 써요. 🧃 활기력 아이템은 완료한 일정 카드를 누르면 쓸 수 있어요.</p>
     </div>`;
-    els.screen.querySelectorAll('[data-beauty]').forEach((b) => b.onclick = () => createScreen(b.dataset.beauty));
     $('#sendMoney').onclick = () => sendMoneyModal();
     els.screen.querySelectorAll('[data-buy]').forEach((b) => b.onclick = () => {
       const it = ITEMS.find((x) => x.id === b.dataset.buy);
@@ -1256,7 +1253,6 @@
           <span class="badge" style="background:${tier.color}">🏅 명예 ${tier.name} · ${S.honor}</span></div>
           <div class="xpbar" style="margin-top:10px;height:9px"><i style="width:${S.lv >= MAX_LV ? 100 : Math.round((S.xp / xpNeed(S.lv)) * 100)}%"></i></div>
           <div class="muted" style="margin-top:4px">${S.lv >= MAX_LV ? 'MAX' : `다음 레벨까지 ${xpNeed(S.lv) - S.xp} XP`}</div>
-          <div class="row" style="margin-top:8px"><button class="btn ghost mini" id="salon">💇 미용실</button><button class="btn ghost mini" id="clinic">🏥 성형외과</button></div>
         </div></div></div>
       <div class="box stat"><div><b>${tot.n}</b><span>푼 문제</span></div><div><b>${tot.n ? Math.round((tot.c / tot.n) * 100) : 0}%</b><span>정답률</span></div><div><b>${S.bestCombo}</b><span>최고 콤보</span></div>
         <div><b>${S.streak.count}</b><span>연속 출근</span></div><div><b>${S.totalXp}</b><span>누적 XP</span></div><div><b>${Object.keys(S.ach).length}/${ACHIEVEMENTS.length}</b><span>업적</span></div></div>
@@ -1275,7 +1271,6 @@
         }).join('')}</div></div>
     </div>`;
     els.screen.querySelectorAll('[data-ag]').forEach((b) => b.onclick = () => { achGroup = b.dataset.ag; pageChar(); });
-    $('#salon').onclick = () => createScreen('salon'); $('#clinic').onclick = () => createScreen('clinic');
   }
 
   /* ---- 설정 ---- */
@@ -1293,7 +1288,7 @@
         : `<p class="muted">홈 화면에 설치하면 주소창 없이 앱처럼 실행돼요.</p><button class="btn full" id="inst">앱 설치하기</button>`}</div>`}
       <div class="box"><h4>👤 내 정보</h4><div class="muted" style="margin-bottom:8px">${esc(u.email || '')}</div>
         <div class="row"><input type="text" id="nm" value="${esc(S.name)}" maxlength="8"><button class="btn" id="nmSave" style="flex:none">이름 변경</button></div>
-        <div class="row" style="margin-top:8px"><button class="btn ghost full" id="look">💇 미용실 · 🏥 성형외과</button><button class="btn ghost full" id="pw">🔑 비밀번호 변경</button></div>
+        <div class="row" style="margin-top:8px"><button class="btn ghost full" id="pw">🔑 비밀번호 변경</button></div>
         <div class="row" style="margin-top:10px;justify-content:space-between"><span>효과음</span><button class="btn ghost" id="snd">${S.sound ? '🔊 켜짐' : '🔇 꺼짐'}</button></div></div>
       <div class="box"><h4>💾 기록</h4><p class="muted">기록은 서버에 자동 저장돼요. 같은 이메일로 로그인하면 다른 기기에서도 이어서 할 수 있어요.</p>
         <button class="btn ghost full" id="sync">지금 저장하기</button></div>
@@ -1304,7 +1299,6 @@
     const inst = $('#inst');
     if (inst) inst.onclick = () => { if (deferredInstall) { deferredInstall.prompt(); deferredInstall = null; } else toast('브라우저 메뉴(⋮) → "앱 설치" 또는 "홈 화면에 추가"를 눌러 주세요'); };
     $('#nmSave').onclick = () => { const v = $('#nm').value.trim(); if (!v) return; S.name = v; save(); renderHud(); toast('이름을 바꿨어요'); };
-    $('#look').onclick = () => go('shop');
     $('#snd').onclick = () => { S.sound = !S.sound; save(); pageSettings(); renderHud(); };
     $('#sync').onclick = async () => { await syncNow(); toast('저장했어요'); };
     $('#pw').onclick = () => {
@@ -1602,7 +1596,7 @@
     S = remote && (!local || (remote.updated || 0) > (local.updated || 0)) ? remote : local;
     if (!S) S = Store.fresh(u.email);
     S.email = u.email;
-    if (!S.name) return createScreen('new');
+    if (!S.name) return createScreen();
     if (!S.story) return prologue();
     titleScreen();
   }
@@ -1615,26 +1609,20 @@
     $('#cont').onclick = () => { Snd.tap(); eventRoll = true; goHome(); };
     $('#out').onclick = async () => { await syncNow(); Api.logout(); S = null; loginScreen(); };
   }
-  /* 캐릭터 꾸미기: mode = 'new'(입사) | 'salon'(미용실: 헤어·안경) | 'clinic'(성형외과: 얼굴·피부·나이) */
-  function createScreen(mode) {
-    if (mode === true) mode = 'salon';
-    if (!mode) mode = 'new';
-    const isNew = mode === 'new', shop = BEAUTY[mode];
-    stageMode('creating'); setBg(isNew ? 'office' : 'booth');
+  /* 신입사원 등록: 캐릭터 꾸미기 (입사 후에는 변경 불가) */
+  function createScreen() {
+    stageMode('creating'); setBg('office');
     els.hud.classList.add('hidden'); els.nav.classList.add('hidden');
-    const backup = clone(S);
-    const LOOK = ['gender', 'hairStyle', 'hairColor', 'skin', 'face', 'age', 'glasses', 'glassesColor', 'illust'];
     let tab = S.illust ? 'illust' : 'custom';
-    const changed = () => LOOK.some((k) => S[k] !== backup[k]);
     const sw = (arr, key, cur) => arr.map((c) => `<button data-${key}="${c}" class="${cur === c ? 'on' : ''}" style="background:${c}"></button>`).join('');
     const render = () => {
       setChar(playerSpec(), rest());
       const sprite = Sprites.has(`player_${S.gender}_0`);
-      const presets = Sprites.presets(S.gender), canPick = !hasFace && presets.length > 0 && mode !== 'salon';
+      const presets = Sprites.presets(S.gender), canPick = !hasFace && presets.length > 0;
       if (!canPick) tab = 'custom';
       const tabs = canPick ? `<div class="seg looktab"><button data-tab="custom" class="${tab === 'custom' ? 'on' : ''}">✏️ 직접 꾸미기</button><button data-tab="illust" class="${tab === 'illust' ? 'on' : ''}">🖼️ 일러스트 고르기</button></div>` : '';
       const illustPart = `<label>일러스트 캐릭터</label><div class="illusts">${presets.map((id, i) => `<button data-il="${id}" class="${S.illust === id ? 'on' : ''}"><div><img src="${Sprites.char('illust:' + id, 'normal')}" alt=""></div>${i + 1}번</button>`).join('')}</div>
-        <p class="muted">일러스트 캐릭터는 헤어·얼굴을 따로 바꿀 수 없고, 다른 일러스트로만 바꿀 수 있어요.</p>`;
+        <p class="muted">입사 후에는 캐릭터를 바꿀 수 없으니 신중하게 골라 주세요!</p>`;
       const hairPart = `
         <label>헤어스타일</label><div class="seg">${PLAYER_HAIR[S.gender].map((h) => `<button data-h="${h.style}" class="${S.hairStyle === h.style ? 'on' : ''}">${h.label}</button>`).join('')}</div>
         <label>머리색</label><div class="swatches">${sw(HAIR_COLORS, 'c', S.hairColor)}</div>
@@ -1644,20 +1632,17 @@
         <label>얼굴</label><div class="faces">${FACES[S.gender].map((f) => `<button data-f="${f.id}" class="${S.face === f.id ? 'on' : ''}"><div>${Art.portrait({ ...playerSpec(), eye: f.eye, eyeScale: f.eyeScale, face: f.face, eyeColor: f.eyeColor, lashes: !!f.lashes, blush: !!f.blush, brow: f.brow, thickBrows: f.thickBrows }, 'smile', { head: true })}</div>${f.label}</button>`).join('')}</div>
         <label>피부톤</label><div class="swatches">${sw(Object.values(SKIN), 's', S.skin)}</div>
         <label>나이대</label><div class="seg">${AGES.map((a) => `<button data-a="${a.v}" class="${S.age === a.v ? 'on' : ''}">${a.label}</button>`).join('')}</div>`;
-      const title = isNew ? '신입사원 등록' : `${shop.icon} 사내 ${shop.name}`;
-      const sub = isNew ? '○○생명 방카슈랑스사업부에 오신 걸 환영합니다!' : `${shop.desc} · 변경 시 ${won(shop.price)} (보유 ${won(S.money)})`;
-      els.screen.innerHTML = `<div class="create"><h3 class="cute" style="margin:0 0 4px;font-size:22px">${title}</h3>
-        <div class="muted">${sub}</div>
-        ${isNew ? `<label>이름</label><input type="text" id="nm" maxlength="8" placeholder="이름 (최대 8자)" value="${esc(S.name)}">
-          <label>성별</label><div class="seg">${[['f', '여성'], ['m', '남성']].map(([v, l]) => `<button data-g="${v}" class="${S.gender === v ? 'on' : ''}">${l}</button>`).join('')}</div>` : ''}
+      els.screen.innerHTML = `<div class="create"><h3 class="cute" style="margin:0 0 4px;font-size:22px">신입사원 등록</h3>
+        <div class="muted">○○생명 방카슈랑스사업부에 오신 걸 환영합니다!</div>
+        <label>이름</label><input type="text" id="nm" maxlength="8" placeholder="이름 (최대 8자)" value="${esc(S.name)}">
+        <label>성별</label><div class="seg">${[['f', '여성'], ['m', '남성']].map(([v, l]) => `<button data-g="${v}" class="${S.gender === v ? 'on' : ''}">${l}</button>`).join('')}</div>
         ${tabs}
         ${hasFace ? `<div class="box facebox">🎉 <b>${esc((Api.user || {}).name || S.name || '')}님만의 캐릭터</b>가 준비되어 있어요!<div class="muted">관리자가 만들어 둔 전용 캐릭터라 외모는 바꿀 수 없어요.</div></div>`
-          : mode === 'salon' && S.illust ? '<p class="muted" style="margin-top:12px">일러스트 캐릭터는 헤어를 바꿀 수 없어요. 🏥 성형외과에서 다른 일러스트로 바꾸거나 직접 꾸미기로 돌아갈 수 있어요.</p>'
           : tab === 'illust' ? illustPart
           : sprite ? '<p class="muted">일러스트 캐릭터를 사용 중이라 세부 외모는 고정이에요.</p>'
-          : isNew ? hairPart + facePart : mode === 'salon' ? hairPart : facePart}
-        <div class="row" style="margin-top:16px">${isNew ? '' : '<button class="btn ghost full" id="cancel">나가기</button>'}
-          ${isNew || !hasFace ? `<button class="btn full" id="go">${isNew ? '첫 출근하기 →' : `결제하고 변신 (${won(shop.price)})`}</button>` : ''}</div></div>`;
+          : hairPart + facePart}
+        ${hasFace ? '' : '<p class="muted" style="margin-top:12px">⚠️ 입사 후에는 외모를 바꿀 수 없어요.</p>'}
+        <div class="row" style="margin-top:16px"><button class="btn full" id="go">첫 출근하기 →</button></div></div>`;
       const nm = $('#nm'); if (nm) nm.oninput = (e) => S.name = e.target.value;
       const on = (sel, fn) => els.screen.querySelectorAll(sel).forEach((b) => b.onclick = () => { fn(b); render(); });
       on('[data-g]', (b) => { S.gender = b.dataset.g; S.hairStyle = PLAYER_HAIR[S.gender][0].style; S.face = FACES[S.gender][0].id; if (S.illust && S.illust[0] !== S.gender) S.illust = tab === 'illust' && Sprites.presets(S.gender)[0] || null; });
@@ -1670,20 +1655,11 @@
       on('[data-s]', (b) => S.skin = b.dataset.s);
       on('[data-gl]', (b) => S.glasses = b.dataset.gl);
       on('[data-gc]', (b) => S.glassesColor = b.dataset.gc);
-      const restore = () => LOOK.forEach((k) => S[k] = backup[k]);
-      const cancel = $('#cancel'); if (cancel) cancel.onclick = () => { restore(); goHome(); };
-      if (isNew && !S.name && hasFace && (Api.user || {}).name) { S.name = String(Api.user.name).slice(0, 8); const n = $('#nm'); if (n) n.value = S.name; }
-      const goBtn = $('#go'); if (goBtn) goBtn.onclick = () => {
-        if (isNew) {
-          S.name = (S.name || '').trim();
-          if (!S.name) return toast('이름을 입력해 주세요');
-          save(); return prologue();
-        }
-        if (!changed()) return toast('바뀐 게 없어요. 마음에 드는 모습을 골라 보세요!');
-        if (S.money < shop.price) return toast(`활동비가 ${won(shop.price - S.money)} 부족해요`);
-        S.money -= shop.price; inc('purchases'); Snd.coin(); checkAch(); save();
-        toast(mode === 'salon' ? '💇 "고객님, 완전 잘 어울리세요!"' : '🏥 "붓기가 빠지면 더 자연스러워져요~"', 3000);
-        goHome();
+      if (!S.name && hasFace && (Api.user || {}).name) { S.name = String(Api.user.name).slice(0, 8); const n = $('#nm'); if (n) n.value = S.name; }
+      $('#go').onclick = () => {
+        S.name = (S.name || '').trim();
+        if (!S.name) return toast('이름을 입력해 주세요');
+        save(); prologue();
       };
     };
     render();
