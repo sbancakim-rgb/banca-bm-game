@@ -56,6 +56,7 @@ const Api = (() => {
     questions, cachedQuestions: () => qmem || [],
     library: () => call('library').then((r) => r.items),
     talk: () => call('talk').then((r) => r.items),
+    myFace: () => call('myFace').then((r) => r.face),
     players: () => call('players').then((r) => r.items),
     cheer: (uid) => call('cheer', { uid }),
     sendMoney: (uid, amount, msg) => call('sendMoney', { uid, amount, msg }),
@@ -138,6 +139,7 @@ const Demo = (() => {
       case 'me': return ok({ user: me });
       case 'library': return ok({ items: d.lib.filter((x) => x.status !== '중지') });
       case 'talk': return ok({ items: TALK_DEFAULT });
+      case 'myFace': return ok({ face: null });
       case 'players': return ok({ items: Object.entries(d.progress).filter(([e]) => e !== email).map(([e, raw]) => { try { const p = JSON.parse(raw); return p.name ? { uid: 'u:' + e, name: p.name, lv: p.lv || 1 } : null; } catch (er) { return null; } }).filter(Boolean) });
       case 'cheer': {
         const to = String(b.uid).slice(2), t = new Date().toDateString();

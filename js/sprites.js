@@ -8,7 +8,7 @@
 const Sprites = (() => {
   const EXPRS = ['normal', 'smile', 'angry', 'worried'];
   const MAP = { happy: 'smile', smirk: 'smile', shout: 'angry', sad: 'worried', surprised: 'worried' };
-  const have = {}, base = {}, ext = {}, bgs = {}, presets = { m: [], f: [] };
+  const have = {}, base = {}, ext = {}, data = {}, bgs = {}, presets = { m: [], f: [] };
   const probe = (src) => new Promise((r) => { const i = new Image(); i.onload = () => r(true); i.onerror = () => r(false); i.src = src; });
 
   async function register(key, path) {
@@ -39,9 +39,12 @@ const Sprites = (() => {
   function char(key, expr) {
     const s = have[key]; if (!s) return null;
     const e = s.has(expr) ? expr : s.has(MAP[expr]) ? MAP[expr] : 'normal';
+    if (data[key]) return data[key][e];
     return `${base[key]}_${e}${ext[key] || '.png'}`;
   }
   return {
+    // 실물 캐릭터: 서버에서 받은 그림(data URL)을 등록
+    registerData: (key, map) => { data[key] = map; have[key] = new Set(Object.keys(map)); },
     init, char, bg: (n) => bgs[n] || null, has: (k) => !!have[k],
     presets: (g) => presets[g] || [],
     count: () => Object.keys(have).length + Object.keys(bgs).length

@@ -401,3 +401,4 @@ input[type=email], input[type=password] { font: inherit; width: 100%; padding: 1
 /* 일러스트 주인공: 작은 얼굴 동그라미·상반신 썸네일 위치 */
 img.sprite.head.illust { width: 250%; left: -75%; top: -54%; }
 img.sprite.bust.illust { width: 135%; left: -17%; top: -3%; }
+.box.facebox { margin-top: 12px; background: linear-gradient(135deg, #fff3c4, #ffe0ea); font-size: 14.5px; line-height: 1.5; }

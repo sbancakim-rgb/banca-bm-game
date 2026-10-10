@@ -9,7 +9,7 @@
     const src = spec && spec.key && Sprites.char(spec.key, expr);
     if (!src) return Art.portrait(spec, expr, opts);
     const cls = opts.head ? 'sprite head' : opts.bust ? 'sprite bust' : 'sprite';
-    return `<img class="${cls}${spec.aura ? ' aura' : ''}${spec.key.startsWith('illust:') ? ' illust' : ''}" src="${src}" alt="" draggable="false">`;
+    return `<img class="${cls}${spec.aura ? ' aura' : ''}${/^(illust|face):/.test(spec.key) ? ' illust' : ''}" src="${src}" alt="" draggable="false">`;
   }
   function bgHTML(name) {
     const src = Sprites.bg(name);
@@ -26,7 +26,7 @@
   const dayNum = () => Math.floor((Date.now() - new Date().getTimezoneOffset() * 60000) / 864e5);
   const clone = (o) => JSON.parse(JSON.stringify(o));
 
-  let S = null, syncTimer = null;
+  let S = null, syncTimer = null, hasFace = false;
   function save() {
     if (!S) return;
     S.updated = Date.now(); Store.save(S);
@@ -106,14 +106,14 @@
     const look = clone(r.look);
     if (f && look.type === 'suit') { delete look.tie; look.necklace = '#f5e6c4'; }
     if (f && look.type === 'shirt') look.shirt = '#fdf7fb';
-    const illust = S.illust && S.illust[0] === S.gender && Sprites.has('illust:' + S.illust) ? 'illust:' + S.illust : null;
+    const illust = hasFace ? 'face:me' : S.illust && S.illust[0] === S.gender && Sprites.has('illust:' + S.illust) ? 'illust:' + S.illust : null;
     return { key: illust || `player_${S.gender}_${RANKS.indexOf(r)}`, gender: S.gender, skin: S.skin,
       eye: fc.eye, eyeScale: fc.eyeScale, face: fc.face, eyeColor: fc.eyeColor, lashes: !!fc.lashes, blush: !!fc.blush, brow: fc.brow, thickBrows: fc.thickBrows,
       age: S.age, glasses: S.glasses || null, glassesColor: S.glassesColor,
       hair: { style: S.hairStyle, color: S.hairColor }, outfit: look, aura: !!r.aura, earrings: f && lv >= 20 ? '#f2c641' : null };
   }
   // 가만히 서 있을 때 표정: 일러스트 캐릭터는 첫 표정(기본), 코드 그림은 미소
-  const rest = () => (playerSpec().key.startsWith('illust:') ? 'normal' : 'smile');
+  const rest = () => (/^(illust|face):/.test(playerSpec().key) ? 'normal' : 'smile');
   const mastery = (g) => S.groupXp[g] / GROUPS[g].cats.length;
   function currentClass() {
     if (S.lv < CLASS_LV) return null;
@@ -1588,6 +1588,14 @@
     busy('문제를 불러오는 중…');
     try { await Api.questions(); } catch (e) { toast(e.message, 3500); }
     loadTalk();
+    // 실물 캐릭터(관리자가 비공개 폴더에 등록) — 받아 두고 다음엔 캐시로 바로 표시
+    const FK = 'bmq_face_' + u.email;
+    try { const c = JSON.parse(localStorage.getItem(FK)); if (c) { Sprites.registerData('face:me', c); hasFace = true; } } catch (e) { }
+    try {
+      const face = await Api.myFace();
+      if (face) { Sprites.registerData('face:me', face); hasFace = true; try { localStorage.setItem(FK, JSON.stringify(face)); } catch (e) { } }
+      else { hasFace = false; try { localStorage.removeItem(FK); } catch (e) { } }
+    } catch (e) { }
     const local = Store.load(u.email);
     let remote = null;
     try { const d = await Api.loadProgress(); if (d) remote = Object.assign(Store.fresh(u.email), JSON.parse(d)); } catch (e) { }
@@ -1622,7 +1630,7 @@
     const render = () => {
       setChar(playerSpec(), rest());
       const sprite = Sprites.has(`player_${S.gender}_0`);
-      const presets = Sprites.presets(S.gender), canPick = presets.length > 0 && mode !== 'salon';
+      const presets = Sprites.presets(S.gender), canPick = !hasFace && presets.length > 0 && mode !== 'salon';
       if (!canPick) tab = 'custom';
       const tabs = canPick ? `<div class="seg looktab"><button data-tab="custom" class="${tab === 'custom' ? 'on' : ''}">✏️ 직접 꾸미기</button><button data-tab="illust" class="${tab === 'illust' ? 'on' : ''}">🖼️ 일러스트 고르기</button></div>` : '';
       const illustPart = `<label>일러스트 캐릭터</label><div class="illusts">${presets.map((id, i) => `<button data-il="${id}" class="${S.illust === id ? 'on' : ''}"><div><img src="${Sprites.char('illust:' + id, 'normal')}" alt=""></div>${i + 1}번</button>`).join('')}</div>
@@ -1643,12 +1651,13 @@
         ${isNew ? `<label>이름</label><input type="text" id="nm" maxlength="8" placeholder="이름 (최대 8자)" value="${esc(S.name)}">
           <label>성별</label><div class="seg">${[['f', '여성'], ['m', '남성']].map(([v, l]) => `<button data-g="${v}" class="${S.gender === v ? 'on' : ''}">${l}</button>`).join('')}</div>` : ''}
         ${tabs}
-        ${mode === 'salon' && S.illust ? '<p class="muted" style="margin-top:12px">일러스트 캐릭터는 헤어를 바꿀 수 없어요. 🏥 성형외과에서 다른 일러스트로 바꾸거나 직접 꾸미기로 돌아갈 수 있어요.</p>'
+        ${hasFace ? `<div class="box facebox">🎉 <b>${esc((Api.user || {}).name || S.name || '')}님만의 캐릭터</b>가 준비되어 있어요!<div class="muted">관리자가 만들어 둔 전용 캐릭터라 외모는 바꿀 수 없어요.</div></div>`
+          : mode === 'salon' && S.illust ? '<p class="muted" style="margin-top:12px">일러스트 캐릭터는 헤어를 바꿀 수 없어요. 🏥 성형외과에서 다른 일러스트로 바꾸거나 직접 꾸미기로 돌아갈 수 있어요.</p>'
           : tab === 'illust' ? illustPart
           : sprite ? '<p class="muted">일러스트 캐릭터를 사용 중이라 세부 외모는 고정이에요.</p>'
           : isNew ? hairPart + facePart : mode === 'salon' ? hairPart : facePart}
         <div class="row" style="margin-top:16px">${isNew ? '' : '<button class="btn ghost full" id="cancel">나가기</button>'}
-          <button class="btn full" id="go">${isNew ? '첫 출근하기 →' : `결제하고 변신 (${won(shop.price)})`}</button></div></div>`;
+          ${isNew || !hasFace ? `<button class="btn full" id="go">${isNew ? '첫 출근하기 →' : `결제하고 변신 (${won(shop.price)})`}</button>` : ''}</div></div>`;
       const nm = $('#nm'); if (nm) nm.oninput = (e) => S.name = e.target.value;
       const on = (sel, fn) => els.screen.querySelectorAll(sel).forEach((b) => b.onclick = () => { fn(b); render(); });
       on('[data-g]', (b) => { S.gender = b.dataset.g; S.hairStyle = PLAYER_HAIR[S.gender][0].style; S.face = FACES[S.gender][0].id; if (S.illust && S.illust[0] !== S.gender) S.illust = tab === 'illust' && Sprites.presets(S.gender)[0] || null; });
@@ -1663,7 +1672,8 @@
       on('[data-gc]', (b) => S.glassesColor = b.dataset.gc);
       const restore = () => LOOK.forEach((k) => S[k] = backup[k]);
       const cancel = $('#cancel'); if (cancel) cancel.onclick = () => { restore(); goHome(); };
-      $('#go').onclick = () => {
+      if (isNew && !S.name && hasFace && (Api.user || {}).name) { S.name = String(Api.user.name).slice(0, 8); const n = $('#nm'); if (n) n.value = S.name; }
+      const goBtn = $('#go'); if (goBtn) goBtn.onclick = () => {
         if (isNew) {
           S.name = (S.name || '').trim();
           if (!S.name) return toast('이름을 입력해 주세요');
