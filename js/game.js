@@ -112,6 +112,8 @@
       age: S.age, glasses: S.glasses || null, glassesColor: S.glassesColor,
       hair: { style: S.hairStyle, color: S.hairColor }, outfit: look, aura: !!r.aura, earrings: f && lv >= 20 ? '#f2c641' : null };
   }
+  // 가만히 서 있을 때 표정: 일러스트 캐릭터는 첫 표정(기본), 코드 그림은 미소
+  const rest = () => (playerSpec().key.startsWith('illust:') ? 'normal' : 'smile');
   const mastery = (g) => S.groupXp[g] / GROUPS[g].cats.length;
   function currentClass() {
     if (S.lv < CLASS_LV) return null;
@@ -606,7 +608,7 @@
     const pct = S.lv >= MAX_LV ? 100 : Math.round((S.xp / need) * 100);
     els.hud.classList.remove('hidden');
     els.hud.innerHTML = `<div class="hud-card" data-go="char">
-        <div class="hud-ava">${charHTML(playerSpec(), 'smile', { head: true })}</div>
+        <div class="hud-ava">${charHTML(playerSpec(), rest(), { head: true })}</div>
         <div class="hud-info"><div class="hud-top"><span class="lvpill">Lv.${S.lv}</span><b>${esc(S.name)}</b><span>${r.title}${cls ? ' · ' + CLASSES[cls].icon : ''}</span></div>
         <div class="xpbar"><i style="width:${pct}%"></i></div></div></div>
       <button class="hud-money" id="moneyBtn">💰 ${won(S.money)}</button>
@@ -633,7 +635,7 @@
   function goHome() {
     ensureDay(); rollEvent(); save();
     const r = rankOf(S.lv);
-    stageMode('home'); setBg(r.bg); setChar(playerSpec(), 'smile', 'enter'); renderHud(); setNav('home');
+    stageMode('home'); setBg(r.bg); setChar(playerSpec(), rest(), 'enter'); renderHud(); setNav('home');
     const cls = currentClass();
     if (cls && S.lastClass && cls !== S.lastClass) toast(`명예 직업 변경: ${CLASSES[cls].icon} ${CLASSES[cls].name}`, 3200);
     if (cls) S.lastClass = cls;
@@ -744,7 +746,7 @@
     setChar(playerSpec(), expr, expr === 'angry' ? 'shake' : 'hop'); Snd.tap();
     els.fx.querySelectorAll('.talk').forEach((x) => x.remove());
     const n = fx(`<div class="talk ${type}">${esc(msg)}</div>`, 3600);
-    clearTimeout(talkTimer); talkTimer = setTimeout(() => { if (!inSession && $('#stage').className === 'home') setChar(playerSpec(), 'smile'); }, 3600);
+    clearTimeout(talkTimer); talkTimer = setTimeout(() => { if (!inSession && $('#stage').className === 'home') setChar(playerSpec(), rest()); }, 3600);
     return n;
   }
 
@@ -1248,7 +1250,7 @@
     const achList = ACHIEVEMENTS.filter((a) => achGroup === '전체' || a.group === achGroup);
     els.screen.innerHTML = `<div class="page"><h2>내 캐릭터</h2>
       <div class="box"><div class="charhead">
-        <div class="big"><div class="bgx">${bgHTML(r.bg)}</div><div class="fg">${charHTML(playerSpec(), 'smile')}</div></div>
+        <div class="big"><div class="bgx">${bgHTML(r.bg)}</div><div class="fg">${charHTML(playerSpec(), rest())}</div></div>
         <div><div class="nm">${esc(S.name)}</div><div class="muted">Lv.${S.lv} · ${r.title}</div>
           <div style="margin-top:6px">${cls ? `<span class="badge" style="background:${CLASSES[cls].color}">${CLASSES[cls].icon} ${CLASSES[cls].name}</span>` : `<span class="badge" style="background:#9aa3b2">Lv${CLASS_LV}에 명예 직업 획득</span>`}
           <span class="badge" style="background:${tier.color}">🏅 명예 ${tier.name} · ${S.honor}</span></div>
@@ -1262,7 +1264,7 @@
         <p class="muted">방카슈랑스는 3개 분야 평균으로 계산해요. 네 분야가 고르게 높으면 💼 올라운더!</p></div>
       <div class="box"><h4>승진 로드맵</h4><div class="ranks">${RANKS.map((x) => {
         const lock = S.lv < x.lv, now = x === r;
-        return `<div class="rank ${lock ? 'lock' : ''} ${now ? 'now' : ''}"><div class="rv">${charHTML(playerSpec(x.lv), 'smile', { bust: true })}</div>
+        return `<div class="rank ${lock ? 'lock' : ''} ${now ? 'now' : ''}"><div class="rv">${charHTML(playerSpec(x.lv), rest(), { bust: true })}</div>
           <div><b>Lv.${x.lv} ${x.title}</b>${now ? '<div class="muted">현재 직급</div>' : ''}</div></div>`;
       }).join('')}</div></div>
       <div class="box"><h4>업적 ${Object.keys(S.ach).length}/${ACHIEVEMENTS.length}</h4>
@@ -1598,7 +1600,7 @@
   }
   function titleScreen() {
     els.hud.classList.add('hidden'); els.nav.classList.add('hidden'); stageMode('');
-    setBg('title'); setChar(playerSpec(), 'smile', 'enter');
+    setBg('title'); setChar(playerSpec(), rest(), 'enter');
     els.screen.innerHTML = `<div class="logo"><div class="k">BANCASSURANCE QUIZ RPG</div><h1>방카BM<br><em>성장기</em></h1><p>인턴에서 사장까지, 지식으로 승진하라!</p></div>
       <div class="title-wrap"><button class="btn" id="cont">출근하기 · Lv.${S.lv} ${esc(S.name)}</button>
       <button class="btn ghost" id="out">다른 계정으로 로그인</button></div>`;
@@ -1618,12 +1620,12 @@
     const changed = () => LOOK.some((k) => S[k] !== backup[k]);
     const sw = (arr, key, cur) => arr.map((c) => `<button data-${key}="${c}" class="${cur === c ? 'on' : ''}" style="background:${c}"></button>`).join('');
     const render = () => {
-      setChar(playerSpec(), 'smile');
+      setChar(playerSpec(), rest());
       const sprite = Sprites.has(`player_${S.gender}_0`);
       const presets = Sprites.presets(S.gender), canPick = presets.length > 0 && mode !== 'salon';
       if (!canPick) tab = 'custom';
       const tabs = canPick ? `<div class="seg looktab"><button data-tab="custom" class="${tab === 'custom' ? 'on' : ''}">✏️ 직접 꾸미기</button><button data-tab="illust" class="${tab === 'illust' ? 'on' : ''}">🖼️ 일러스트 고르기</button></div>` : '';
-      const illustPart = `<label>일러스트 캐릭터</label><div class="illusts">${presets.map((id, i) => `<button data-il="${id}" class="${S.illust === id ? 'on' : ''}"><div><img src="${Sprites.char('illust:' + id, 'smile')}" alt=""></div>${i + 1}번</button>`).join('')}</div>
+      const illustPart = `<label>일러스트 캐릭터</label><div class="illusts">${presets.map((id, i) => `<button data-il="${id}" class="${S.illust === id ? 'on' : ''}"><div><img src="${Sprites.char('illust:' + id, 'normal')}" alt=""></div>${i + 1}번</button>`).join('')}</div>
         <p class="muted">일러스트 캐릭터는 헤어·얼굴을 따로 바꿀 수 없고, 다른 일러스트로만 바꿀 수 있어요.</p>`;
       const hairPart = `
         <label>헤어스타일</label><div class="seg">${PLAYER_HAIR[S.gender].map((h) => `<button data-h="${h.style}" class="${S.hairStyle === h.style ? 'on' : ''}">${h.label}</button>`).join('')}</div>
