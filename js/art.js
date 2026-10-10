@@ -24,7 +24,8 @@ const Art = (() => {
       const g0 = xR - i * step, g1 = g0 - step, tx = g0 - step / 2 + sway;
       const ty = yTip + ((i * 7) % 3) * 4 - (i === 0 || i === n - 1 ? 6 : 0);
       const gy = yGap + ((i * 5) % 3) * 3;
-      d += ` Q${(g0 - 2).toFixed(1)},${((gy + ty) / 2 + 4).toFixed(1)} ${tx.toFixed(1)},${ty.toFixed(1)} Q${(g1 + 4).toFixed(1)},${((gy + ty) / 2).toFixed(1)} ${g1.toFixed(1)},${gy.toFixed(1)}`;
+      // 끝을 2px 정도 뭉툭하게 (뾰족한 톱니 느낌 완화)
+      d += ` Q${(g0 - 2).toFixed(1)},${((gy + ty) / 2 + 4).toFixed(1)} ${(tx + 1.4).toFixed(1)},${(ty - 0.6).toFixed(1)} Q${tx.toFixed(1)},${(ty + 1.6).toFixed(1)} ${(tx - 1.4).toFixed(1)},${(ty - 0.6).toFixed(1)} Q${(g1 + 4).toFixed(1)},${((gy + ty) / 2).toFixed(1)} ${g1.toFixed(1)},${gy.toFixed(1)}`;
     }
     return d;
   }
@@ -32,22 +33,28 @@ const Art = (() => {
   const capOpen = (st) => `<path d="M120,214 C108,112 154,64 200,64 C246,64 292,112 280,214 C278,180 270,150 252,132 C232,120 168,120 148,132 C130,150 122,180 120,214 Z" ${st}/>`;
   // 시스루뱅: 이마가 비치는 가는 앞머리 가닥
   function seeThru(c, d) {
-    // 가닥 사이로 이마가 비치도록 가늘고 듬성듬성하게
-    return [[156, 150], [171, 160], [187, 164], [203, 158], [219, 165], [234, 158], [248, 148]]
-      .map(([x, y], i) => `<path d="M${x - 4},122 Q${x - 6 + (i % 2) * 3},${(122 + y) / 2} ${x - 1 + (i % 2) * 2},${y} Q${x + 2},${(122 + y) / 2} ${x + 4},122 Z" fill="${c}" stroke="${LINE}" stroke-width="1.3" stroke-linejoin="round" opacity=".95"/>`).join('')
-      + `<path d="M146,124 Q200,114 256,124" fill="none" stroke="${d}" stroke-width="2"/>`;
+    // 시스루뱅: 뿌리는 넓고 끝은 가늘게 휘어지는 머리카락 다발 (끝이 뾰족하지 않게 살짝 뭉툭)
+    const L = [[150, 146, -3], [162, 160, -2], [175, 168, -1], [188, 162, 0], [201, 170, 1], [214, 163, 1], [227, 168, 2], [240, 156, 3], [251, 144, 3]];
+    return L.map(([x, y, b]) => `<path d="M${x - 5},120 C${x - 6 + b},134 ${x - 3 + b * 2},${y - 14} ${x - 1 + b * 2},${y} Q${x + b * 2},${y + 1.5} ${x + 1.2 + b * 2},${y - 0.5} C${x + 2.5 + b * 2},${y - 16} ${x + 4 + b},134 ${x + 5},120 Z" fill="${c}" stroke="${LINE}" stroke-width="1.1" stroke-linejoin="round"/>`).join('')
+      + `<path d="M146,123 Q200,113 256,123" fill="none" stroke="${d}" stroke-width="1.6" opacity=".8"/>`;
   }
   function hair(style, c, id) {
-    const d = shade(c, -0.28), l = shade(c, 0.3);
-    const st = `fill="${c}" stroke="${LINE}" stroke-width="2.5" stroke-linejoin="round"`;
-    const shine = (x = 0) => `<path d="M${150 + x},112 Q${200 + x},92 ${246 + x},110" fill="none" stroke="${l}" stroke-width="4" stroke-linecap="round" opacity=".35"/>`;
-    const strands = (pts) => `<path d="${pts}" fill="none" stroke="${d}" stroke-width="2" opacity=".6"/>`;
+    const d = shade(c, -0.32), l = shade(c, 0.5), F = `url(#hg${id})`, HL = shade(c, -0.45);
+    const st = `fill="${F}" stroke="${HL}" stroke-width="2.4" stroke-linejoin="round"`;
+    // 엔젤링: 정수리 아래 끊어진 하이라이트 띠 + 가는 반사선
+    const shine = (x = 0) => `<g fill="none" stroke-linecap="round">
+      <path d="M${144 + x},122 Q${154 + x},108 ${168 + x},101" stroke="${l}" stroke-width="4.5" opacity=".4"/>
+      <path d="M${178 + x},97 Q${194 + x},92 ${210 + x},94" stroke="${l}" stroke-width="6" opacity=".45"/>
+      <path d="M${220 + x},96 Q${236 + x},101 ${250 + x},114" stroke="${l}" stroke-width="4.5" opacity=".4"/>
+      <path d="M${158 + x},106 Q${200 + x},86 ${242 + x},104" stroke="#fff" stroke-width="1.6" opacity=".55"/>
+      <path d="M${186 + x},94 L${190 + x},93" stroke="#fff" stroke-width="3" opacity=".8"/></g>`;
+    const strands = (pts) => `<path d="${pts}" fill="none" stroke="${d}" stroke-width="1.6" opacity=".55" stroke-linecap="round"/>`;
     let back = '', front = '';
     switch (style) {
       case 'male_short':
         back = `<path d="M124,214 C110,120 150,68 200,68 C250,68 290,120 276,214 L268,236 L132,236 Z" ${st}/>`;
         front = `<path d="M126,206 C116,118 155,70 200,70 C245,70 284,118 274,206 L268,160 ${fringe(268, 132, 136, 166, 6, -3)} L132,160 Z" ${st}/>
-          <path d="M128,196 L136,232 L142,200 Z M272,196 L264,232 L258,200 Z" fill="${c}" stroke="${LINE}" stroke-width="2"/>
+          <path d="M128,196 L136,232 L142,200 Z M272,196 L264,232 L258,200 Z" fill="${F}" stroke="${HL}" stroke-width="2"/>
           ${strands('M200,80 Q190,110 186,150 M232,86 Q236,110 232,136 M166,88 Q160,120 158,160')}${shine()}`;
         break;
       case 'male_side':
@@ -59,7 +66,7 @@ const Art = (() => {
       case 'male_slick':
         back = `<path d="M124,212 C110,118 152,68 200,68 C248,68 290,118 276,212 L268,232 L132,232 Z" ${st}/>`;
         front = `<path d="M128,196 C118,116 156,70 200,70 C244,70 282,116 272,196 C268,164 262,144 250,130 C228,118 172,118 150,130 C138,144 132,164 128,196 Z" ${st}/>
-          <path d="M128,196 C126,170 128,150 136,138 L142,186 Z M272,196 C274,170 272,150 264,138 L258,186 Z" fill="#a9a9b3" stroke="${LINE}" stroke-width="2"/>
+          <path d="M128,196 C126,170 128,150 136,138 L142,186 Z M272,196 C274,170 272,150 264,138 L258,186 Z" fill="#a9a9b3" stroke="${HL}" stroke-width="2"/>
           ${strands('M156,124 Q190,96 236,92 M170,122 Q206,104 250,110 M146,140 Q180,100 220,84')}${shine()}`;
         break;
       case 'female_bob':
@@ -76,9 +83,9 @@ const Art = (() => {
       case 'female_pony':
         back = `<path d="M118,206 C104,110 150,62 200,62 C250,62 296,110 282,206 L276,240 L124,240 Z" ${st}/>
           <path d="M262,96 C320,110 330,200 312,290 C304,330 290,360 280,380 C296,320 300,250 286,190 C280,150 270,120 252,104 Z" ${st}/>
-          <circle cx="262" cy="98" r="9" fill="#ff6f91" stroke="${LINE}" stroke-width="2"/>`;
+          <circle cx="262" cy="98" r="9" fill="#ff6f91" stroke="${HL}" stroke-width="2"/>`;
         front = `<path d="M122,212 C110,114 154,66 200,66 C246,66 290,114 278,212 L272,166 ${fringe(272, 130, 138, 166, 6, 4)} L128,200 Z" ${st}/>
-          <path d="M126,200 C120,240 124,270 132,292 L140,250 Z M274,200 C280,240 276,270 268,292 L260,250 Z" fill="${c}" stroke="${LINE}" stroke-width="2"/>
+          <path d="M126,200 C120,240 124,270 132,292 L140,250 Z M274,200 C280,240 276,270 268,292 L260,250 Z" fill="${F}" stroke="${HL}" stroke-width="2"/>
           ${strands('M196,76 Q190,110 196,140 M164,88 Q160,120 162,150')}${shine()}`;
         break;
       case 'female_updo':
@@ -92,7 +99,7 @@ const Art = (() => {
       case 'male_two':
         back = `<path d="M126,214 C112,124 150,70 200,70 C250,70 288,124 274,214 L266,232 L134,232 Z" ${st}/>`;
         front = `<path d="M128,200 C118,120 156,72 200,72 C244,72 282,120 272,200 L270,168 ${fringe(270, 130, 132, 180, 5, -5)} L130,168 Z" ${st}/>
-          <path d="M130,170 L134,214 L142,186 Z M270,170 L266,214 L258,186 Z" fill="${d}" stroke="${LINE}" stroke-width="2"/>
+          <path d="M130,170 L134,214 L142,186 Z M270,170 L266,214 L258,186 Z" fill="${d}" stroke="${HL}" stroke-width="2"/>
           ${strands('M206,82 Q196,120 190,170 M170,90 Q160,124 154,170')}${shine()}`;
         break;
       case 'female_short':
@@ -111,57 +118,57 @@ const Art = (() => {
         back = `<path d="M124,214 C110,122 152,70 202,70 C252,70 290,122 276,214 L270,240 L130,240 Z" ${st}/>`;
         front = `<path d="M126,204 C114,120 156,72 204,72 C252,74 288,120 276,204 C272,182 266,166 256,156 C262,172 256,186 242,186 C230,186 226,174 234,166 C226,158 204,154 184,152 C164,150 146,162 138,182 L132,204 Z" ${st}/>
           <path d="M242,186 C232,184 230,172 238,168" fill="none" stroke="${d}" stroke-width="2.5" stroke-linecap="round"/>
-          <path d="M128,196 L134,236 L142,204 Z M272,196 L266,236 L258,204 Z" fill="${c}" stroke="${LINE}" stroke-width="2"/>
+          <path d="M128,196 L134,236 L142,204 Z M272,196 L266,236 L258,204 Z" fill="${F}" stroke="${HL}" stroke-width="2"/>
           ${strands('M150,112 Q196,124 248,150 M144,140 Q190,138 236,160 M170,90 Q220,96 262,130')}${shine(6)}`;
         break;
       case 'm_part': // 가르마펌: 6:4 가르마 + 볼륨 컬, 이마 살짝 보임
         back = `<path d="M122,214 C108,120 150,66 202,66 C254,66 292,120 278,214 L272,240 L128,240 Z" ${st}/>`;
         front = `<path d="M124,206 C112,118 154,66 202,66 C252,66 290,118 278,206 L272,184 C266,160 250,140 228,128 C212,122 196,120 182,118 C164,128 150,146 142,170 C140,180 138,192 134,206 Z" ${st}/>
-          <path d="M182,118 C168,136 156,158 150,186 C144,170 144,150 152,134 Z" fill="${c}" stroke="${LINE}" stroke-width="2.2" stroke-linejoin="round"/>
+          <path d="M182,118 C168,136 156,158 150,186 C144,170 144,150 152,134 Z" fill="${F}" stroke="${HL}" stroke-width="2.2" stroke-linejoin="round"/>
           <path d="M184,118 C214,124 246,140 266,170" fill="none" stroke="${d}" stroke-width="2.5"/>
           ${strands('M184,80 Q182,100 182,118 M150,104 Q160,124 166,140 M222,88 Q246,104 262,140 M136,150 Q140,170 140,190')}${shine(10)}`;
         break;
       case 'm_dandy': // 댄디컷: 눈썹 위까지 내려오는 단정하고 부드러운 앞머리
         back = `<path d="M124,214 C110,122 152,70 200,70 C248,70 290,122 276,214 L268,238 L132,238 Z" ${st}/>`;
         front = `<path d="M126,206 C116,120 156,72 200,72 C244,72 284,120 274,206 L270,164 ${fringe(270, 130, 150, 168, 8, -2)} L130,164 Z" ${st}/>
-          <path d="M128,190 L134,232 L142,198 Z M272,190 L266,232 L258,198 Z" fill="${c}" stroke="${LINE}" stroke-width="2"/>
+          <path d="M128,190 L134,232 L142,198 Z M272,190 L266,232 L258,198 Z" fill="${F}" stroke="${HL}" stroke-width="2"/>
           ${strands('M200,82 Q196,120 194,156 M168,90 Q162,124 160,158 M232,90 Q236,124 234,158')}${shine()}`;
         break;
       case 'm_leaf': // 리프컷: 가운데서 갈라져 양옆으로 흐르는 앞머리
         back = `<path d="M120,226 C106,122 150,68 200,68 C250,68 294,122 280,226 L274,256 L126,256 Z" ${st}/>`;
         front = `<path d="M124,214 C112,120 154,70 200,70 C246,70 288,120 276,214 C274,196 268,182 256,176 C244,172 234,166 226,156 C216,146 208,140 201,126 C194,140 186,146 176,156 C168,166 156,172 144,176 C132,182 126,196 124,214 Z" ${st}/>
           <path d="M201,128 C196,146 184,158 170,166 M201,128 C206,146 218,158 232,166" fill="none" stroke="${d}" stroke-width="2.2"/>
-          <path d="M124,200 C118,226 124,246 134,258 L140,214 Z M276,200 C282,226 276,246 266,258 L260,214 Z" fill="${c}" stroke="${LINE}" stroke-width="2"/>
+          <path d="M124,200 C118,226 124,246 134,258 L140,214 Z M276,200 C282,226 276,246 266,258 L260,214 Z" fill="${F}" stroke="${HL}" stroke-width="2"/>
           ${strands('M202,80 Q202,110 202,138 M180,86 Q166,120 150,150 M224,86 Q238,120 252,150')}${shine()}`;
         break;
       /* ===== 트렌드 헤어: 여성 ===== */
       case 'f_hush': // 허쉬컷: 어깨선 레이어드 + 얼굴 감싸는 사이드 + 시스루뱅
         back = `<path d="M114,200 C100,108 150,62 200,62 C250,62 300,108 286,200 C292,258 300,298 314,332 C294,322 282,340 262,334 L138,334 C118,340 106,322 86,332 C100,298 108,258 114,200 Z" ${st}/>
           ${strands('M108,280 Q104,306 94,326 M292,280 Q296,306 306,326')}`;
-        front = `${capOpen(st)}${seeThru(c, d)}
-          <path d="M124,186 C112,236 120,276 152,302 C136,272 134,236 140,198 Z" fill="${c}" stroke="${LINE}" stroke-width="2.2" stroke-linejoin="round"/>
-          <path d="M276,186 C288,236 280,276 248,302 C264,272 266,236 260,198 Z" fill="${c}" stroke="${LINE}" stroke-width="2.2" stroke-linejoin="round"/>${shine()}`;
+        front = `${capOpen(st)}${seeThru(F, d)}
+          <path d="M124,186 C112,236 120,276 152,302 C136,272 134,236 140,198 Z" fill="${F}" stroke="${HL}" stroke-width="2.2" stroke-linejoin="round"/>
+          <path d="M276,186 C288,236 280,276 248,302 C264,272 266,236 260,198 Z" fill="${F}" stroke="${HL}" stroke-width="2.2" stroke-linejoin="round"/>${shine()}`;
         break;
       case 'f_ccurl': // C컬 단발(태슬): 턱선에서 안으로 말리는 단발 + 시스루뱅
         back = `<path d="M116,200 C102,108 150,62 200,62 C250,62 298,108 284,200 C292,250 292,284 270,302 C260,308 248,304 246,296 L154,296 C152,304 140,308 130,302 C108,284 108,250 116,200 Z" ${st}/>`;
-        front = `${capOpen(st)}${seeThru(c, d)}
-          <path d="M124,194 C114,246 120,284 152,300 C138,280 134,244 140,204 Z" fill="${c}" stroke="${LINE}" stroke-width="2.2" stroke-linejoin="round"/>
-          <path d="M276,194 C286,246 280,284 248,300 C262,280 266,244 260,204 Z" fill="${c}" stroke="${LINE}" stroke-width="2.2" stroke-linejoin="round"/>
+        front = `${capOpen(st)}${seeThru(F, d)}
+          <path d="M124,194 C114,246 120,284 152,300 C138,280 134,244 140,204 Z" fill="${F}" stroke="${HL}" stroke-width="2.2" stroke-linejoin="round"/>
+          <path d="M276,194 C286,246 280,284 248,300 C262,280 266,244 260,204 Z" fill="${F}" stroke="${HL}" stroke-width="2.2" stroke-linejoin="round"/>
           <path d="M150,298 Q140,292 140,280 M250,298 Q260,292 260,280" fill="none" stroke="${d}" stroke-width="2"/>${shine()}`;
         break;
       case 'f_seewave': // 시스루뱅 긴 웨이브
         back = `<path d="M114,200 C98,106 150,60 200,60 C250,60 302,106 286,200 C304,264 278,302 302,354 C322,404 292,434 316,488 L84,488 C108,434 78,404 98,354 C122,302 96,264 114,200 Z" ${st}/>
           ${strands('M104,330 Q126,380 102,432 M296,330 Q274,380 298,432')}`;
-        front = `${capOpen(st)}${seeThru(c, d)}
-          <path d="M124,190 C112,250 128,300 112,346 C134,320 140,260 140,204 Z" fill="${c}" stroke="${LINE}" stroke-width="2.2" stroke-linejoin="round"/>
-          <path d="M276,190 C288,250 272,300 288,346 C266,320 260,260 260,204 Z" fill="${c}" stroke="${LINE}" stroke-width="2.2" stroke-linejoin="round"/>${shine()}`;
+        front = `${capOpen(st)}${seeThru(F, d)}
+          <path d="M124,190 C112,250 128,300 112,346 C134,320 140,260 140,204 Z" fill="${F}" stroke="${HL}" stroke-width="2.2" stroke-linejoin="round"/>
+          <path d="M276,190 C288,250 272,300 288,346 C266,320 260,260 260,204 Z" fill="${F}" stroke="${HL}" stroke-width="2.2" stroke-linejoin="round"/>${shine()}`;
         break;
       case 'f_layer': // 레이어드 롱: 가르마 + 얼굴선 레이어
         back = `<path d="M114,200 C98,106 150,60 200,60 C250,60 302,106 286,200 C294,300 300,400 312,486 L88,486 C100,400 106,300 114,200 Z" ${st}/>
           ${strands('M110,300 Q102,400 106,470 M290,300 Q298,400 294,470')}`;
         front = `<path d="M122,212 C110,114 154,64 206,64 C252,66 292,114 280,212 C278,180 268,150 246,132 C230,124 214,122 206,120 C190,132 168,140 150,160 C136,176 128,194 122,212 Z" ${st}/>
-          <path d="M206,120 C186,140 160,156 146,190 C140,212 142,240 132,268 C122,236 124,200 136,170 Z" fill="${c}" stroke="${LINE}" stroke-width="2.2" stroke-linejoin="round"/>
-          <path d="M270,170 C284,220 280,262 290,300 C268,276 262,236 262,196 Z" fill="${c}" stroke="${LINE}" stroke-width="2.2" stroke-linejoin="round"/>
+          <path d="M206,120 C186,140 160,156 146,190 C140,212 142,240 132,268 C122,236 124,200 136,170 Z" fill="${F}" stroke="${HL}" stroke-width="2.2" stroke-linejoin="round"/>
+          <path d="M270,170 C284,220 280,262 290,300 C268,276 262,236 262,196 Z" fill="${F}" stroke="${HL}" stroke-width="2.2" stroke-linejoin="round"/>
           <path d="M206,70 L206,120" stroke="${d}" stroke-width="2"/>${shine(8)}`;
         break;
       case 'perm': {
@@ -218,26 +225,33 @@ const Art = (() => {
     const top = sharp ? 'M142,204 Q164,186 192,198' : 'M141,206 Q164,178 193,198';
     const sur = expr === 'surprised';
     const lidY = expr === 'angry' ? 4 : 0;
+    const irx = sur ? rx - 2 : rx, iry = sur ? ry - 2 : ry, icy = sharp ? 207 : 209;
+    const lidC = shade(s.skin || '#ffe3d1', -0.32);
     return `
       <defs>
         <clipPath id="ec${id}"><path d="M142,206 Q164,${sharp ? 186 : 180 + lidY} 192,200 Q190,${sharp ? 222 : 230} 166,${sharp ? 222 : 230} Q146,${sharp ? 222 : 228} 142,206 Z"/></clipPath>
         <linearGradient id="ig${id}" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stop-color="${shade(iris, -0.55)}"/><stop offset=".55" stop-color="${iris}"/><stop offset="1" stop-color="${shade(iris, 0.45)}"/>
+          <stop offset="0" stop-color="${shade(iris, -0.62)}"/><stop offset=".45" stop-color="${shade(iris, -0.1)}"/><stop offset=".8" stop-color="${iris}"/><stop offset="1" stop-color="${shade(iris, 0.5)}"/>
         </linearGradient>
+        <linearGradient id="ew${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ddd5e4"/><stop offset=".45" stop-color="#fbf9fd"/><stop offset="1" stop-color="#ffffff"/></linearGradient>
       </defs>
-      <path d="M142,206 Q164,${sharp ? 186 : 180 + lidY} 192,200 Q190,${sharp ? 222 : 230} 166,${sharp ? 222 : 230} Q146,${sharp ? 222 : 228} 142,206 Z" fill="#fff"/>
+      <path d="M142,206 Q164,${sharp ? 186 : 180 + lidY} 192,200 Q190,${sharp ? 222 : 230} 166,${sharp ? 222 : 230} Q146,${sharp ? 222 : 228} 142,206 Z" fill="url(#ew${id})"/>
       <g clip-path="url(#ec${id})">
-        <ellipse cx="168" cy="${sharp ? 207 : 209}" rx="${sur ? rx - 2 : rx}" ry="${sur ? ry - 2 : ry}" fill="url(#ig${id})" stroke="${shade(iris, -0.6)}" stroke-width="1.5"/>
-        <ellipse cx="168" cy="${sharp ? 208 : 211}" rx="${sur ? 3 : 6}" ry="${sur ? 4 : (sharp ? 7 : 9)}" fill="#1d1416"/>
-        <circle cx="162" cy="${sharp ? 201 : 201}" r="${sharp ? 3.5 : 5}" fill="#fff"/>
-        <circle cx="174" cy="${sharp ? 214 : 218}" r="2.4" fill="#fff" opacity=".9"/>
-        <path d="M142,196 Q166,${186 + lidY} 194,196 L194,190 L142,190 Z" fill="${LINE}" opacity=".18"/>
+        <ellipse cx="168" cy="${icy}" rx="${irx}" ry="${iry}" fill="url(#ig${id})" stroke="${shade(iris, -0.6)}" stroke-width="1.4"/>
+        <ellipse cx="168" cy="${icy}" rx="${irx - 3}" ry="${iry - 3}" fill="none" stroke="${shade(iris, -0.35)}" stroke-width="1" opacity=".55"/>
+        <ellipse cx="168" cy="${icy + iry * 0.5}" rx="${irx * 0.6}" ry="${iry * 0.3}" fill="${shade(iris, 0.7)}" opacity=".5"/>
+        <ellipse cx="168" cy="${icy + 1}" rx="${sur ? 3 : 5.5}" ry="${sur ? 4 : (sharp ? 6.5 : 8.5)}" fill="#1d1416"/>
+        <ellipse cx="161.5" cy="${icy - iry * 0.45}" rx="${sharp ? 3.2 : 4.4}" ry="${sharp ? 4.2 : 5.8}" fill="#fff" transform="rotate(-22 161.5 ${icy - iry * 0.45})"/>
+        <circle cx="174.5" cy="${icy + iry * 0.42}" r="2.2" fill="#fff" opacity=".9"/>
+        <circle cx="171" cy="${icy - iry * 0.2}" r="1.2" fill="#fff" opacity=".85"/>
+        <path d="M142,196 Q166,${186 + lidY} 194,196 L194,188 L142,188 Z" fill="${shade(iris, -0.7)}" opacity=".28"/>
       </g>
       ${shape === 'sleepy' ? `<path d="M136,178 L198,178 L198,${expr === 'surprised' ? 192 : 201} Q166,${expr === 'surprised' ? 186 : 197} 136,${expr === 'surprised' ? 196 : 204} Z" fill="${s.skin || '#ffe3d1'}"/>
         <path d="M141,${expr === 'surprised' ? 197 : 205} Q166,${expr === 'surprised' ? 186 : 196} 194,${expr === 'surprised' ? 193 : 201}" fill="none" stroke="${LINE}" stroke-width="5" stroke-linecap="round"/>` :
-      `<path d="${top}" fill="none" stroke="${LINE}" stroke-width="${sharp ? 4 : 5}" stroke-linecap="round"/>`}
-      <path d="M189,197 L197,192" stroke="${LINE}" stroke-width="3" stroke-linecap="round"/>
-      ${s.lashes ? `<path d="M143,204 L136,198 M147,198 L141,190" stroke="${LINE}" stroke-width="2.5" stroke-linecap="round"/>` : ''}
+      `<path d="${sharp ? 'M194,197 Q166,182 142,203 L135,206 Q133,201 139,198 Q164,176 196,193 Z' : 'M194,198 Q166,174 141,205 L134,207 Q131,202 137,198 Q163,166 196,193 Z'}" fill="${LINE}"/>
+       <path d="${sharp ? 'M146,190 Q166,180 188,187' : 'M146,188 Q166,173 189,184'}" fill="none" stroke="${lidC}" stroke-width="1.4" stroke-linecap="round" opacity=".75"/>`}
+      ${s.lashes ? `<path d="M140,201 L132,196 M144,196 L138,188 M150,192 L147,185" stroke="${LINE}" stroke-width="2" stroke-linecap="round"/>
+        <path d="M146,${sharp ? 221 : 227} L141,${sharp ? 224 : 231}" stroke="${LINE}" stroke-width="1.4" stroke-linecap="round" opacity=".7"/>` : ''}
       <path d="M150,${sharp ? 222 : 229} Q168,${sharp ? 226 : 234} 186,${sharp ? 220 : 226}" fill="none" stroke="${LINE}" stroke-width="1.6" opacity=".55"/>`;
   }
 
@@ -255,19 +269,20 @@ const Art = (() => {
     else if (expr === 'sad' || expr === 'worried') d = 'M146,182 Q166,172 188,170';
     else if (expr === 'surprised') d = 'M146,166 Q166,156 188,164';
     else d = s.brow === 'stern' ? 'M146,176 Q168,174 190,180' : 'M146,178 Q166,168 188,174';
-    return `<path d="${d}" fill="none" stroke="${c}" stroke-width="${w}" stroke-linecap="round"/>`;
+    return `<path d="${d}" fill="none" stroke="${c}" stroke-width="${w}" stroke-linecap="round"/>
+      <path d="${d}" fill="none" stroke="${shade(c, 0.35)}" stroke-width="${Math.max(1, w - 3)}" stroke-linecap="round" opacity=".45" transform="translate(2,-1)"/>`;
   }
 
   function mouth(expr, s) {
     switch (expr) {
-      case 'smile': return `<path d="M184,258 Q200,274 216,258" fill="none" stroke="${LINE}" stroke-width="3" stroke-linecap="round"/>`;
-      case 'happy': return `<path d="M181,255 Q200,286 219,255 Z" fill="#a3343f" stroke="${LINE}" stroke-width="2.5" stroke-linejoin="round"/><path d="M190,268 Q200,262 210,268 Q206,278 200,279 Q194,278 190,268 Z" fill="#ff8a8a"/>`;
-      case 'angry': return `<path d="M186,270 Q200,258 214,270" fill="none" stroke="${LINE}" stroke-width="3" stroke-linecap="round"/>`;
-      case 'shout': return `<ellipse cx="200" cy="268" rx="14" ry="12" fill="#7a2230" stroke="${LINE}" stroke-width="2.5"/><path d="M190,274 Q200,268 210,274 Q204,280 196,280 Z" fill="#ff8a8a"/>`;
-      case 'surprised': return `<ellipse cx="200" cy="268" rx="7" ry="9" fill="#7a2230" stroke="${LINE}" stroke-width="2.5"/>`;
-      case 'sad': case 'worried': return `<path d="M188,270 Q200,262 212,270" fill="none" stroke="${LINE}" stroke-width="3" stroke-linecap="round"/>`;
-      case 'smirk': return `<path d="M186,264 Q204,270 216,258" fill="none" stroke="${LINE}" stroke-width="3" stroke-linecap="round"/>`;
-      default: return `<path d="M189,264 Q200,269 211,264" fill="none" stroke="${LINE}" stroke-width="3" stroke-linecap="round"/>`;
+      case 'smile': return `<path d="M184,258 Q200,274 216,258" fill="none" stroke="#6e3238" stroke-width="3" stroke-linecap="round"/>`;
+      case 'happy': return `<path d="M181,255 Q200,286 219,255 Z" fill="#a3343f" stroke="#6e3238" stroke-width="2.5" stroke-linejoin="round"/><path d="M190,268 Q200,262 210,268 Q206,278 200,279 Q194,278 190,268 Z" fill="#ff8a8a"/>`;
+      case 'angry': return `<path d="M186,270 Q200,258 214,270" fill="none" stroke="#6e3238" stroke-width="3" stroke-linecap="round"/>`;
+      case 'shout': return `<ellipse cx="200" cy="268" rx="14" ry="12" fill="#7a2230" stroke="#6e3238" stroke-width="2.5"/><path d="M190,274 Q200,268 210,274 Q204,280 196,280 Z" fill="#ff8a8a"/>`;
+      case 'surprised': return `<ellipse cx="200" cy="268" rx="7" ry="9" fill="#7a2230" stroke="#6e3238" stroke-width="2.5"/>`;
+      case 'sad': case 'worried': return `<path d="M188,270 Q200,262 212,270" fill="none" stroke="#6e3238" stroke-width="3" stroke-linecap="round"/>`;
+      case 'smirk': return `<path d="M186,264 Q204,270 216,258" fill="none" stroke="#6e3238" stroke-width="3" stroke-linecap="round"/>`;
+      default: return `<path d="M189,264 Q200,269 211,264" fill="none" stroke="#6e3238" stroke-width="2.8" stroke-linecap="round"/><path d="M195,271 Q200,273 205,271" fill="none" stroke="#c98080" stroke-width="1.6" stroke-linecap="round" opacity=".6"/>`;
     }
   }
 
@@ -285,7 +300,7 @@ const Art = (() => {
     switch (o.type) {
       case 'suit': {
         const v = s.gender === 'f' ? 'M172,362 L200,446 L228,362 Z' : 'M170,362 L200,450 L230,362 Z';
-        g = `<path d="${torso}" fill="${m}" ${st}/>
+        g = `<path d="${torso}" fill="url(#cl${id})" ${st}/>
           <path d="${v}" fill="${shirt}" ${st}/>
           ${s.gender === 'f' ? (o.ribbon ? ribbon(o.ribbon) : `<path d="M180,370 Q200,400 220,370" fill="none" stroke="${o.necklace || '#e9d8a6'}" stroke-width="3"/>`) : collar + tie(o.tie || '#9b2335')}
           <path d="M168,362 L140,392 L162,420 L150,436 L188,508 L200,450 Z" fill="${md}" ${st}/>
@@ -311,20 +326,20 @@ const Art = (() => {
         break;
       case 'cardigan':
         g = `<path d="${torso}" fill="${o.inner || '#fff7ea'}" ${st}/>
-          <path d="M168,362 C130,374 50,410 46,600 L178,600 L186,420 Z" fill="${m}" ${st}/>
-          <path d="M232,362 C270,374 350,410 354,600 L222,600 L214,420 Z" fill="${m}" ${st}/>
+          <path d="M168,362 C130,374 50,410 46,600 L178,600 L186,420 Z" fill="url(#cl${id})" ${st}/>
+          <path d="M232,362 C270,374 350,410 354,600 L222,600 L214,420 Z" fill="url(#cl${id})" ${st}/>
           <circle cx="182" cy="470" r="4.5" fill="${md}"/><circle cx="182" cy="520" r="4.5" fill="${md}"/><circle cx="181" cy="570" r="4.5" fill="${md}"/>
           <path d="M80,520 L100,520 M76,540 L98,540 M300,520 L320,520 M302,540 L324,540" stroke="${md}" stroke-width="2" opacity=".6"/>
           ${o.necklace ? `<path d="M174,372 Q200,410 226,372" fill="none" stroke="${o.necklace}" stroke-width="5" stroke-dasharray="1 7" stroke-linecap="round"/>` : ''}`;
         break;
       case 'vest':
         g = `<path d="${torso}" fill="${shirt}" ${st}/>${collar}${o.tie ? tie(o.tie) : ''}
-          <path d="M160,368 C130,390 110,440 104,600 L296,600 C290,440 270,390 240,368 L214,440 L200,520 L186,440 Z" fill="${m}" ${st}/>
+          <path d="M160,368 C130,390 110,440 104,600 L296,600 C290,440 270,390 240,368 L214,440 L200,520 L186,440 Z" fill="url(#cl${id})" ${st}/>
           <path d="M200,520 L200,600" stroke="${md}" stroke-width="2"/>
           <path d="M120,560 L180,560 M220,560 L280,560" stroke="${md}" stroke-width="2" opacity=".5"/>`;
         break;
       case 'jumper':
-        g = `<path d="${torso}" fill="${m}" ${st}/>
+        g = `<path d="${torso}" fill="url(#cl${id})" ${st}/>
           <path d="M164,352 L176,392 L200,382 L224,392 L236,352 Q200,366 164,352 Z" fill="${md}" ${st}/>
           <path d="M200,382 L200,600" stroke="#c0c4cc" stroke-width="3"/>
           <rect x="196" y="420" width="8" height="14" rx="2" fill="#c0c4cc"/>
@@ -332,19 +347,23 @@ const Art = (() => {
           <rect x="226" y="490" width="56" height="8" rx="3" fill="${md}"/>`;
         break;
       case 'hoodie':
-        g = `<path d="${torso}" fill="${m}" ${st}/>
+        g = `<path d="${torso}" fill="url(#cl${id})" ${st}/>
           <path d="M146,370 Q200,420 254,370 Q240,350 200,350 Q160,350 146,370 Z" fill="${md}" ${st}/>
           <path d="M186,396 L184,460 M214,396 L216,460" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
           <path d="M150,530 L250,530 L240,590 L160,590 Z" fill="none" stroke="${md}" stroke-width="2.5"/>`;
         break;
       case 'hanbok_vest':
         g = `<path d="${torso}" fill="${o.inner || '#f3e9dc'}" ${st}/>
-          <path d="M168,362 C130,374 50,410 46,600 L190,600 L196,430 Z" fill="${m}" ${st}/>
-          <path d="M232,362 C270,374 350,410 354,600 L210,600 L204,430 Z" fill="${m}" ${st}/>
+          <path d="M168,362 C130,374 50,410 46,600 L190,600 L196,430 Z" fill="url(#cl${id})" ${st}/>
+          <path d="M232,362 C270,374 350,410 354,600 L210,600 L204,430 Z" fill="url(#cl${id})" ${st}/>
           <path d="M160,372 L200,440 L240,372" fill="none" stroke="#fff" stroke-width="5" opacity=".9"/>
           <circle cx="194" cy="470" r="6" fill="#c9a227" ${st}/>`;
         break;
     }
+    // 공통 음영: 어깨 하이라이트 · 겨드랑이 그림자 · 칼라 아래 그림자
+    g += `<path d="M66,452 Q84,402 140,380" fill="none" stroke="#fff" stroke-width="9" stroke-linecap="round" opacity=".13"/>
+      <path d="M96,600 Q92,520 104,470 M304,600 Q308,520 296,470" fill="none" stroke="#000" stroke-width="10" opacity=".07"/>
+      <path d="M176,366 Q200,382 224,366" fill="none" stroke="#000" stroke-width="6" opacity=".08"/>`;
     // 액세서리
     const acc = o.acc || [];
     if (acc.includes('lanyard')) g += `<path d="M176,364 L222,470 M224,364 L226,470" stroke="#2f6fd6" stroke-width="5"/>
@@ -382,8 +401,14 @@ const Art = (() => {
     const aura = s.aura ? `<defs><radialGradient id="au${id}"><stop offset="0" stop-color="#ffe9a8" stop-opacity=".9"/><stop offset="1" stop-color="#ffd24a" stop-opacity="0"/></radialGradient></defs>
       <circle cx="200" cy="300" r="230" fill="url(#au${id})"/>
       ${[[70, 120], [330, 160], [90, 380], [320, 420], [200, 40], [40, 260], [360, 300]].map(([x, y], i) => `<path class="spark" style="animation-delay:${i * 0.3}s" d="M${x},${y - 12} L${x + 3},${y - 3} L${x + 12},${y} L${x + 3},${y + 3} L${x},${y + 12} L${x - 3},${y + 3} L${x - 12},${y} L${x - 3},${y - 3} Z" fill="#fff6c8"/>`).join('')}` : '';
-    const blush = s.blush || expr === 'happy' ? `<ellipse cx="150" cy="242" rx="15" ry="6.5" fill="#ff7f99" opacity=".38"/><ellipse cx="250" cy="242" rx="15" ry="6.5" fill="#ff7f99" opacity=".38"/>
-       <path d="M142,240 L148,236 M150,242 L156,238 M244,240 L250,236 M252,242 L258,238" stroke="#e8577a" stroke-width="1.5" opacity=".5"/>` : '';
+    const blush = s.blush || expr === 'happy' ? `<ellipse cx="150" cy="243" rx="19" ry="9" fill="url(#bl${id})"/><ellipse cx="250" cy="243" rx="19" ry="9" fill="url(#bl${id})"/>
+       <path d="M143,241 L148,237 M151,243 L156,239 M244,241 L249,237 M252,243 L257,239" stroke="#e8577a" stroke-width="1.3" stroke-linecap="round" opacity=".45"/>` : '';
+    const skinD = shade(skin, -0.22), fc = FACE[s.face] || FACE.oval;
+    // 앞머리가 이마에 드리우는 그림자 (앞머리 모양을 아래로 밀어 얼굴 안에만 칠함)
+    const hairShadow = `<style>.hs${id} [fill="none"]{display:none}.hs${id} *{fill:${skinD}!important;stroke:none!important;opacity:1!important}</style>
+      <g clip-path="url(#fc${id})" opacity=".32"><g class="hs${id}" filter="url(#bf${id})" transform="translate(2,9)">${h.front}</g></g>`;
+    const faceShade = `<g clip-path="url(#fc${id})"><ellipse cx="292" cy="226" rx="58" ry="116" fill="${skinD}" opacity=".22"/>
+      <path d="M150,262 Q200,318 250,262 L250,320 L150,320 Z" fill="${skinD}" opacity=".18"/><ellipse cx="172" cy="150" rx="40" ry="18" fill="#fff" opacity=".12"/></g>`;
     const ageLines = (s.age || 20) >= 40 && !s.wrinkles ? `<path d="M179,248 Q175,258 180,268 M221,248 Q225,258 220,268${s.age >= 50 ? ' M140,214 Q135,218 133,223 M260,214 Q265,218 267,223 M172,146 Q200,140 228,146' : ''}" fill="none" stroke="${skinS}" stroke-width="2" stroke-linecap="round" opacity=".7"/>` : '';
     const greyStreak = (s.age || 20) >= 50 ? `<path d="M158,96 Q186,118 182,158 M228,92 Q238,118 234,150 M140,130 Q150,150 146,176" fill="none" stroke="#d9d9e2" stroke-width="5" stroke-linecap="round" opacity=".85"/>` : '';
     const wrinkles = s.wrinkles ? `<path d="M140,214 Q134,218 132,224 M260,214 Q266,218 268,224 M178,246 Q172,258 178,272 M222,246 Q228,258 222,272 M168,140 Q200,132 232,140 M174,150 Q200,144 226,150" fill="none" stroke="${skinS}" stroke-width="2.2" stroke-linecap="round"/>` : '';
@@ -403,22 +428,31 @@ const Art = (() => {
 
     return `<svg class="portrait" viewBox="${vb}" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMax meet">
       <defs>
-        <linearGradient id="sk${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${skin}"/><stop offset="1" stop-color="${shade(skin, -0.04)}"/></linearGradient>
+        <linearGradient id="sk${id}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${shade(skin, 0.06)}"/><stop offset=".6" stop-color="${skin}"/><stop offset="1" stop-color="${shade(skin, -0.05)}"/></linearGradient>
+        <linearGradient id="hg${id}" gradientUnits="userSpaceOnUse" x1="0" y1="60" x2="0" y2="420"><stop offset="0" stop-color="${shade(s.hair.color, 0.14)}"/><stop offset=".35" stop-color="${s.hair.color}"/><stop offset="1" stop-color="${shade(s.hair.color, -0.3)}"/></linearGradient>
+        <linearGradient id="cl${id}" x1="0" y1="0" x2="1" y2=".4"><stop offset="0" stop-color="${shade((s.outfit && s.outfit.main) || '#2b3a67', 0.16)}"/><stop offset=".55" stop-color="${(s.outfit && s.outfit.main) || '#2b3a67'}"/><stop offset="1" stop-color="${shade((s.outfit && s.outfit.main) || '#2b3a67', -0.22)}"/></linearGradient>
+        <radialGradient id="bl${id}"><stop offset="0" stop-color="#ff7f99" stop-opacity=".55"/><stop offset="1" stop-color="#ff7f99" stop-opacity="0"/></radialGradient>
+        <clipPath id="fc${id}"><path d="${fc}"/></clipPath>
+        <filter id="bf${id}" x="-10%" y="-10%" width="120%" height="130%"><feGaussianBlur stdDeviation="2.6"/></filter>
       </defs>
       ${aura}
       <g transform="translate(200,238) scale(1.14) translate(-200,-200)">${h.back}</g>
       <path d="M184,290 L184,352 Q200,362 216,352 L216,290 Z" fill="${skinS}" stroke="${LINE}" stroke-width="2.5"/>
+      <path d="M184,322 Q200,354 216,322 L216,346 Q200,366 184,346 Z" fill="${skinD}" opacity=".5"/>
       ${outfit(s.outfit, s, id)}
       <g transform="translate(200,238) scale(1.14) translate(-200,-200)">
       <ellipse cx="131" cy="208" rx="11" ry="17" fill="${skin}" stroke="${LINE}" stroke-width="2.5"/>
       <ellipse cx="269" cy="208" rx="11" ry="17" fill="${skin}" stroke="${LINE}" stroke-width="2.5"/>
+      <path d="M134,198 Q127,207 133,218 M266,198 Q273,207 267,218" fill="none" stroke="${skinD}" stroke-width="2" stroke-linecap="round" opacity=".8"/>
       ${earrings}
-      <path d="${FACE[s.face] || FACE.oval}" fill="url(#sk${id})" stroke="${LINE}" stroke-width="2.5"/>
-      <path d="M150,150 Q200,170 250,150 L250,140 L150,140 Z" fill="${skinS}" opacity=".0"/>
+      <path d="${fc}" fill="url(#sk${id})" stroke="${LINE}" stroke-width="2.5"/>
+      ${faceShade}${hairShadow}
       ${blush}${wrinkles}${ageLines}
       ${eyes(s, expr, id)}
       ${brows(s, expr)}${mirror(brows(s, expr))}
-      <path d="M200,232 Q205,240 199,244" fill="none" stroke="${skinS}" stroke-width="2.5" stroke-linecap="round"/>
+      <path d="M201,229 Q206,239 200,244 Q197,245 195,243" fill="none" stroke="${skinD}" stroke-width="2" stroke-linecap="round"/>
+      <circle cx="197.5" cy="235" r="1.6" fill="#fff" opacity=".7"/>
+      ${s.gender === 'f' && !s.wrinkles ? `<ellipse cx="200" cy="271" rx="7" ry="2.6" fill="#f08a96" opacity=".35"/>` : ''}
       ${mouth(expr, s)}${beard}
       ${h.front}${greyStreak}
       ${glasses}${sweat}
