@@ -705,44 +705,28 @@
 
   /* ---------------- 내 캐릭터 말풍선 (홈에서 터치) ---------------- */
   let talkLast = -1, talkTaps = [], talkTimer = null;
+  // 멘트는 구글 시트 '멘트' 탭에서 불러온다 (실패하면 마지막 저장본 → 기본값)
+  let TALK = null;
+  function loadTalk() {
+    try { TALK = JSON.parse(localStorage.getItem('bmq_talk')) || null; } catch (e) { }
+    Api.talk().then((items) => { if (items && items.length) { TALK = items; try { localStorage.setItem('bmq_talk', JSON.stringify(items)); } catch (e) { } } }).catch(() => { });
+  }
+  const TALK_TYPE = { '말': 'say', '생각': 'think' };
+  const TALK_EXPR = { '기본': 'normal', '미소': 'smile', '활짝': 'happy', '씩': 'smirk', '놀람': 'surprised', '걱정': 'worried', '화남': 'angry' };
   function talkLines() {
     const h = new Date().getHours(), open = CAT_ORDER.filter((c) => catCount(c) > 0);
-    const done = open.filter((c) => S.daily.done[c]).length, nWrong = Object.keys(S.wrong).length;
-    const L = [
-      ['think', 'normal', '(점심은 제육? 돈까스? …이것도 기회비용이지.)'],
-      ['say', 'smile', '공시이율은 내려가도 제 열정은 최저보증이에요!'],
-      ['think', 'worried', '(지점장님 눈빛이 오늘따라 매섭던데…)'],
-      ['say', 'smirk', '복리의 마법, 제 실력에도 적용 중입니다.'],
-      ['think', 'surprised', '(헉, 청약서 자필서명 빠뜨린 거 아니지?)'],
-      ['say', 'happy', '커피 한 잔이면 방카 규정 다 외울 수 있어요!'],
-      ['think', 'normal', '(오늘은 은행 직원분들께 뭘 알려드리지…)'],
-      ['say', 'smile', '고객님의 노후, 제가 함께 설계해 드릴게요.'],
-      ['say', 'normal', '불완전판매 제로. 그게 진짜 실적이죠.'],
-      ['think', 'smile', '(인턴 때 생각하면… 많이 컸다, 나.)'],
-      ['think', 'worried', '(환율이 또 움직였네… 달러보험 문의 오겠다.)'],
-      ['say', 'smirk', '황금 문제? 저한텐 그냥 문제예요.'],
-      ['think', 'normal', '(금리가 오르면 공시이율도… 따라오겠지? 시차가 있으니까.)'],
-      ['say', 'happy', '오늘도 계약 성사! …하고 싶다.'],
-      ['think', 'worried', '(25%룰… 아니 그건 은행이 걱정할 일인가?)'],
-      ['say', 'normal', '설명은 쉽게, 근거는 정확하게. 오늘의 다짐!'],
-      ['think', 'smile', '(김프로님 상품 설명은 언제 들어도 명강의야.)'],
-      ['think', 'surprised', '(황프로님한테 서류 반송 연락 오면 어떡하지…)'],
-      ['say', 'smile', '정 파트장님 안경 바꾸셨나? 오늘따라 더 날카로우셔.'],
-      ['think', 'normal', '(명함이 줄어드는 속도 = 내 성장 속도.)']
-    ];
-    if (S.money < 500) L.push(['think', 'worried', '(활동비가… 텅장이다.)']);
-    if (S.money >= 20000) L.push(['say', 'happy', '활동비 부자! 매점 털러 가볼까?']);
-    if (open.length && done === open.length) L.push(['say', 'happy', '오늘 일정 끝! 학습회에서 조금만 더 해볼까?']);
-    if (!done) L.push(['say', 'normal', '자, 오늘 첫 일정부터 시작해볼까?']);
-    if (S.streak.count >= 3) L.push(['say', 'smile', `${S.streak.count}일 연속 출근! 개근상 노려본다.`]);
-    if (S.lv >= 30) L.push(['say', 'smirk', '사업부장실 의자… 생각보다 푹신하네.']);
-    if (S.lv >= 50) L.push(['say', 'happy', '사장님이라 불러주세요. …농담이에요.']);
-    if (h < 10) L.push(['think', 'normal', '(모닝커피 수혈 완료. 이제 일할 수 있다.)']);
-    if (h >= 21) L.push(['think', 'worried', '(야근… 그래도 공부는 해야지.)']);
-    if (nWrong >= 20) L.push(['think', 'worried', '(오답노트가 점점 두꺼워진다…)']);
-    const b = bossTier();
-    if (b.stars >= 4 && !S.dailyBoss.done) L.push(['think', 'surprised', `(오늘… ${b.title}님이 오신다고?! 심장 떨려.)`]);
-    return L;
+    const done = open.filter((c) => S.daily.done[c]).length, b = bossTier();
+    const ok = {
+      '항상': true, '아침(10시 전)': h < 10, '야근(21시 이후)': h >= 21, '일정 시작 전': !done,
+      '일정 모두 완료': open.length > 0 && done === open.length, '활동비 500원 미만': S.money < 500, '활동비 2만원 이상': S.money >= 20000,
+      '3일 이상 연속 출근': S.streak.count >= 3, '오답 20개 이상': Object.keys(S.wrong).length >= 20,
+      '사업부장 이상': S.lv >= 30, '사장': S.lv >= 50, '희귀 보스 등장': b.stars >= 4 && !S.dailyBoss.done
+    };
+    const fill = (t) => t.replace(/\{이름\}/g, S.name).replace(/\{직급\}/g, rankOf(S.lv).title).replace(/\{레벨\}/g, S.lv)
+      .replace(/\{연속\}/g, S.streak.count).replace(/\{보스\}/g, b.title);
+    const L = (TALK && TALK.length ? TALK : TALK_DEFAULT).filter((r) => (r.cond in ok ? ok[r.cond] : true))
+      .map((r) => [TALK_TYPE[r.type] || 'say', TALK_EXPR[r.expr] || 'normal', fill(String(r.text))]);
+    return L.length ? L : [['say', 'smile', '오늘도 힘내 봅시다!']];
   }
   function charTalk() {
     const now = Date.now();
@@ -1444,6 +1428,7 @@
     els.hud.classList.add('hidden'); els.nav.classList.add('hidden');
     busy('문제를 불러오는 중…');
     try { await Api.questions(); } catch (e) { toast(e.message, 3500); }
+    loadTalk();
     const local = Store.load(u.email);
     let remote = null;
     try { const d = await Api.loadProgress(); if (d) remote = Object.assign(Store.fresh(u.email), JSON.parse(d)); } catch (e) { }

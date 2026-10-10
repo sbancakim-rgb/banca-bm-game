@@ -55,6 +55,7 @@ const Api = (() => {
     logout() { token = null; user = null; ls.del(TK); ls.del(UK); ls.del(QC); },
     questions, cachedQuestions: () => qmem || [],
     library: () => call('library').then((r) => r.items),
+    talk: () => call('talk').then((r) => r.items),
     loadProgress: () => call('loadProgress').then((r) => r.data),
     saveProgress: (data, level, totalXp, meta) => call('saveProgress', { data, level, totalXp, meta }),
     ranking: (keys) => call('ranking', keys),
@@ -128,6 +129,7 @@ const Demo = (() => {
     switch (action) {
       case 'me': return ok({ user: me });
       case 'library': return ok({ items: d.lib.filter((x) => x.status !== '중지') });
+      case 'talk': return ok({ items: TALK_DEFAULT });
       case 'loadProgress': return ok({ data: d.progress[email] || null });
       case 'saveProgress': d.progress[email] = b.data; store(d); return ok();
       case 'report': { const no = 'R' + Date.now().toString().slice(-8); d.reports.unshift({ no, at: new Date().toISOString(), email, qid: b.qid, cat: b.cat, snapshot: b.snapshot, kind: b.kind, reason: b.reason, status: '접수' }); store(d); return ok({ no }); }
