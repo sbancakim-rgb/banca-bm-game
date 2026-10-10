@@ -9,7 +9,7 @@
     const src = spec && spec.key && Sprites.char(spec.key, expr);
     if (!src) return Art.portrait(spec, expr, opts);
     const cls = opts.head ? 'sprite head' : opts.bust ? 'sprite bust' : 'sprite';
-    return `<img class="${cls}${spec.aura ? ' aura' : ''}" src="${src}" alt="" draggable="false">`;
+    return `<img class="${cls}${spec.aura ? ' aura' : ''}${spec.key.startsWith('illust:') ? ' illust' : ''}" src="${src}" alt="" draggable="false">`;
   }
   function bgHTML(name) {
     const src = Sprites.bg(name);

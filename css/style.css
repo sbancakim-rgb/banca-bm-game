@@ -398,3 +398,6 @@ input[type=email], input[type=password] { font: inherit; width: 100%; padding: 1
 .illusts button.on { box-shadow: inset 0 0 0 3px var(--pink); background: #fff3f7; }
 .illusts button div { height: 92px; border-radius: 10px; overflow: hidden; background: linear-gradient(#dcebfa, #f7f9fc); margin-bottom: 4px; }
 .illusts img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 8%; }
+/* 일러스트 주인공: 작은 얼굴 동그라미·상반신 썸네일 위치 */
+img.sprite.head.illust { width: 250%; left: -75%; top: -54%; }
+img.sprite.bust.illust { width: 135%; left: -17%; top: -3%; }

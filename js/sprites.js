@@ -1,14 +1,14 @@
 /* =========================================================
    Sprites — 일러스트 이미지 자동 연결
    · NPC / 직급별 주인공:  img/chars/{키}_{표정}.png
-   · 일러스트 주인공 선택: img/player/{m1~m8 | f1~f8}_{표정}.png
+   · 일러스트 주인공 선택: img/player/{m1 | f1 …}_{표정}.webp  (목록: img/player/index.json)
    · 배경:                 img/bg/{배경}.jpg|png
    파일이 없으면 SVG(코드 그림)로 대체한다.
    ========================================================= */
 const Sprites = (() => {
   const EXPRS = ['normal', 'smile', 'angry', 'worried'];
   const MAP = { happy: 'smile', smirk: 'smile', shout: 'angry', sad: 'worried', surprised: 'worried' };
-  const have = {}, base = {}, bgs = {}, presets = { m: [], f: [] };
+  const have = {}, base = {}, ext = {}, bgs = {}, presets = { m: [], f: [] };
   const probe = (src) => new Promise((r) => { const i = new Image(); i.onload = () => r(true); i.onerror = () => r(false); i.src = src; });
 
   async function register(key, path) {
@@ -20,9 +20,15 @@ const Sprites = (() => {
   async function init(keys, bgNames) {
     await Promise.all([
       ...keys.map((k) => register(k, `img/chars/${k}`)),
-      ...['m', 'f'].flatMap((g) => Array.from({ length: 8 }, (_, i) => `${g}${i + 1}`).map(async (id) => {
-        if (await register('illust:' + id, `img/player/${id}`)) presets[g].push(id);
-      })),
+      // 일러스트 주인공: 목록 파일(img/player/index.json)만 읽고, 그림은 화면에 나올 때 내려받는다
+      fetch('img/player/index.json', { cache: 'no-cache' }).then((r) => (r.ok ? r.json() : null)).then((man) => {
+        if (!man) return;
+        ['m', 'f'].forEach((g) => (man[g] || []).forEach((c) => {
+          const key = 'illust:' + c.id;
+          have[key] = new Set(c.exprs); base[key] = `img/player/${c.id}`; ext[key] = '.webp';
+          presets[g].push(c.id);
+        }));
+      }).catch(() => { }),
       ...bgNames.map(async (b) => {
         if (await probe(`img/bg/${b}.jpg`)) bgs[b] = `img/bg/${b}.jpg`;
         else if (await probe(`img/bg/${b}.png`)) bgs[b] = `img/bg/${b}.png`;
@@ -33,7 +39,7 @@ const Sprites = (() => {
   function char(key, expr) {
     const s = have[key]; if (!s) return null;
     const e = s.has(expr) ? expr : s.has(MAP[expr]) ? MAP[expr] : 'normal';
-    return `${base[key]}_${e}.png`;
+    return `${base[key]}_${e}${ext[key] || '.png'}`;
   }
   return {
     init, char, bg: (n) => bgs[n] || null, has: (k) => !!have[k],
