@@ -402,3 +402,8 @@ input[type=email], input[type=password] { font: inherit; width: 100%; padding: 1
 img.sprite.head.illust { width: 250%; left: -75%; top: -54%; }
 img.sprite.bust.illust { width: 135%; left: -17%; top: -3%; }
 .box.facebox { margin-top: 12px; background: linear-gradient(135deg, #fff3c4, #ffe0ea); font-size: 14.5px; line-height: 1.5; }
+/* 말풍선: 얼굴을 가리지 않게 오른쪽 아래(어깨 옆, 일정 패널 바로 위)로 — 꼬리는 위쪽 얼굴을 향함 */
+.talk { top: auto; bottom: calc(54% + 14px); right: 3%; max-width: 46%; }
+.talk.say::after { top: -12px; bottom: auto; left: 16%; border: 9px solid transparent; border-bottom-color: var(--ink); border-top: 0; }
+.talk.think::before { top: -18px; bottom: auto; left: 10%; }
+.talk.think::after { top: -30px; bottom: auto; left: 4%; }
