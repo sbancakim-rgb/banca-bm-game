@@ -1167,11 +1167,11 @@
     $('#sync').onclick = async () => { await syncNow(); toast('저장했어요'); };
     $('#pw').onclick = () => {
       const m = modal(`<h2 style="font-size:22px">🔑 비밀번호 변경</h2><input type="password" id="o" placeholder="현재 비밀번호" autocomplete="current-password">
-        <input type="password" id="n1" placeholder="새 비밀번호 (6자 이상)" style="margin-top:8px" autocomplete="new-password"><input type="password" id="n2" placeholder="새 비밀번호 확인" style="margin-top:8px" autocomplete="new-password">
+        <input type="password" id="n1" placeholder="새 비밀번호 (5자 이상)" style="margin-top:8px" autocomplete="new-password"><input type="password" id="n2" placeholder="새 비밀번호 확인" style="margin-top:8px" autocomplete="new-password">
         <div class="row" style="margin-top:10px"><button class="btn ghost full" data-close>취소</button><button class="btn full" id="pg">변경</button></div>`);
       $('#pg').onclick = async () => {
         if ($('#n1').value !== $('#n2').value) return toast('새 비밀번호가 서로 달라요');
-        if ($('#n1').value.length < 6) return toast('새 비밀번호는 6자 이상');
+        if ($('#n1').value.length < 5) return toast('새 비밀번호는 5자 이상');
         try { await Api.changePassword($('#o').value, $('#n1').value); m.close(); toast('비밀번호를 바꿨어요'); } catch (e) { toast(e.message); }
       };
     };
@@ -1206,7 +1206,7 @@
     const me = (Api.user || {}).email;
     body.innerHTML = `<div class="box"><h4>➕ 회원 등록 (등록된 이메일만 로그인 가능)</h4>
         <input type="text" id="ue" placeholder="이메일" inputmode="email" autocomplete="off"><input type="text" id="un" placeholder="이름" style="margin-top:8px">
-        <input type="text" id="up" placeholder="초기 비밀번호 (6자 이상)" style="margin-top:8px" autocomplete="off">
+        <input type="text" id="up" placeholder="초기 비밀번호 (5자 이상)" style="margin-top:8px" autocomplete="off">
         <button class="btn full" id="uadd" style="margin-top:8px">등록</button>
         <p class="muted">등록한 이메일과 비밀번호를 해당 직원에게 전달해 주세요. 직원은 설정에서 비밀번호를 바꿀 수 있어요.</p></div>
       <h4 class="sec">회원 ${users.length}명</h4>
@@ -1219,13 +1219,13 @@
     $('#uadd').onclick = async () => {
       const email = $('#ue').value.trim(), name = $('#un').value.trim(), password = $('#up').value;
       if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return toast('이메일 형식을 확인해 주세요');
-      if (password.length < 6) return toast('비밀번호는 6자 이상');
+      if (password.length < 5) return toast('비밀번호는 5자 이상');
       try { await Api.admin.saveUser({ email, name, password, active: true }); toast('등록했어요'); pageAdmin(); } catch (e) { toast(e.message); }
     };
     body.querySelectorAll('[data-pw]').forEach((b) => b.onclick = () => {
-      const m = modal(`<h2 style="font-size:20px">비밀번호 재설정</h2><div class="muted">${esc(b.dataset.pw)}</div><input type="text" id="np" placeholder="새 비밀번호 (6자 이상)" style="margin-top:8px" autocomplete="off">
+      const m = modal(`<h2 style="font-size:20px">비밀번호 재설정</h2><div class="muted">${esc(b.dataset.pw)}</div><input type="text" id="np" placeholder="새 비밀번호 (5자 이상)" style="margin-top:8px" autocomplete="off">
         <div class="row" style="margin-top:10px"><button class="btn ghost full" data-close>취소</button><button class="btn full" id="npg">변경</button></div>`);
-      $('#npg').onclick = async () => { const p = $('#np').value; if (p.length < 6) return toast('6자 이상'); try { await Api.admin.saveUser({ email: b.dataset.pw, password: p }); m.close(); toast('변경했어요'); } catch (e) { toast(e.message); } };
+      $('#npg').onclick = async () => { const p = $('#np').value; if (p.length < 5) return toast('5자 이상'); try { await Api.admin.saveUser({ email: b.dataset.pw, password: p }); m.close(); toast('변경했어요'); } catch (e) { toast(e.message); } };
     });
     body.querySelectorAll('[data-act]').forEach((b) => b.onclick = async () => { await Api.admin.saveUser({ email: b.dataset.act, active: b.dataset.on !== '1' }); pageAdmin(); });
     body.querySelectorAll('[data-rm]').forEach((b) => b.onclick = async () => { if (await confirmBox(`${b.dataset.rm} 회원을 삭제할까요?\n(진행 기록은 '진행' 시트에 남아요)`, '삭제')) { await Api.admin.deleteUser(b.dataset.rm); pageAdmin(); } });
