@@ -383,3 +383,10 @@ input[type=email], input[type=password] { font: inherit; width: 100%; padding: 1
 .talk.say::after { left: 18%; transform: none; }
 .talk.think::before { left: 10%; bottom: -18px; } .talk.think::after { left: 4%; bottom: -30px; }
 @keyframes talkpop2 { from { opacity: 0; transform: translateY(10px) scale(.7); } to { opacity: 1; transform: none; } }
+
+/* v4 — 우편함 · 응원 · 송금 */
+.mail { background: #fbf6f9; border-radius: 12px; padding: 10px 12px; margin: 8px 0; font-size: 14px; line-height: 1.5; }
+.mail small { display: block; color: var(--pink); font-weight: 800; margin-top: 2px; }
+.lb { display: block; font-size: 12.5px; font-weight: 800; margin: 10px 0 4px; }
+.rankrow .acts { display: flex; gap: 6px; flex: none; }
+.rankrow .acts .btn { padding: 6px 10px; }

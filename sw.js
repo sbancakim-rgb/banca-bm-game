@@ -1,7 +1,7 @@
 /* Service worker — required for Chrome's install prompt.
    Bump CACHE whenever you ship changed files, or returning viewers keep
    the old shell: a cache-first worker will happily serve last week's app. */
-const CACHE = "bmq-v8";
+const CACHE = "bmq-v9";
 const SHELL = [
   "./", "./index.html", "./manifest.webmanifest",
   "./icons/icon-192.png", "./icons/icon-512.png", "./icons/apple-touch-icon.png",

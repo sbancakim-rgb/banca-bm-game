@@ -56,6 +56,12 @@ const Api = (() => {
     questions, cachedQuestions: () => qmem || [],
     library: () => call('library').then((r) => r.items),
     talk: () => call('talk').then((r) => r.items),
+    players: () => call('players').then((r) => r.items),
+    cheer: (uid) => call('cheer', { uid }),
+    sendMoney: (uid, amount, msg) => call('sendMoney', { uid, amount, msg }),
+    inbox: () => call('inbox').then((r) => r.items),
+    submitQuestion: (question) => call('submitQuestion', { question }),
+    mySubmissions: () => call('mySubmissions').then((r) => r.items),
     loadProgress: () => call('loadProgress').then((r) => r.data),
     saveProgress: (data, level, totalXp, meta) => call('saveProgress', { data, level, totalXp, meta }),
     ranking: (keys) => call('ranking', keys),
@@ -73,7 +79,9 @@ const Api = (() => {
       importQuestions: (items) => call('adminQuestionsImport', { items }),
       library: () => call('adminLibrary').then((r) => r.items),
       saveLibrary: (item) => call('adminLibrarySave', { item }),
-      info: () => call('adminInfo')
+      info: () => call('adminInfo'),
+      submissions: () => call('adminSubmissions').then((r) => r.items),
+      resolveSubmission: (no, status, memo, question) => call('adminSubmissionResolve', { no, status, memo, question })
     }
   };
 })();
@@ -94,7 +102,7 @@ const Demo = (() => {
   }
   function db() {
     const d = load();
-    d.users = d.users || {}; d.reports = d.reports || []; d.progress = d.progress || {}; d.qedits = d.qedits || {}; d.lib = d.lib || [];
+    d.users = d.users || {}; d.reports = d.reports || []; d.progress = d.progress || {}; d.qedits = d.qedits || {}; d.lib = d.lib || []; d.mail = d.mail || []; d.subs = d.subs || [];
     return d;
   }
   let loaded = null;
@@ -130,6 +138,26 @@ const Demo = (() => {
       case 'me': return ok({ user: me });
       case 'library': return ok({ items: d.lib.filter((x) => x.status !== '중지') });
       case 'talk': return ok({ items: TALK_DEFAULT });
+      case 'players': return ok({ items: Object.entries(d.progress).filter(([e]) => e !== email).map(([e, raw]) => { try { const p = JSON.parse(raw); return p.name ? { uid: 'u:' + e, name: p.name, lv: p.lv || 1 } : null; } catch (er) { return null; } }).filter(Boolean) });
+      case 'cheer': {
+        const to = String(b.uid).slice(2), t = new Date().toDateString();
+        const sent = d.mail.filter((m) => m.from === email && m.kind === '응원' && new Date(m.at).toDateString() === t);
+        if (to === email) throw new Error('나 자신은 응원할 수 없어요');
+        if (sent.length >= SOCIAL.cheerPerDay) throw new Error(`응원은 하루 ${SOCIAL.cheerPerDay}번까지예요`);
+        if (sent.some((m) => m.to === to)) throw new Error('오늘 이미 응원한 동료예요');
+        d.mail.push({ to, from: email, fromName: (JSON.parse(d.progress[email] || '{}').name) || '', kind: '응원', cash: SOCIAL.cheerCash, honor: SOCIAL.cheerHonor, msg: '', at: Date.now() });
+        store(d); return ok({ cheer: demoCheer(d, email) });
+      }
+      case 'sendMoney': {
+        const to = String(b.uid).slice(2), amt = Math.floor(+b.amount);
+        if (!(amt >= SOCIAL.sendMin && amt <= SOCIAL.sendMax)) throw new Error(`한 번에 ${SOCIAL.sendMin}원~${SOCIAL.sendMax.toLocaleString()}원까지 보낼 수 있어요`);
+        if (to === email) throw new Error('나에게는 보낼 수 없어요');
+        d.mail.push({ to, from: email, fromName: (JSON.parse(d.progress[email] || '{}').name) || '', kind: '활동비', cash: amt, honor: 0, msg: b.msg || '', at: Date.now() });
+        store(d); return ok({ sent: amt });
+      }
+      case 'inbox': { const mine = d.mail.filter((m) => m.to === email && !m.got); mine.forEach((m) => m.got = Date.now()); store(d); return ok({ items: mine.map((m) => ({ kind: m.kind, from: m.fromName, cash: m.cash, honor: m.honor, msg: m.msg, at: m.at })) }); }
+      case 'submitQuestion': { const no = 'S' + Date.now().toString().slice(-9); d.subs.unshift({ ...b.question, no, at: Date.now(), email, author: (JSON.parse(d.progress[email] || '{}').name) || u.name, status: '검토' }); store(d); return ok({ no }); }
+      case 'mySubmissions': return ok({ items: d.subs.filter((x) => x.email === email) });
       case 'loadProgress': return ok({ data: d.progress[email] || null });
       case 'saveProgress': d.progress[email] = b.data; store(d); return ok();
       case 'report': { const no = 'R' + Date.now().toString().slice(-8); d.reports.unshift({ no, at: new Date().toISOString(), email, qid: b.qid, cat: b.cat, snapshot: b.snapshot, kind: b.kind, reason: b.reason, status: '접수' }); store(d); return ok({ no }); }
@@ -138,7 +166,7 @@ const Demo = (() => {
         { title: '[데모] 보험·방카슈랑스 뉴스', link: 'https://news.google.com/search?q=%EB%B0%A9%EC%B9%B4%EC%8A%88%EB%9E%91%EC%8A%A4&hl=ko', source: '데모', date: new Date().toString(), topic: '보험' }] });
       case 'ranking': {
         const rows = Object.entries(d.progress).map(([e, raw]) => { try { const p = JSON.parse(raw); return { email: e, name: p.name, lv: p.lv, ...(p.period || {}) }; } catch (er) { return null; } }).filter(Boolean);
-        return ok(rankingFrom(rows, b, email));
+        const r = rankingFrom(rows, b, email); ['week', 'month'].forEach((k) => r[k].list.forEach((x) => x.uid = 'u:' + x.email)); r.cheer = demoCheer(d, email); return ok(r);
       }
       case 'changePassword':
         if (u.hash !== await hash(b.old)) throw new Error('현재 비밀번호가 틀렸어요');
@@ -168,8 +196,21 @@ const Demo = (() => {
       case 'adminLibrary': return ok({ items: d.lib });
       case 'adminLibrarySave': { const it = b.item; if (!it.id) it.id = 'L' + Date.now(); const i = d.lib.findIndex((x) => x.id === it.id); if (i >= 0) d.lib[i] = it; else d.lib.push(it); store(d); return ok(); }
       case 'adminInfo': return ok({ sheetUrl: '' });
+      case 'adminSubmissions': return ok({ items: d.subs });
+      case 'adminSubmissionResolve': {
+        const x = d.subs.find((y) => y.no === b.no); if (!x) throw new Error('접수번호를 찾지 못했어요');
+        x.status = b.status === '승인' ? '승인' : '반려'; x.memo = b.memo || '';
+        if (x.status === '승인') { const q = { ...b.question, id: 'u-' + x.no, author: x.author }; d.qedits[q.id] = q; x.qid = q.id;
+          d.mail.push({ to: x.email, from: '', fromName: '방카사업부', kind: '출제보상', cash: SOCIAL.submitCash, honor: SOCIAL.submitHonor, msg: '제출한 문제가 채택됐어요!', at: Date.now() }); }
+        else d.mail.push({ to: x.email, from: '', fromName: '방카사업부', kind: '출제결과', cash: 0, honor: 0, msg: ('제출한 문제가 반려됐어요. ' + (b.memo || '')).trim(), at: Date.now() });
+        store(d); return ok({ qid: x.qid });
+      }
     }
     throw new Error('알 수 없는 요청');
+  }
+  function demoCheer(d, email) {
+    const t = new Date().toDateString(), sent = d.mail.filter((m) => m.from === email && m.kind === '응원' && new Date(m.at).toDateString() === t);
+    return { left: Math.max(0, SOCIAL.cheerPerDay - sent.length), to: sent.map((m) => 'u:' + m.to) };
   }
   return { handle, loadData, questions, ADMIN, ADMIN_PW };
 })();
@@ -177,7 +218,7 @@ const Demo = (() => {
 /* 랭킹 계산 — 데모 모드용 (서버는 Code.gs ranking_ 이 같은 규칙으로 계산) */
 function rankingFrom(rows, k, myEmail) {
   const pick = (curKey, xpField, prevKeyField, prevXpField, target) => rows.map((r) => ({
-    name: r.name || '이름없음', lv: r.lv || 1, me: r.email === myEmail,
+    name: r.name || '이름없음', lv: r.lv || 1, me: r.email === myEmail, email: r.email,
     xp: r[curKey] === target ? (r[xpField] || 0) : r[prevKeyField] === target ? (r[prevXpField] || 0) : 0
   })).filter((x) => x.xp > 0).sort((a, b) => b.xp - a.xp);
   return {

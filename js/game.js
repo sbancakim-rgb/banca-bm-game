@@ -301,7 +301,7 @@
   function ask(q, who, npc, sec, ctx) {
     return new Promise(async (res) => {
       els.dlg.classList.add('asking');
-      els.meta.innerHTML = `<span>${DIFF_LABEL[q.diff] || ''}</span><span>${q.type === 'ox' ? 'O / X' : '4지선다'}</span>`;
+      els.meta.innerHTML = `${q.author ? `<span>✍️ ${esc(q.author)} 출제</span>` : ''}<span>${DIFF_LABEL[q.diff] || ''}</span><span>${q.type === 'ox' ? 'O / X' : '4지선다'}</span>`;
       await say(who, q.q, { noWait: true });
       let answered = false, raf, rushShown = false;
       const st = { retry: false, retryUsed: false, shield: false, calm: false, used: new Set() };
@@ -620,7 +620,7 @@
   els.nav.querySelectorAll('button').forEach((b) => b.onclick = () => go(b.dataset.go));
   function go(k) {
     if (inSession) return;
-    ({ home: goHome, study: pageStudy, shop: pageShop, char: pageChar, settings: pageSettings, wrong: pageWrong, lib: pageLib, news: pageNews, admin: pageAdmin, rank: pageRank })[k]();
+    ({ home: goHome, study: pageStudy, shop: pageShop, char: pageChar, settings: pageSettings, wrong: pageWrong, lib: pageLib, news: pageNews, admin: pageAdmin, rank: pageRank, submit: pageSubmit })[k]();
   }
   const backBtn = (to, label) => `<button class="back" data-back="${to}">← ${label}</button>`;
   const bindBack = () => els.screen.querySelectorAll('[data-back]').forEach((b) => b.onclick = () => go(b.dataset.back));
@@ -671,6 +671,7 @@
     els.screen.querySelectorAll('[data-go2]').forEach((b) => b.onclick = () => go(b.dataset.go2));
     $('#charTap').onclick = charTalk;
     const evGo = $('#evGo'); if (evGo) evGo.onclick = runEvent;
+    checkInbox();
     $('#bossBtn').onclick = async () => {
       if (!bd) return runSession('boss');
       if (!S.items.bossticket) return toast('오늘의 보스는 끝! 내일 새 보스가 와요. (🎫 보스 재도전권으로 한 번 더 가능)');
@@ -889,15 +890,166 @@
       }
     }
     const cur = rankTab === 'week' ? r.week : r.month, last = rankTab === 'week' ? r.lastWeek : r.lastMonth;
+    const cheer = r.cheer || { left: 0, to: [] };
     const medal = (i) => ['🥇', '🥈', '🥉'][i] || `${i + 1}`;
     const page = els.screen.querySelector('.page'); if (!page) return;
     page.querySelector('.loading').outerHTML = `
       <div class="seg"><button data-rt="week" class="${rankTab === 'week' ? 'on' : ''}">주간 (${esc(r.week.key)})</button><button data-rt="month" class="${rankTab === 'month' ? 'on' : ''}">월간 (${esc(r.month.key)})</button></div>
       <div class="box winner">${last.winner ? `👑 지난 ${rankTab === 'week' ? '주' : '달'} 최우수BM <b>${esc(last.winner.name)}</b> <span class="muted">Lv.${last.winner.lv} · ${last.winner.xp.toLocaleString()} XP</span>` : `<span class="muted">지난 ${rankTab === 'week' ? '주' : '달'} 기록이 아직 없어요.</span>`}</div>
       <p class="muted">이번 ${rankTab === 'week' ? '주' : '달'}에 얻은 경험치로 순위를 매겨요. 1위는 다음 ${rankTab === 'week' ? '주' : '달'}에 최우수BM으로 선정돼 명예 +${BEST_BM[rankTab].honor} · ${won(BEST_BM[rankTab].cash)}을 받아요.</p>
-      ${cur.list.length ? cur.list.map((x, i) => `<div class="rankrow ${x.me ? 'me' : ''}"><span class="rk">${medal(i)}</span><span class="nm">${esc(x.name)}${x.me ? ' (나)' : ''}<small>Lv.${x.lv} ${rankOf(x.lv).title}</small></span><b>${x.xp.toLocaleString()} XP</b></div>`).join('')
+      <div class="box row" style="justify-content:space-between;padding:10px 14px"><span>📣 오늘 남은 응원 <b id="cheerLeft">${cheer.left}</b>/${SOCIAL.cheerPerDay}</span><span class="muted">응원받은 동료는 ${won(SOCIAL.cheerCash)} · 명예 +${SOCIAL.cheerHonor}</span></div>
+      ${cur.list.length ? cur.list.map((x, i) => `<div class="rankrow ${x.me ? 'me' : ''}"><span class="rk">${medal(i)}</span><span class="nm">${esc(x.name)}${x.me ? ' (나)' : ''}<small>Lv.${x.lv} ${rankOf(x.lv).title} · ${x.xp.toLocaleString()} XP</small></span>
+        ${x.me ? '' : `<span class="acts"><button class="btn mini" data-cheer="${esc(x.uid)}" data-nm="${esc(x.name)}" ${cheer.left <= 0 || cheer.to.includes(x.uid) ? 'disabled' : ''}>${cheer.to.includes(x.uid) ? '응원 완료' : '📣 응원'}</button><button class="btn ghost mini" data-send="${esc(x.uid)}" data-nm="${esc(x.name)}">💸</button></span>`}</div>`).join('')
         : '<p class="muted" style="text-align:center;margin-top:30px">아직 이번 기간 기록이 없어요. 첫 1위를 노려 보세요!</p>'}`;
     els.screen.querySelectorAll('[data-rt]').forEach((b) => b.onclick = () => { rankTab = b.dataset.rt; pageRank(); });
+    els.screen.querySelectorAll('[data-cheer]').forEach((b) => b.onclick = () => doCheer(b.dataset.cheer, b.dataset.nm, b));
+    els.screen.querySelectorAll('[data-send]').forEach((b) => b.onclick = () => sendMoneyModal(b.dataset.send, b.dataset.nm));
+  }
+
+  /* ---------------- 우편함 (응원 · 활동비 · 출제 보상) ---------------- */
+  let inboxAt = 0;
+  async function checkInbox(force) {
+    if (!S || inSession || (!force && Date.now() - inboxAt < 60000)) return;
+    inboxAt = Date.now();
+    let items = [];
+    try { items = await Api.inbox(); } catch (e) { return; }
+    if (!items.length) return;
+    let cash = 0, honor = 0;
+    const lines = items.map((m) => {
+      if (m.kind === '활동비') { S.money += m.cash; cash += m.cash; } // 동료가 보낸 돈은 '누적 획득'에 넣지 않음
+      else if (m.cash) { earn(m.cash, true); cash += m.cash; }
+      if (m.honor) { S.honor += m.honor; honor += m.honor; }
+      if (m.kind === '응원') inc('cheered');
+      const who = esc(m.from || '동료');
+      const body = m.kind === '응원' ? `📣 <b>${who}</b>님이 응원을 보냈어요!`
+        : m.kind === '활동비' ? `💸 <b>${who}</b>님이 활동비 <b>${won(m.cash)}</b>을 보냈어요${m.msg ? `<br><span class="muted">"${esc(m.msg)}"</span>` : ''}`
+        : m.kind === '출제보상' ? `✍️ ${esc(m.msg)}`
+        : `📝 ${esc(m.msg)}`;
+      return `<div class="mail">${body}${m.cash || m.honor ? `<small>${m.cash ? '+' + won(m.cash) : ''}${m.honor ? ` · 명예 +${m.honor}` : ''}</small>` : ''}</div>`;
+    });
+    Snd.coin(); checkAch(); save(); syncNow(); renderHud();
+    modal(`<h2>📬 우편함</h2>${lines.join('')}<p class="muted" style="text-align:center">합계 ${won(cash)}${honor ? ` · 명예 +${honor}` : ''}</p><button class="btn full" data-close>받기</button>`);
+  }
+
+  /* ---------------- 응원 · 활동비 보내기 ---------------- */
+  async function doCheer(uid, name, btn) {
+    btn.disabled = true;
+    try {
+      const r = await Api.cheer(uid);
+      inc('cheers'); S.honor += 1; checkAch(); save();
+      toast(`📣 ${name}님을 응원했어요! (오늘 남은 응원 ${r.cheer.left}번)`);
+      btn.textContent = '응원 완료'; btn.classList.add('ghost');
+      els.screen.querySelectorAll('[data-cheer]').forEach((b) => { if (r.cheer.left <= 0 && b !== btn) b.disabled = true; });
+      const left = $('#cheerLeft'); if (left) left.textContent = r.cheer.left;
+    } catch (e) { toast(e.message); btn.disabled = false; }
+  }
+  async function sendMoneyModal(uid, name) {
+    let players = [];
+    if (!uid) {
+      try { players = await Api.players(); } catch (e) { return toast(e.message); }
+      if (!players.length) return toast('아직 활동비를 보낼 수 있는 동료가 없어요');
+    }
+    const m = modal(`<h2 style="font-size:22px">💸 활동비 보내기</h2>
+      <p class="muted" style="text-align:center">보유 ${won(S.money)} · 한 번에 ${won(SOCIAL.sendMin)}~${won(SOCIAL.sendMax)} · 하루 최대 ${won(SOCIAL.sendDailyMax)}</p>
+      ${uid ? `<div class="box" style="text-align:center;margin:8px 0">받는 사람 <b>${esc(name)}</b></div>`
+        : `<label class="lb">받는 사람</label><select id="smTo">${players.map((p) => `<option value="${esc(p.uid)}">${esc(p.name)} · Lv.${p.lv} ${rankOf(p.lv).title}</option>`).join('')}</select>`}
+      <label class="lb">금액</label><input type="number" id="smAmt" inputmode="numeric" min="${SOCIAL.sendMin}" max="${SOCIAL.sendMax}" step="100" value="1000">
+      <div class="seg" style="margin-top:8px">${[500, 1000, 3000, 5000].map((v) => `<button data-amt="${v}">${won(v)}</button>`).join('')}</div>
+      <label class="lb">메시지 (선택)</label><input type="text" id="smMsg" maxlength="40" placeholder="예: 오늘 보스전 고생했어요!">
+      <div class="row" style="margin-top:12px"><button class="btn ghost full" data-close>취소</button><button class="btn full" id="smGo">보내기</button></div>`);
+    m.el.querySelectorAll('[data-amt]').forEach((b) => b.onclick = () => $('#smAmt').value = b.dataset.amt);
+    $('#smGo').onclick = async () => {
+      const to = uid || $('#smTo').value, toName = name || ($('#smTo').selectedOptions[0] || {}).textContent.split(' · ')[0];
+      const amt = Math.floor(+$('#smAmt').value);
+      if (!(amt >= SOCIAL.sendMin && amt <= SOCIAL.sendMax)) return toast(`${won(SOCIAL.sendMin)}~${won(SOCIAL.sendMax)} 사이로 입력해 주세요`);
+      if (amt > S.money) return toast('활동비가 부족해요');
+      $('#smGo').disabled = true;
+      try {
+        await syncNow();
+        await Api.sendMoney(to, amt, $('#smMsg').value.trim());
+        S.money -= amt; inc('sent', amt); save(); syncNow(); renderHud(); m.close();
+        Snd.coin(); toast(`💸 ${toName}님에게 ${won(amt)}을 보냈어요!`);
+        if (els.screen.querySelector('.shop')) pageShop();
+      } catch (e) { toast(e.message); const b = $('#smGo'); if (b) b.disabled = false; }
+    };
+  }
+
+  /* ---------------- 직원 출제 ---------------- */
+  function subForm() {
+    return `<div class="qform">
+      <div class="row"><select id="fCat">${CAT_ORDER.map((k) => `<option value="${k}">${CATS[k].label}</option>`).join('')}</select>
+        <select id="fType"><option value="mc">4지선다</option><option value="ox">OX</option></select>
+        <select id="fDiff">${[1, 2, 3].map((d) => `<option value="${d}" ${d === 2 ? 'selected' : ''}>${DIFF_LABEL[d]}</option>`).join('')}</select></div>
+      <label>질문</label><textarea id="fQ" style="min-height:70px" maxlength="200" placeholder="예: 연금저축 중도해지 시 세액공제받은 금액에 매기는 세율은?"></textarea>
+      <div id="fMC">${[0, 1, 2, 3].map((i) => `<label>보기 ${i + 1}</label><input type="text" id="fC${i}" maxlength="40">`).join('')}</div>
+      <label>정답</label><select id="fA">${[0, 1, 2, 3].map((i) => `<option value="${i}">${i + 1}번</option>`).join('')}</select>
+      <label>힌트 (선택)</label><input type="text" id="fH" maxlength="40">
+      <label>해설</label><textarea id="fE" style="min-height:70px" maxlength="400" placeholder="왜 정답인지, 현장에서 어떻게 설명하면 좋은지"></textarea>
+      <label>근거·출처</label><input type="text" id="fS" maxlength="80" placeholder="예: 소득세법 제64조의4, 상품설명서 p.3">
+    </div>`;
+  }
+  function readSub() {
+    const type = $('#fType').value;
+    const q = { cat: $('#fCat').value, type, diff: +$('#fDiff').value, q: $('#fQ').value.trim(), hint: $('#fH').value.trim(), exp: $('#fE').value.trim(), src: $('#fS').value.trim() };
+    if (type === 'ox') q.answer = $('#fA').value === 'O';
+    else { q.choices = [0, 1, 2, 3].map((i) => $('#fC' + i).value.trim()); q.answer = +$('#fA').value; }
+    if (q.q.length < 8) throw new Error('질문을 8자 이상 써 주세요');
+    if (type === 'mc' && q.choices.some((c) => !c)) throw new Error('보기 4개를 모두 입력해 주세요');
+    if (type === 'mc' && new Set(q.choices).size < 4) throw new Error('보기가 서로 달라야 해요');
+    if (q.exp.length < 10) throw new Error('해설을 10자 이상 써 주세요');
+    if (!q.src) throw new Error('근거·출처를 적어 주세요');
+    return q;
+  }
+  async function pageSubmit() {
+    setNav('study');
+    els.screen.innerHTML = `<div class="page">${backBtn('study', '학습회')}<h2>✍️ 문제 출제하기</h2>
+      <p class="muted" style="margin-top:-6px">현장에서 자주 받는 질문을 문제로 만들어 주세요. 관리자가 검토해서 채택하면 <b>출제자 이름과 함께 출제</b>되고, 보상 ${won(SOCIAL.submitCash)} · 명예 +${SOCIAL.submitHonor}을 받아요.</p>
+      <div class="box">${subForm()}<button class="btn full" id="subGo" style="margin-top:12px">제출하기</button></div>
+      <h4 class="sec">내 제출 내역</h4><div id="mySubs"><div class="loading"><div class="spin"></div></div></div></div>`;
+    bindBack(); bindFormType();
+    $('#subGo').onclick = async () => {
+      let q; try { q = readSub(); } catch (e) { return toast(e.message); }
+      $('#subGo').disabled = true;
+      try { const r = await Api.submitQuestion(q); inc('submitted'); save(); toast(`제출했어요! (${r.no}) 검토 후 우편함으로 알려드려요`); pageSubmit(); }
+      catch (e) { toast(e.message); $('#subGo').disabled = false; }
+    };
+    let mine = [];
+    try { mine = await Api.mySubmissions(); } catch (e) { }
+    const box = $('#mySubs'); if (!box) return;
+    const col = { '검토': '#e0a020', '승인': '#2fb67c', '반려': '#e5484d' };
+    box.innerHTML = mine.length ? mine.map((x) => `<div class="item"><div class="h"><span class="tg" style="background:${col[x.status] || '#999'}">${esc(x.status === '승인' ? '채택' : x.status)}</span><span class="q">${esc(x.q)}</span></div>
+      <div class="body">${x.memo ? `관리자 메모: ${esc(x.memo)}` : '처리 메모 없음'}</div></div>`).join('') : '<p class="muted" style="text-align:center">아직 제출한 문제가 없어요.</p>';
+    bindItems();
+  }
+  let subFilter = '검토';
+  async function admSubmissions(body) {
+    const subs = await Api.admin.submissions();
+    const list = subs.filter((x) => subFilter === '전체' || x.status === subFilter);
+    body.innerHTML = `<div class="seg">${['검토', '승인', '반려', '전체'].map((s) => `<button data-sf="${s}" class="${subFilter === s ? 'on' : ''}">${s} ${s === '전체' ? subs.length : subs.filter((x) => x.status === s).length}</button>`).join('')}</div>
+      <p class="muted">승인하면 문제 시트에 '출제자'와 함께 추가되고, 출제자에게 보상(${won(SOCIAL.submitCash)} · 명예 +${SOCIAL.submitHonor})이 우편함으로 가요. 승인 전에 내용을 고칠 수 있어요.</p>
+      ${list.length ? list.map((x, i) => `<div class="item"><div class="h" data-si="${i}"><span class="tg" style="background:${(CATS[x.cat] || {}).color || '#999'}">${esc((CATS[x.cat] || {}).label || x.cat)}</span>
+        <span class="q">${esc(x.q)}<div class="muted">✍️ ${esc(x.author || '')} · ${new Date(x.at).toLocaleString('ko-KR')} · ${esc(x.status)}</div></span></div></div>`).join('')
+        : '<p class="muted" style="text-align:center;margin-top:30px">해당하는 제출 문제가 없어요.</p>'}`;
+    body.querySelectorAll('[data-sf]').forEach((b) => b.onclick = () => { subFilter = b.dataset.sf; pageAdmin(); });
+    body.querySelectorAll('[data-si]').forEach((h) => h.onclick = () => {
+      const x = list[+h.dataset.si];
+      const q = { id: '', cat: x.cat, type: x.type, diff: x.diff, q: x.q, choices: x.choices, answer: x.answer, hint: x.hint, exp: x.exp, src: x.src, asOf: '', expires: '', status: '사용', tags: ['직원출제'] };
+      const m = modal(`<h2 style="font-size:21px">✍️ 제출 문제 검토</h2><div class="muted" style="margin-bottom:6px">출제자 ${esc(x.author || '')} · ${esc(x.no)} · ${esc(x.status)}</div>
+        ${qForm(q)}<label>처리 메모 (출제자에게 전달)</label><input type="text" id="memo" value="${esc(x.memo || '')}" placeholder="예: 보기 3번 표현을 다듬어 채택했어요">
+        <div class="row" style="margin-top:12px;flex-wrap:wrap"><button class="btn ghost full" data-close>닫기</button>
+          ${x.status === '검토' ? '<button class="btn danger full" id="sRej">반려</button><button class="btn full" id="sOk">승인 · 출제</button>' : ''}</div>`);
+      bindFormType();
+      const ok = $('#sOk'), rej = $('#sRej');
+      if (ok) ok.onclick = async () => {
+        let nq; try { nq = readForm({ ...q, id: undefined }); } catch (e) { return toast(e.message); }
+        ok.disabled = true;
+        try { await Api.admin.resolveSubmission(x.no, '승인', $('#memo').value, nq); admQ = null; await Api.questions(true); m.close(); toast('채택했어요! 출제 목록에 추가됐어요'); pageAdmin(); }
+        catch (e) { toast(e.message); ok.disabled = false; }
+      };
+      if (rej) rej.onclick = async () => {
+        try { await Api.admin.resolveSubmission(x.no, '반려', $('#memo').value); m.close(); toast('반려 처리했어요'); pageAdmin(); } catch (e) { toast(e.message); }
+      };
+    });
   }
 
   /* ---- 학습회 ---- */
@@ -921,6 +1073,7 @@
         <button class="hubtile" data-h="practice"><span>📝</span><b>연습문제</b><small>분야 골라 무제한 · 정답당 +1XP · +5원</small></button>
         <button class="hubtile" data-h="news"><span>📰</span><b>오늘의 경제 기사</b><small>최신 기사 읽기 · 건당 +2XP (하루 ${STUDY_XP.dailyMax}건)</small></button>
         <button class="hubtile" data-h="lib"><span>📚</span><b>개인 학습 · 자료실</b><small>학습 자료 읽기 · 건당 +2XP (하루 ${STUDY_XP.dailyMax}건)</small></button>
+        <button class="hubtile" data-h="submit"><span>✍️</span><b>문제 출제하기</b><small>내가 만든 문제가 채택되면 ${won(SOCIAL.submitCash)} · 명예 +${SOCIAL.submitHonor}</small></button>
         <button class="hubtile" data-h="wrong"><span>📒</span><b>오답노트</b><small>${nWrong}문제 · 맞히면 극복! (명예 +5)</small></button>
       </div>
       <div class="box"><h4>오늘의 학습 기록</h4><div class="muted">읽은 기사 ${S.study.articles.length}/${STUDY_XP.dailyMax} · 읽은 자료 ${S.study.notes.length}/${STUDY_XP.dailyMax} · 누적 연습 정답 ${S.cnt.practice || 0}</div></div>
@@ -1059,6 +1212,7 @@
     els.screen.innerHTML = `<div class="page"><h2>🛒 사내 매점</h2>
       <div class="box row" style="justify-content:space-between"><div><div class="muted">보유 활동비</div><b style="font-size:22px">💰 ${won(S.money)}</b></div>
         <div class="muted" style="text-align:right">정답 1개 30~80원<br>퍼펙트 +200원 · 보스 승리 보상</div></div>
+      <button class="btn blue full" id="sendMoney" style="margin-bottom:6px">💸 동료에게 활동비 보내기</button>
       <h4 class="sec">🏬 사내 복지관</h4>
       <div class="hub">${Object.entries(BEAUTY).map(([k, b]) => `<button class="hubtile" data-beauty="${k}"><span>${b.icon}</span><b>${b.name}</b><small>${b.desc}<br>${won(b.price)}</small></button>`).join('')}</div>
       <h4 class="sec">🛍️ 아이템</h4>
@@ -1068,6 +1222,7 @@
       <p class="muted">💡 문제용 아이템은 퀴즈 중 선택지 위 아이템 바에서 써요. 🧃 활기력 아이템은 완료한 일정 카드를 누르면 쓸 수 있어요.</p>
     </div>`;
     els.screen.querySelectorAll('[data-beauty]').forEach((b) => b.onclick = () => createScreen(b.dataset.beauty));
+    $('#sendMoney').onclick = () => sendMoneyModal();
     els.screen.querySelectorAll('[data-buy]').forEach((b) => b.onclick = () => {
       const it = ITEMS.find((x) => x.id === b.dataset.buy);
       if (S.money < it.price) return toast(`활동비가 ${won(it.price - S.money)} 부족해요`);
@@ -1171,7 +1326,7 @@
   async function pageAdmin() {
     if (!(Api.user || {}).admin) return goHome();
     setNav('settings');
-    const tabs = [['users', '👥 회원'], ['reports', '⚠️ 이의 제기'], ['questions', '📝 문제'], ['lib', '📚 공용 자료']];
+    const tabs = [['users', '👥 회원'], ['reports', '⚠️ 이의 제기'], ['subs', '✍️ 제출 문제'], ['questions', '📝 문제'], ['lib', '📚 공용 자료']];
     els.screen.innerHTML = `<div class="page">${backBtn('settings', '설정')}<h2>🛠️ 관리자</h2>
       <div class="seg">${tabs.map(([k, l]) => `<button data-t="${k}" class="${admTab === k ? 'on' : ''}">${l}</button>`).join('')}</div>
       <div id="admBody"><div class="loading"><div class="spin"></div>불러오는 중…</div></div></div>`;
@@ -1182,6 +1337,7 @@
       if (admTab === 'users') await admUsers(body);
       else if (admTab === 'reports') await admReports(body);
       else if (admTab === 'questions') await admQuestions(body);
+      else if (admTab === 'subs') await admSubmissions(body);
       else await admLib(body);
     } catch (e) { body.innerHTML = `<p class="muted">${esc(e.message)}</p>`; }
   }
