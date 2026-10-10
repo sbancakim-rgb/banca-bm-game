@@ -7,7 +7,7 @@ const Store = (() => {
 
   const fresh = (email) => ({
     v: 2, created: Date.now(), updated: 0, email: email || '', name: '',
-    gender: 'f', hairStyle: 'f_hush', hairColor: '#5b3a2e', skin: '#ffe3d1', face: 'f1', age: 20, glasses: '', glassesColor: '#2a2a33',
+    gender: 'f', hairStyle: 'f_layer', hairColor: '#5b3a2e', skin: '#ffe3d1', face: 'f1', age: 20, glasses: '', glassesColor: '#2a2a33',
     lv: 1, xp: 0, totalXp: 0, honor: 0, money: 0, moneyTotal: 0,
     items: Object.assign({}, typeof STARTER_ITEMS !== 'undefined' ? STARTER_ITEMS : {}),
     groupXp: { banca: 0, market: 0, econ: 0, term: 0 },

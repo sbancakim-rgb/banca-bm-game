@@ -11,3 +11,4 @@ backend/SeedIndex.gs
 
 # 서버 코드는 Apps Script에서 관리 (관리자 이메일·시트 ID 포함)
 backend/
+hair_gallery.html

@@ -388,8 +388,9 @@ const STUDY_XP = { practice: 1, article: 2, note: 2, dailyMax: 5 };
 
 /* 플레이어 커스터마이즈 옵션 */
 const PLAYER_HAIR = {
-  m: [{ style: 'm_comma', label: '쉼표머리' }, { style: 'm_part', label: '가르마펌' }, { style: 'm_dandy', label: '댄디컷' }, { style: 'm_leaf', label: '리프컷' }],
-  f: [{ style: 'f_hush', label: '허쉬컷' }, { style: 'f_ccurl', label: 'C컬 단발' }, { style: 'f_seewave', label: '시스루 웨이브' }, { style: 'f_layer', label: '레이어드 롱' }]
+  m: [{ style: 'm_part', label: '가르마펌' }, { style: 'm_dandy', label: '댄디컷' }, { style: 'm_leaf', label: '리프컷' }, { style: 'm_crop', label: '크롭컷' },
+    { style: 'm_gail', label: '가일컷' }, { style: 'm_wolf', label: '울프컷' }, { style: 'm_shadow', label: '쉐도우펌' }, { style: 'm_buzz', label: '버즈컷' }],
+  f: [{ style: 'f_layer', label: '레이어드 롱' }, { style: 'f_hime', label: '히메컷' }, { style: 'f_bluntbob', label: '일자 단발' }, { style: 'f_sidewave', label: '옆가르마 웨이브' }, { style: 'f_pixie', label: '숏컷' }]
 };
 const HAIR_COLORS = ['#2a2226', '#5b3a2e', '#8a5a3c', '#c48a5a', '#3a3f6b', '#7a2e3a'];
 const FACES = {
