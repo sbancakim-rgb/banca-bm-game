@@ -1,7 +1,7 @@
 /* Service worker — required for Chrome's install prompt.
    Bump CACHE whenever you ship changed files, or returning viewers keep
    the old shell: a cache-first worker will happily serve last week's app. */
-const CACHE = "bmq-v16";
+const CACHE = "bmq-v17";
 const SHELL = [
   "./", "./index.html", "./manifest.webmanifest",
   "./icons/icon-192.png", "./icons/icon-512.png", "./icons/apple-touch-icon.png",
@@ -47,17 +47,20 @@ self.addEventListener("fetch", (e) => {
     return;
   }
 
-  // Static assets: serve from cache instantly, refresh the cache in the background
-  // (so updated question banks arrive on the next launch).
+  // 게임 코드·스타일·목록 파일(js/css/json): 네트워크 먼저 → 배포하면 다음 실행에 바로 반영, 오프라인이면 캐시
+  // 그림·아이콘 등 나머지: 캐시 먼저(빠르게) + 뒤에서 새로 받아 두기
+  const fresh = /\.(js|css|json|webmanifest)$/.test(url.pathname);
+  const save = (res) => {
+    if (res && res.status === 200 && res.type === "basic") { const copy = res.clone(); caches.open(CACHE).then((c) => c.put(req, copy)); }
+    return res;
+  };
+  if (fresh) {
+    e.respondWith(fetch(req).then(save).catch(() => caches.match(req)));
+    return;
+  }
   e.respondWith(
     caches.match(req).then((hit) => {
-      const net = fetch(req).then((res) => {
-        if (res && res.status === 200 && res.type === "basic") {
-          const copy = res.clone();
-          caches.open(CACHE).then((c) => c.put(req, copy));
-        }
-        return res;
-      }).catch(() => hit);
+      const net = fetch(req).then(save).catch(() => hit);
       return hit || net;
     })
   );
