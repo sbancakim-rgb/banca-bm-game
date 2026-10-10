@@ -1,0 +1,13 @@
+# 공개 저장소에 올리지 않을 것 — 문제·정답은 비공개 구글 시트에서만 관리
+js/data/q_*.js
+seed/
+_archive/
+tools/
+.claude/
+
+# 서버 시드(문제·정답 포함) — 공개 저장소 제외
+backend/Seed*.gs
+backend/SeedIndex.gs
+
+# 서버 코드는 Apps Script에서 관리 (관리자 이메일·시트 ID 포함)
+backend/
