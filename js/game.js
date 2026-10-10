@@ -1370,7 +1370,7 @@
         <div class="row" style="margin-top:10px;justify-content:space-between"><span>효과음</span><button class="btn ghost" id="snd">${S.sound ? '🔊 켜짐' : '🔇 꺼짐'}</button></div></div>
       <div class="box"><h4>💾 기록</h4><p class="muted">기록은 서버에 자동 저장돼요. 같은 이메일로 로그인하면 다른 기기에서도 이어서 할 수 있어요.</p>
         <button class="btn ghost full" id="sync">지금 저장하기</button></div>
-      <div class="box"><h4>🗑️ 캐릭터 초기화</h4><p class="muted">레벨 · 경험치 · 활동비 · 업적 · 아이템 등 모든 진행 기록을 지우고 신입사원 등록부터 다시 시작해요. 되돌릴 수 없어요.</p>
+      <div class="box"><h4>🗑️ 캐릭터 초기화</h4><p class="muted">레벨 · 경험치 · 활동비 · 업적 · 아이템 등 모든 진행 기록을 지우고 신입사원 등록부터 다시 시작해요. 되돌릴 수 없어요.${hasFace ? '<br>📷 관리자가 지정한 내 캐릭터 그림은 그대로 유지돼요.' : ''}</p>
         <button class="btn danger full" id="reset">캐릭터 초기화</button></div>
       <button class="btn danger full" id="logout">로그아웃</button>
       <p class="muted" style="text-align:center;margin-top:14px">방카BM 성장기 v2.0 · 문제 ${Api.cachedQuestions().length}개</p>
@@ -1394,7 +1394,7 @@
     $('#reset').onclick = async () => {
       if (!(await confirmBox(`정말 초기화할까요?
 
-Lv.${S.lv} ${rankOf(S.lv).title} ${S.name}의 모든 기록(경험치 ${S.totalXp.toLocaleString()} · 활동비 ${won(S.money)} · 업적 ${Object.keys(S.ach).length}개)이 사라지고 되돌릴 수 없어요.`, '초기화', '취소'))) return;
+Lv.${S.lv} ${rankOf(S.lv).title} ${S.name}의 모든 기록(경험치 ${S.totalXp.toLocaleString()} · 활동비 ${won(S.money)} · 업적 ${Object.keys(S.ach).length}개)이 사라지고 되돌릴 수 없어요.${hasFace ? '\n(지정된 캐릭터 그림은 그대로 유지돼요)' : ''}`, '초기화', '취소'))) return;
       const m = modal(`<h2 style="font-size:22px">마지막 확인</h2><p class="muted" style="text-align:center">아래 칸에 <b>초기화</b> 라고 입력해 주세요.</p>
         <input type="text" id="rsTxt" placeholder="초기화" autocomplete="off"><div class="row" style="margin-top:10px"><button class="btn ghost full" data-close>취소</button><button class="btn danger full" id="rsGo">초기화</button></div>`);
       $('#rsGo').onclick = async () => {
