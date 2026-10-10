@@ -32,7 +32,32 @@
     S.updated = Date.now(); Store.save(S);
     clearTimeout(syncTimer); syncTimer = setTimeout(syncNow, 4000);
   }
-  async function syncNow() { if (!S || !Api.loggedIn()) return; ensurePeriod(); try { await Api.saveProgress(JSON.stringify(S), S.lv, S.totalXp, { name: S.name, ...S.period }); } catch (e) { } }
+  async function syncNow(reset) {
+    if (!S || !Api.loggedIn() || (!S.name && !reset)) return;
+    ensurePeriod();
+    try {
+      const r = await Api.saveProgress(JSON.stringify(S), S.lv, S.totalXp, { name: S.name, ...S.period }, reset);
+      if (r && r.stale) adoptRemote(r.data);
+    } catch (e) { if (reset) throw e; }
+  }
+  // 서버에 더 진행된 기록이 있으면(다른 기기에서 플레이) 그걸로 바꾼다 — 진행한 기록은 절대 뒤로 가지 않음
+  function adoptRemote(data) {
+    let R; try { R = Object.assign(Store.fresh(S.email), JSON.parse(data)); } catch (e) { return; }
+    R.email = S.email; S = R; Store.save(S);
+    if (!R.name) { toast('다른 기기에서 캐릭터를 초기화했어요', 3200); inSession = false; els.vn.classList.remove('on'); return createScreen(); }
+    toast('☁️ 다른 기기에서 더 진행한 기록을 불러왔어요', 3200);
+    if (!inSession && $('#stage').className === 'home') goHome(); else if (typeof renderHud === 'function') renderHud();
+  }
+  // 이 기기 기록 vs 서버 기록 중 고르기: 초기화한 쪽이 더 나중이면 그쪽, 아니면 더 많이 진행한 쪽
+  function pickSave(local, remote) {
+    if (!remote || !local) return local || remote;
+    const newer = (remote.created || 0) > (local.created || 0) ? remote : local, older = newer === remote ? local : remote;
+    if (newer.resetAt && newer.created !== older.created) return newer; // 초기화한 기록이 우선 (예전 기기 기록으로 되살아나지 않게)
+    if (!remote.name) return local;
+    if (!local.name) return remote;
+    if ((remote.totalXp || 0) !== (local.totalXp || 0)) return (remote.totalXp || 0) > (local.totalXp || 0) ? remote : local;
+    return (remote.updated || 0) >= (local.updated || 0) ? remote : local;
+  }
   addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') syncNow(); });
 
   /* ---------------- 공통 UI ---------------- */
@@ -100,18 +125,21 @@
 
   /* ---------------- 플레이어 / 성장 ---------------- */
   const rankOf = (lv) => RANKS.reduce((r, x) => (lv >= x.lv ? x : r), RANKS[0]);
-  const faceOf = () => (FACES[S.gender] || FACES.f).find((x) => x.id === S.face) || FACES[S.gender][0];
-  function playerSpec(lv = S.lv) {
-    const r = rankOf(lv), f = S.gender === 'f', fc = faceOf();
+  const faceOf = (P = S) => { const g = FACES[P.gender] || FACES.f; return g.find((x) => x.id === P.face) || g[0]; };
+  // P: 캐릭터 겉모습(내 기록 또는 동료의 look), faceKey: 실물 캐릭터 그림 키
+  function specOf(P, lv, faceKey) {
+    const D = Store.fresh(''); P = Object.assign({}, D, P || {}); lv = lv || 1;
+    const r = rankOf(lv), f = P.gender === 'f', fc = faceOf(P);
     const look = clone(r.look);
     if (f && look.type === 'suit') { delete look.tie; look.necklace = '#f5e6c4'; }
     if (f && look.type === 'shirt') look.shirt = '#fdf7fb';
-    const illust = hasFace ? 'face:me' : S.illust && S.illust[0] === S.gender && Sprites.has('illust:' + S.illust) ? 'illust:' + S.illust : null;
-    return { key: illust || `player_${S.gender}_${RANKS.indexOf(r)}`, gender: S.gender, skin: S.skin,
+    const illust = faceKey && Sprites.has(faceKey) ? faceKey : P.illust && P.illust[0] === P.gender && Sprites.has('illust:' + P.illust) ? 'illust:' + P.illust : null;
+    return { key: illust || `player_${P.gender}_${RANKS.indexOf(r)}`, gender: P.gender, skin: P.skin,
       eye: fc.eye, eyeScale: fc.eyeScale, face: fc.face, eyeColor: fc.eyeColor, lashes: !!fc.lashes, blush: !!fc.blush, brow: fc.brow, thickBrows: fc.thickBrows,
-      age: S.age, glasses: S.glasses || null, glassesColor: S.glassesColor,
-      hair: { style: S.hairStyle, color: S.hairColor }, outfit: look, aura: !!r.aura, earrings: f && lv >= 20 ? '#f2c641' : null };
+      age: P.age, glasses: P.glasses || null, glassesColor: P.glassesColor,
+      hair: { style: P.hairStyle, color: P.hairColor }, outfit: look, aura: !!r.aura, earrings: f && lv >= 20 ? '#f2c641' : null };
   }
+  const playerSpec = (lv = S.lv) => specOf(S, lv, hasFace ? 'face:me' : null);
   // 가만히 서 있을 때 표정: 일러스트 캐릭터는 첫 표정(기본), 코드 그림은 미소
   const rest = () => (/^(illust|face):/.test(playerSpec().key) ? 'normal' : 'smile');
   const mastery = (g) => S.groupXp[g] / GROUPS[g].cats.length;
@@ -901,12 +929,62 @@
       <div class="box winner">${last.winner ? `👑 지난 ${rankTab === 'week' ? '주' : '달'} 최우수BM <b>${esc(last.winner.name)}</b> <span class="muted">Lv.${last.winner.lv} · ${last.winner.xp.toLocaleString()} XP</span>` : `<span class="muted">지난 ${rankTab === 'week' ? '주' : '달'} 기록이 아직 없어요.</span>`}</div>
       <p class="muted">이번 ${rankTab === 'week' ? '주' : '달'}에 얻은 경험치로 순위를 매겨요. 1위는 다음 ${rankTab === 'week' ? '주' : '달'}에 최우수BM으로 선정돼 명예 +${BEST_BM[rankTab].honor} · ${won(BEST_BM[rankTab].cash)}을 받아요.</p>
       <div class="box row" style="justify-content:space-between;padding:10px 14px"><span>📣 오늘 남은 응원 <b id="cheerLeft">${cheer.left}</b>/${SOCIAL.cheerPerDay}</span><span class="muted">응원받은 동료는 ${won(SOCIAL.cheerCash)} · 명예 +${SOCIAL.cheerHonor}</span></div>
-      ${cur.list.length ? cur.list.map((x, i) => `<div class="rankrow ${x.me ? 'me' : ''}"><span class="rk">${medal(i)}</span><span class="nm">${esc(x.name)}${x.me ? ' (나)' : ''}<small>Lv.${x.lv} ${rankOf(x.lv).title} · ${x.xp.toLocaleString()} XP</small></span>
+      ${cur.list.length ? cur.list.map((x, i) => `<div class="rankrow ${x.me ? 'me' : ''}"><span class="rk">${medal(i)}</span><button class="rkav" data-av="${i}" aria-label="${esc(x.name)} 캐릭터 보기">${avatar(x)}</button><span class="nm" data-av="${i}">${esc(x.name)}${x.me ? ' (나)' : ''}<small>Lv.${x.lv} ${rankOf(x.lv).title} · ${x.xp.toLocaleString()} XP</small></span>
         ${x.me ? '' : `<span class="acts"><button class="btn mini" data-cheer="${esc(x.uid)}" data-nm="${esc(x.name)}" ${cheer.left <= 0 || cheer.to.includes(x.uid) ? 'disabled' : ''}>${cheer.to.includes(x.uid) ? '응원 완료' : '📣 응원'}</button><button class="btn ghost mini" data-send="${esc(x.uid)}" data-nm="${esc(x.name)}">💸</button></span>`}</div>`).join('')
         : '<p class="muted" style="text-align:center;margin-top:30px">아직 이번 기간 기록이 없어요. 첫 1위를 노려 보세요!</p>'}`;
     els.screen.querySelectorAll('[data-rt]').forEach((b) => b.onclick = () => { rankTab = b.dataset.rt; pageRank(); });
+    els.screen.querySelectorAll('[data-av]').forEach((b) => b.onclick = () => charViewer(cur.list[+b.dataset.av]));
+    // 실물 캐릭터 사진은 기본 표정만 먼저 받아서 바꿔 끼운다
+    const fl = cur.list.filter((x) => x.face && !x.me);
+    if (fl.length) loadPeerFaces(fl.map((x) => x.uid), ['normal']).then(() => {
+      els.screen.querySelectorAll('button.rkav').forEach((b) => { const x = cur.list[+b.dataset.av]; if (x && x.face && !x.me) b.innerHTML = avatar(x); });
+    });
     els.screen.querySelectorAll('[data-cheer]').forEach((b) => b.onclick = () => doCheer(b.dataset.cheer, b.dataset.nm, b));
     els.screen.querySelectorAll('[data-send]').forEach((b) => b.onclick = () => sendMoneyModal(b.dataset.send, b.dataset.nm));
+  }
+
+  /* ---------------- 동료 캐릭터 보기 (최우수BM 사진 · 관리자 캐릭터 메뉴) ---------------- */
+  const FACE_EXPRS = ['normal', 'smile', 'angry', 'worried'], peerFace = {};
+  async function loadPeerFaces(uids, exprs = FACE_EXPRS) {
+    const need = [...new Set(uids)].filter((u) => !peerFace[u] || exprs.some((e) => !peerFace[u][e]));
+    if (!need.length) return;
+    try {
+      const got = await Api.peerFaces(need, exprs);
+      Object.entries(got).forEach(([u, m]) => { peerFace[u] = Object.assign(peerFace[u] || {}, m); Sprites.registerData('face:' + u, peerFace[u]); });
+    } catch (e) { }
+  }
+  // p: { name, lv, look, uid, face, me }
+  const peerSpec = (p) => (p.me ? playerSpec(p.lv || S.lv) : specOf(p.look || {}, p.lv || 1, p.face ? 'face:' + p.uid : null));
+  const restOf = (spec) => (/^(illust|face):/.test(spec.key) ? 'normal' : 'smile');
+  const avatar = (p) => { const sp = peerSpec(p); return charHTML(sp, restOf(sp), { head: true }); };
+  function peerLines(p) {
+    const lv = p.lv || 1, fill = (t) => t.replace(/\{이름\}/g, p.name).replace(/\{직급\}/g, rankOf(lv).title).replace(/\{레벨\}/g, lv);
+    const L = (TALK && TALK.length ? TALK : TALK_DEFAULT).filter((r) => (!r.cond || r.cond === '항상') && !/\{(연속|보스)\}/.test(r.text))
+      .map((r) => [TALK_TYPE[r.type] || 'say', TALK_EXPR[r.expr] || 'normal', fill(String(r.text))]);
+    return L.length ? L : [['say', 'smile', '오늘도 힘내 봅시다!']];
+  }
+  async function charViewer(p) {
+    const m = modal(`<div class="cview"><div class="loading" style="padding-top:40%"><div class="spin"></div>캐릭터를 불러오는 중…</div></div>
+      <h2 style="font-size:22px">${esc(p.name)}</h2><p class="muted" style="text-align:center;margin:0 0 12px">${p.lv ? `Lv.${p.lv} ${rankOf(p.lv).title}` : '아직 입사 전'} · 캐릭터를 눌러 보세요!</p>
+      <button class="btn ghost full" data-close>닫기</button>`);
+    if (p.face && !p.me) await loadPeerFaces([p.uid]);
+    const box = m.el.querySelector('.cview'); if (!box || !box.isConnected) return;
+    const spec = peerSpec(p), L = peerLines(p);
+    let last = -1, taps = [], tm = null;
+    box.innerHTML = `<div class="cvfig">${charHTML(spec, restOf(spec))}</div>`;
+    const fig = box.querySelector('.cvfig');
+    box.onclick = () => {
+      const now = Date.now(); taps = taps.filter((t) => now - t < 3000); taps.push(now);
+      let line;
+      if (taps.length >= 6) { line = ['say', 'angry', '그만 좀 찔러요! 업무 중이라구요!']; taps = []; }
+      else { let i; do { i = Math.floor(Math.random() * L.length); } while (L.length > 1 && i === last); last = i; line = L[i]; }
+      const [type, expr, msg] = line;
+      fig.className = 'cvfig'; fig.innerHTML = charHTML(spec, expr); void fig.offsetWidth; fig.className = 'cvfig ' + (expr === 'angry' ? 'shake' : 'hop');
+      box.querySelectorAll('.talk').forEach((x) => x.remove());
+      box.insertAdjacentHTML('beforeend', `<div class="talk ${type}">${esc(msg)}</div>`);
+      Snd.tap();
+      clearTimeout(tm); tm = setTimeout(() => { if (!fig.isConnected) return; fig.className = 'cvfig'; fig.innerHTML = charHTML(spec, restOf(spec)); box.querySelectorAll('.talk').forEach((x) => x.remove()); }, 3600);
+    };
   }
 
   /* ---------------- 우편함 (응원 · 활동비 · 출제 보상) ---------------- */
@@ -1282,7 +1360,7 @@
     const iOS = /iPad|iPhone|iPod/.test(navigator.userAgent), u = Api.user || {};
     els.screen.innerHTML = `<div class="page"><h2>⚙️ 설정</h2>
       ${Api.demo ? '<div class="box demo">🧪 로컬 데모 모드 — 서버(구글 시트)에 연결되지 않았어요. 기록은 이 브라우저에만 저장돼요.</div>' : ''}
-      ${u.admin ? '<button class="btn full" id="adm" style="margin-bottom:12px">🛠️ 관리자 메뉴 (회원 · 이의 제기 · 문제 · 자료실)</button>' : ''}
+      ${u.admin ? '<button class="btn full" id="adm" style="margin-bottom:12px">🛠️ 관리자 메뉴 (회원 · 캐릭터 · 이의 제기 · 문제 · 자료실)</button>' : ''}
       ${standalone() ? '' : `<div class="box"><h4>📲 앱으로 설치</h4>
         ${iOS ? '<p class="muted">사파리 하단 <b>공유 버튼</b> → <b>홈 화면에 추가</b>를 누르면 앱처럼 전체화면으로 실행돼요.</p>'
         : `<p class="muted">홈 화면에 설치하면 주소창 없이 앱처럼 실행돼요.</p><button class="btn full" id="inst">앱 설치하기</button>`}</div>`}
@@ -1292,6 +1370,8 @@
         <div class="row" style="margin-top:10px;justify-content:space-between"><span>효과음</span><button class="btn ghost" id="snd">${S.sound ? '🔊 켜짐' : '🔇 꺼짐'}</button></div></div>
       <div class="box"><h4>💾 기록</h4><p class="muted">기록은 서버에 자동 저장돼요. 같은 이메일로 로그인하면 다른 기기에서도 이어서 할 수 있어요.</p>
         <button class="btn ghost full" id="sync">지금 저장하기</button></div>
+      <div class="box"><h4>🗑️ 캐릭터 초기화</h4><p class="muted">레벨 · 경험치 · 활동비 · 업적 · 아이템 등 모든 진행 기록을 지우고 신입사원 등록부터 다시 시작해요. 되돌릴 수 없어요.</p>
+        <button class="btn danger full" id="reset">캐릭터 초기화</button></div>
       <button class="btn danger full" id="logout">로그아웃</button>
       <p class="muted" style="text-align:center;margin-top:14px">방카BM 성장기 v2.0 · 문제 ${Api.cachedQuestions().length}개</p>
     </div>`;
@@ -1311,6 +1391,22 @@
         try { await Api.changePassword($('#o').value, $('#n1').value); m.close(); toast('비밀번호를 바꿨어요'); } catch (e) { toast(e.message); }
       };
     };
+    $('#reset').onclick = async () => {
+      if (!(await confirmBox(`정말 초기화할까요?
+
+Lv.${S.lv} ${rankOf(S.lv).title} ${S.name}의 모든 기록(경험치 ${S.totalXp.toLocaleString()} · 활동비 ${won(S.money)} · 업적 ${Object.keys(S.ach).length}개)이 사라지고 되돌릴 수 없어요.`, '초기화', '취소'))) return;
+      const m = modal(`<h2 style="font-size:22px">마지막 확인</h2><p class="muted" style="text-align:center">아래 칸에 <b>초기화</b> 라고 입력해 주세요.</p>
+        <input type="text" id="rsTxt" placeholder="초기화" autocomplete="off"><div class="row" style="margin-top:10px"><button class="btn ghost full" data-close>취소</button><button class="btn danger full" id="rsGo">초기화</button></div>`);
+      $('#rsGo').onclick = async () => {
+        if ($('#rsTxt').value.trim() !== '초기화') return toast('"초기화"라고 정확히 입력해 주세요');
+        $('#rsGo').disabled = true;
+        const prev = S, F = Store.fresh(S.email); F.resetAt = F.created; F.sound = prev.sound;
+        S = F;
+        try { await syncNow(true); }
+        catch (e) { S = prev; $('#rsGo').disabled = false; return toast('서버에 연결하지 못해 초기화하지 않았어요: ' + e.message, 3500); }
+        Store.save(S); m.close(); toast('캐릭터를 초기화했어요. 새로 입사해 볼까요?'); createScreen();
+      };
+    };
     $('#logout').onclick = async () => {
       if (!(await confirmBox('로그아웃할까요?', '로그아웃'))) return;
       await syncNow(); Api.logout(); S = null; location.reload();
@@ -1323,7 +1419,7 @@
   async function pageAdmin() {
     if (!(Api.user || {}).admin) return goHome();
     setNav('settings');
-    const tabs = [['users', '👥 회원'], ['reports', '⚠️ 이의 제기'], ['subs', '✍️ 제출 문제'], ['questions', '📝 문제'], ['lib', '📚 공용 자료']];
+    const tabs = [['users', '👥 회원'], ['chars', '🎭 캐릭터'], ['reports', '⚠️ 이의 제기'], ['subs', '✍️ 제출 문제'], ['questions', '📝 문제'], ['lib', '📚 공용 자료']];
     els.screen.innerHTML = `<div class="page">${backBtn('settings', '설정')}<h2>🛠️ 관리자</h2>
       <div class="seg">${tabs.map(([k, l]) => `<button data-t="${k}" class="${admTab === k ? 'on' : ''}">${l}</button>`).join('')}</div>
       <div id="admBody"><div class="loading"><div class="spin"></div>불러오는 중…</div></div></div>`;
@@ -1332,11 +1428,26 @@
     const body = $('#admBody');
     try {
       if (admTab === 'users') await admUsers(body);
+      else if (admTab === 'chars') await admChars(body);
       else if (admTab === 'reports') await admReports(body);
       else if (admTab === 'questions') await admQuestions(body);
       else if (admTab === 'subs') await admSubmissions(body);
       else await admLib(body);
     } catch (e) { body.innerHTML = `<p class="muted">${esc(e.message)}</p>`; }
+  }
+  async function admChars(body) {
+    const items = await Api.admin.chars();
+    const me = (Api.user || {}).email;
+    items.forEach((x) => { x.me = x.email === me; });
+    body.innerHTML = items.length ? `<p class="muted">회원들의 캐릭터예요. 게임을 시작하지 않았어도 실물 캐릭터를 등록했다면 보여요. 눌러서 크게 보세요.</p>
+      <div class="chargrid">${items.map((x, i) => `<button class="charcard" data-ci="${i}"><span class="rkav">${avatar(x)}</span><b>${esc(x.name)}</b>
+        <small>${x.lv ? `Lv.${x.lv} ${rankOf(x.lv).title}` : '입사 전'}${x.face ? ' · 📷 실물' : ''}${x.active ? '' : ' · 중지'}</small></button>`).join('')}</div>`
+      : '<p class="muted">아직 캐릭터가 있는 회원이 없어요.</p>';
+    body.querySelectorAll('[data-ci]').forEach((b) => b.onclick = () => charViewer(items[+b.dataset.ci]));
+    const fl = items.filter((x) => x.face && !x.me);
+    if (fl.length) loadPeerFaces(fl.map((x) => x.uid), ['normal']).then(() => {
+      body.querySelectorAll('[data-ci]').forEach((b) => { const x = items[+b.dataset.ci]; if (x.face && !x.me) b.querySelector('.rkav').innerHTML = avatar(x); });
+    });
   }
   async function admUsers(body) {
     const users = await Api.admin.users();
@@ -1591,11 +1702,20 @@
       else { hasFace = false; try { localStorage.removeItem(FK); } catch (e) { } }
     } catch (e) { }
     const local = Store.load(u.email);
-    let remote = null;
-    try { const d = await Api.loadProgress(); if (d) remote = Object.assign(Store.fresh(u.email), JSON.parse(d)); } catch (e) { }
-    S = remote && (!local || (remote.updated || 0) > (local.updated || 0)) ? remote : local;
-    if (!S) S = Store.fresh(u.email);
+    let remote = null, failed = false;
+    try { const d = await Api.loadProgress(); if (d) remote = Object.assign(Store.fresh(u.email), JSON.parse(d)); } catch (e) { failed = true; }
+    if (failed && !(local && local.name)) {
+      // 서버 기록을 확인하지 못했는데 새로 만들면 기존 기록을 덮어쓸 수 있다 → 다시 시도만 허용
+      els.screen.innerHTML = `<div class="title-wrap" style="text-align:center"><div class="box">⚠️ 서버에서 내 기록을 불러오지 못했어요.<br><span class="muted">인터넷 연결을 확인한 뒤 다시 시도해 주세요.</span></div>
+        <button class="btn" id="retry">다시 시도</button><button class="btn ghost" id="out">다른 계정으로 로그인</button></div>`;
+      $('#retry').onclick = () => enterGame();
+      $('#out').onclick = () => { Api.logout(); S = null; loginScreen(); };
+      return;
+    }
+    S = pickSave(local, remote) || Store.fresh(u.email);
     S.email = u.email;
+    Store.save(S);
+    if (S.name && remote && S !== remote) syncNow();
     if (!S.name) return createScreen();
     if (!S.story) return prologue();
     titleScreen();

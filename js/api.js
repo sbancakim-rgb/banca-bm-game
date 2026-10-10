@@ -64,7 +64,8 @@ const Api = (() => {
     submitQuestion: (question) => call('submitQuestion', { question }),
     mySubmissions: () => call('mySubmissions').then((r) => r.items),
     loadProgress: () => call('loadProgress').then((r) => r.data),
-    saveProgress: (data, level, totalXp, meta) => call('saveProgress', { data, level, totalXp, meta }),
+    saveProgress: (data, level, totalXp, meta, reset) => call('saveProgress', { data, level, totalXp, meta, reset: !!reset }),
+    peerFaces: (uids, exprs) => call('peerFaces', { uids, exprs }).then((r) => r.faces || {}),
     ranking: (keys) => call('ranking', keys),
     report: (p) => call('report', p),
     news: () => call('news').then((r) => r.items),
@@ -82,6 +83,7 @@ const Api = (() => {
       saveLibrary: (item) => call('adminLibrarySave', { item }),
       info: () => call('adminInfo'),
       submissions: () => call('adminSubmissions').then((r) => r.items),
+      chars: () => call('adminChars').then((r) => r.items),
       resolveSubmission: (no, status, memo, question) => call('adminSubmissionResolve', { no, status, memo, question })
     }
   };
@@ -161,13 +163,17 @@ const Demo = (() => {
       case 'submitQuestion': { const no = 'S' + Date.now().toString().slice(-9); d.subs.unshift({ ...b.question, no, at: Date.now(), email, author: (JSON.parse(d.progress[email] || '{}').name) || u.name, status: '검토' }); store(d); return ok({ no }); }
       case 'mySubmissions': return ok({ items: d.subs.filter((x) => x.email === email) });
       case 'loadProgress': return ok({ data: d.progress[email] || null });
-      case 'saveProgress': d.progress[email] = b.data; store(d); return ok();
+      case 'saveProgress': {
+        try { const o = JSON.parse(d.progress[email] || 'null'); if (o && !b.reset && ((o.resetAt && o.created > (JSON.parse(b.data).created || 0)) || (o.totalXp || 0) > (b.totalXp || 0))) return ok({ stale: true, data: d.progress[email] }); } catch (er) { }
+        d.progress[email] = b.data; store(d); return ok();
+      }
+      case 'peerFaces': return ok({ faces: {} });
       case 'report': { const no = 'R' + Date.now().toString().slice(-8); d.reports.unshift({ no, at: new Date().toISOString(), email, qid: b.qid, cat: b.cat, snapshot: b.snapshot, kind: b.kind, reason: b.reason, status: '접수' }); store(d); return ok({ no }); }
       case 'news': return ok({ items: [
         { title: '[데모] 서버를 연결하면 구글 뉴스의 최신 경제 기사가 여기에 나와요', link: 'https://news.google.com/search?q=%EA%B8%B0%EC%A4%80%EA%B8%88%EB%A6%AC&hl=ko', source: '데모', date: new Date().toString(), topic: '기준금리' },
         { title: '[데모] 보험·방카슈랑스 뉴스', link: 'https://news.google.com/search?q=%EB%B0%A9%EC%B9%B4%EC%8A%88%EB%9E%91%EC%8A%A4&hl=ko', source: '데모', date: new Date().toString(), topic: '보험' }] });
       case 'ranking': {
-        const rows = Object.entries(d.progress).map(([e, raw]) => { try { const p = JSON.parse(raw); return { email: e, name: p.name, lv: p.lv, ...(p.period || {}) }; } catch (er) { return null; } }).filter(Boolean);
+        const rows = Object.entries(d.progress).map(([e, raw]) => { try { const p = JSON.parse(raw); return { email: e, name: p.name, lv: p.lv, look: demoLook(p), ...(p.period || {}) }; } catch (er) { return null; } }).filter(Boolean);
         const r = rankingFrom(rows, b, email); ['week', 'month'].forEach((k) => r[k].list.forEach((x) => x.uid = 'u:' + x.email)); r.cheer = demoCheer(d, email); return ok(r);
       }
       case 'changePassword':
@@ -199,6 +205,8 @@ const Demo = (() => {
       case 'adminLibrarySave': { const it = b.item; if (!it.id) it.id = 'L' + Date.now(); const i = d.lib.findIndex((x) => x.id === it.id); if (i >= 0) d.lib[i] = it; else d.lib.push(it); store(d); return ok(); }
       case 'adminInfo': return ok({ sheetUrl: '' });
       case 'adminSubmissions': return ok({ items: d.subs });
+      case 'adminChars': return ok({ items: Object.entries(d.users).map(([e, x]) => { let p = null; try { p = JSON.parse(d.progress[e] || 'null'); } catch (er) { }
+        return { email: e, uid: 'u:' + e, name: (p && p.name) || x.name || e, member: x.name || '', lv: p && p.name ? p.lv || 1 : 0, look: p ? demoLook(p) : null, face: false, active: x.active }; }).filter((x) => x.look || x.face) });
       case 'adminSubmissionResolve': {
         const x = d.subs.find((y) => y.no === b.no); if (!x) throw new Error('접수번호를 찾지 못했어요');
         x.status = b.status === '승인' ? '승인' : '반려'; x.memo = b.memo || '';
@@ -220,7 +228,7 @@ const Demo = (() => {
 /* 랭킹 계산 — 데모 모드용 (서버는 Code.gs ranking_ 이 같은 규칙으로 계산) */
 function rankingFrom(rows, k, myEmail) {
   const pick = (curKey, xpField, prevKeyField, prevXpField, target) => rows.map((r) => ({
-    name: r.name || '이름없음', lv: r.lv || 1, me: r.email === myEmail, email: r.email,
+    name: r.name || '이름없음', lv: r.lv || 1, me: r.email === myEmail, email: r.email, look: r.look || null, face: false,
     xp: r[curKey] === target ? (r[xpField] || 0) : r[prevKeyField] === target ? (r[prevXpField] || 0) : 0
   })).filter((x) => x.xp > 0).sort((a, b) => b.xp - a.xp);
   return {
@@ -229,4 +237,11 @@ function rankingFrom(rows, k, myEmail) {
     lastWeek: { key: k.lastWk, winner: pick('week', 'weekXp', 'prevWeek', 'prevWeekXp', k.lastWk)[0] || null },
     lastMonth: { key: k.lastMo, winner: pick('month', 'monthXp', 'prevMonth', 'prevMonthXp', k.lastMo)[0] || null }
   };
+}
+
+/* 캐릭터 겉모습만 (데모 — 서버는 Code.gs lookOf_) */
+function demoLook(p) {
+  if (!p || !p.name) return null;
+  const o = {}; ['gender', 'hairStyle', 'hairColor', 'skin', 'face', 'age', 'glasses', 'glassesColor', 'illust'].forEach((k) => { if (p[k] != null) o[k] = p[k]; });
+  return o;
 }
