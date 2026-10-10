@@ -1,31 +1,43 @@
 /* =========================================================
    Sprites — 일러스트 이미지 자동 연결
-   img/chars/{키}_{표정}.png , img/bg/{배경}.jpg|png 가 있으면 사용하고,
-   없으면 SVG(임시 그림)로 대체한다.
+   · NPC / 직급별 주인공:  img/chars/{키}_{표정}.png
+   · 일러스트 주인공 선택: img/player/{m1~m8 | f1~f8}_{표정}.png
+   · 배경:                 img/bg/{배경}.jpg|png
+   파일이 없으면 SVG(코드 그림)로 대체한다.
    ========================================================= */
 const Sprites = (() => {
   const EXPRS = ['normal', 'smile', 'angry', 'worried'];
   const MAP = { happy: 'smile', smirk: 'smile', shout: 'angry', sad: 'worried', surprised: 'worried' };
-  const have = {}, bgs = {};
+  const have = {}, base = {}, bgs = {}, presets = { m: [], f: [] };
   const probe = (src) => new Promise((r) => { const i = new Image(); i.onload = () => r(true); i.onerror = () => r(false); i.src = src; });
 
+  async function register(key, path) {
+    if (!(await probe(`${path}_normal.png`))) return false;
+    have[key] = new Set(['normal']); base[key] = path;
+    await Promise.all(EXPRS.slice(1).map(async (e) => { if (await probe(`${path}_${e}.png`)) have[key].add(e); }));
+    return true;
+  }
   async function init(keys, bgNames) {
     await Promise.all([
-      ...keys.map(async (k) => {
-        if (!(await probe(`img/chars/${k}_normal.png`))) return;
-        have[k] = new Set(['normal']);
-        await Promise.all(EXPRS.slice(1).map(async (e) => { if (await probe(`img/chars/${k}_${e}.png`)) have[k].add(e); }));
-      }),
+      ...keys.map((k) => register(k, `img/chars/${k}`)),
+      ...['m', 'f'].flatMap((g) => Array.from({ length: 8 }, (_, i) => `${g}${i + 1}`).map(async (id) => {
+        if (await register('illust:' + id, `img/player/${id}`)) presets[g].push(id);
+      })),
       ...bgNames.map(async (b) => {
         if (await probe(`img/bg/${b}.jpg`)) bgs[b] = `img/bg/${b}.jpg`;
         else if (await probe(`img/bg/${b}.png`)) bgs[b] = `img/bg/${b}.png`;
       })
     ]);
+    ['m', 'f'].forEach((g) => presets[g].sort((a, b) => parseInt(a.slice(1)) - parseInt(b.slice(1))));
   }
   function char(key, expr) {
     const s = have[key]; if (!s) return null;
     const e = s.has(expr) ? expr : s.has(MAP[expr]) ? MAP[expr] : 'normal';
-    return `img/chars/${key}_${e}.png`;
+    return `${base[key]}_${e}.png`;
   }
-  return { init, char, bg: (n) => bgs[n] || null, has: (k) => !!have[k], count: () => Object.keys(have).length + Object.keys(bgs).length };
+  return {
+    init, char, bg: (n) => bgs[n] || null, has: (k) => !!have[k],
+    presets: (g) => presets[g] || [],
+    count: () => Object.keys(have).length + Object.keys(bgs).length
+  };
 })();

@@ -106,7 +106,8 @@
     const look = clone(r.look);
     if (f && look.type === 'suit') { delete look.tie; look.necklace = '#f5e6c4'; }
     if (f && look.type === 'shirt') look.shirt = '#fdf7fb';
-    return { key: `player_${S.gender}_${RANKS.indexOf(r)}`, gender: S.gender, skin: S.skin,
+    const illust = S.illust && S.illust[0] === S.gender && Sprites.has('illust:' + S.illust) ? 'illust:' + S.illust : null;
+    return { key: illust || `player_${S.gender}_${RANKS.indexOf(r)}`, gender: S.gender, skin: S.skin,
       eye: fc.eye, eyeScale: fc.eyeScale, face: fc.face, eyeColor: fc.eyeColor, lashes: !!fc.lashes, blush: !!fc.blush, brow: fc.brow, thickBrows: fc.thickBrows,
       age: S.age, glasses: S.glasses || null, glassesColor: S.glassesColor,
       hair: { style: S.hairStyle, color: S.hairColor }, outfit: look, aura: !!r.aura, earrings: f && lv >= 20 ? '#f2c641' : null };
@@ -1612,12 +1613,18 @@
     stageMode('creating'); setBg(isNew ? 'office' : 'booth');
     els.hud.classList.add('hidden'); els.nav.classList.add('hidden');
     const backup = clone(S);
-    const LOOK = ['gender', 'hairStyle', 'hairColor', 'skin', 'face', 'age', 'glasses', 'glassesColor'];
+    const LOOK = ['gender', 'hairStyle', 'hairColor', 'skin', 'face', 'age', 'glasses', 'glassesColor', 'illust'];
+    let tab = S.illust ? 'illust' : 'custom';
     const changed = () => LOOK.some((k) => S[k] !== backup[k]);
     const sw = (arr, key, cur) => arr.map((c) => `<button data-${key}="${c}" class="${cur === c ? 'on' : ''}" style="background:${c}"></button>`).join('');
     const render = () => {
       setChar(playerSpec(), 'smile');
       const sprite = Sprites.has(`player_${S.gender}_0`);
+      const presets = Sprites.presets(S.gender), canPick = presets.length > 0 && mode !== 'salon';
+      if (!canPick) tab = 'custom';
+      const tabs = canPick ? `<div class="seg looktab"><button data-tab="custom" class="${tab === 'custom' ? 'on' : ''}">✏️ 직접 꾸미기</button><button data-tab="illust" class="${tab === 'illust' ? 'on' : ''}">🖼️ 일러스트 고르기</button></div>` : '';
+      const illustPart = `<label>일러스트 캐릭터</label><div class="illusts">${presets.map((id, i) => `<button data-il="${id}" class="${S.illust === id ? 'on' : ''}"><div><img src="${Sprites.char('illust:' + id, 'smile')}" alt=""></div>${i + 1}번</button>`).join('')}</div>
+        <p class="muted">일러스트 캐릭터는 헤어·얼굴을 따로 바꿀 수 없고, 다른 일러스트로만 바꿀 수 있어요.</p>`;
       const hairPart = `
         <label>헤어스타일</label><div class="seg">${PLAYER_HAIR[S.gender].map((h) => `<button data-h="${h.style}" class="${S.hairStyle === h.style ? 'on' : ''}">${h.label}</button>`).join('')}</div>
         <label>머리색</label><div class="swatches">${sw(HAIR_COLORS, 'c', S.hairColor)}</div>
@@ -1633,13 +1640,18 @@
         <div class="muted">${sub}</div>
         ${isNew ? `<label>이름</label><input type="text" id="nm" maxlength="8" placeholder="이름 (최대 8자)" value="${esc(S.name)}">
           <label>성별</label><div class="seg">${[['f', '여성'], ['m', '남성']].map(([v, l]) => `<button data-g="${v}" class="${S.gender === v ? 'on' : ''}">${l}</button>`).join('')}</div>` : ''}
-        ${sprite ? '<p class="muted">일러스트 캐릭터를 사용 중이라 세부 외모는 고정이에요.</p>'
+        ${tabs}
+        ${mode === 'salon' && S.illust ? '<p class="muted" style="margin-top:12px">일러스트 캐릭터는 헤어를 바꿀 수 없어요. 🏥 성형외과에서 다른 일러스트로 바꾸거나 직접 꾸미기로 돌아갈 수 있어요.</p>'
+          : tab === 'illust' ? illustPart
+          : sprite ? '<p class="muted">일러스트 캐릭터를 사용 중이라 세부 외모는 고정이에요.</p>'
           : isNew ? hairPart + facePart : mode === 'salon' ? hairPart : facePart}
         <div class="row" style="margin-top:16px">${isNew ? '' : '<button class="btn ghost full" id="cancel">나가기</button>'}
           <button class="btn full" id="go">${isNew ? '첫 출근하기 →' : `결제하고 변신 (${won(shop.price)})`}</button></div></div>`;
       const nm = $('#nm'); if (nm) nm.oninput = (e) => S.name = e.target.value;
       const on = (sel, fn) => els.screen.querySelectorAll(sel).forEach((b) => b.onclick = () => { fn(b); render(); });
-      on('[data-g]', (b) => { S.gender = b.dataset.g; S.hairStyle = PLAYER_HAIR[S.gender][0].style; S.face = FACES[S.gender][0].id; });
+      on('[data-g]', (b) => { S.gender = b.dataset.g; S.hairStyle = PLAYER_HAIR[S.gender][0].style; S.face = FACES[S.gender][0].id; if (S.illust && S.illust[0] !== S.gender) S.illust = tab === 'illust' && Sprites.presets(S.gender)[0] || null; });
+      on('[data-tab]', (b) => { tab = b.dataset.tab; S.illust = tab === 'illust' ? (S.illust || presets[0]) : null; });
+      on('[data-il]', (b) => S.illust = b.dataset.il);
       on('[data-a]', (b) => S.age = +b.dataset.a);
       on('[data-f]', (b) => S.face = b.dataset.f);
       on('[data-h]', (b) => S.hairStyle = b.dataset.h);
@@ -1655,7 +1667,7 @@
           if (!S.name) return toast('이름을 입력해 주세요');
           save(); return prologue();
         }
-        if (!changed()) return toast('바뀐 게 없어요. 마음에 드는 스타일을 골라 보세요!');
+        if (!changed()) return toast('바뀐 게 없어요. 마음에 드는 모습을 골라 보세요!');
         if (S.money < shop.price) return toast(`활동비가 ${won(shop.price - S.money)} 부족해요`);
         S.money -= shop.price; inc('purchases'); Snd.coin(); checkAch(); save();
         toast(mode === 'salon' ? '💇 "고객님, 완전 잘 어울리세요!"' : '🏥 "붓기가 빠지면 더 자연스러워져요~"', 3000);

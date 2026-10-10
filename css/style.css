@@ -390,3 +390,11 @@ input[type=email], input[type=password] { font: inherit; width: 100%; padding: 1
 .lb { display: block; font-size: 12.5px; font-weight: 800; margin: 10px 0 4px; }
 .rankrow .acts { display: flex; gap: 6px; flex: none; }
 .rankrow .acts .btn { padding: 6px 10px; }
+
+/* v5 — 일러스트 캐릭터 선택 */
+.looktab { margin-top: 12px; }
+.illusts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.illusts button { background: #fff; border-radius: 14px; padding: 4px 4px 6px; font-size: 12px; font-weight: 700; box-shadow: inset 0 0 0 2px #ecd7e1; }
+.illusts button.on { box-shadow: inset 0 0 0 3px var(--pink); background: #fff3f7; }
+.illusts button div { height: 92px; border-radius: 10px; overflow: hidden; background: linear-gradient(#dcebfa, #f7f9fc); margin-bottom: 4px; }
+.illusts img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 8%; }
