@@ -30,7 +30,7 @@ const NPCS = {
   hwangpro: {
     name: '황프로', role: '방카OP센터 · 백오피스', bg: 'office', time: 25,
     spec: { gender: 'f', skin: SKIN.a, eye: 'round', eyeColor: '#6b3f2a', lashes: true, blush: true, earrings: '#e9d8a6',
-      hair: { style: 'female_bob', color: '#4a2f27' }, glasses: 'half', glassesColor: '#b07a4f',
+      hair: { style: 'female_long', color: '#5a3a2c' }, glasses: 'half', glassesColor: '#b07a4f',
       outfit: { type: 'cardigan', main: '#9db8a7', inner: '#fffaf0', necklace: '#f5e6c4' } },
     intro: ['서류 한 장, 서명 하나가 계약을 살리고 죽여요.', '청약부터 지급까지, 백오피스 체크리스트 들어갑니다~', '오늘은 꼼꼼함 테스트예요. 대충은 안 돼요!'],
     ok: ['딩동댕~ 서류 반송 걱정 없겠네요.', '꼼꼼하시네요! 마음에 들어요.', '정답! 그대로만 하면 민원 제로예요.'],
@@ -135,7 +135,7 @@ const NPCS = {
   yunpro: {
     name: '윤프로', role: '입사 동기 · 쉬움', bg: 'office', time: 30, diff: 1,
     spec: { gender: 'f', skin: SKIN.a, eye: 'round', eyeColor: '#6a3b5a', lashes: true, blush: true,
-      hair: { style: 'female_pony', color: '#7a4a32' },
+      hair: { style: 'female_long', color: '#8a5a3a' },
       outfit: { type: 'suit', main: '#e8a0b4', shirt: '#fff', ribbon: '#ffffff' } },
     intro: ['동기야~ 용어 퀴즈 배틀 한 판 할래?', '오늘 점심 내기! 용어 퀴즈로 정하자~'],
     ok: ['헐 대박, 이것도 알아?', '오~ 동기 좀 치는데?'],
