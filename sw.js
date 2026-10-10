@@ -1,7 +1,7 @@
 /* Service worker — required for Chrome's install prompt.
    Bump CACHE whenever you ship changed files, or returning viewers keep
    the old shell: a cache-first worker will happily serve last week's app. */
-const CACHE = "bmq-v19";
+const CACHE = "bmq-v20";
 const SHELL = [
   "./", "./index.html", "./manifest.webmanifest",
   "./icons/icon-192.png", "./icons/icon-512.png", "./icons/apple-touch-icon.png",
@@ -36,7 +36,7 @@ self.addEventListener("fetch", (e) => {
   // with the cached shell as the offline fallback.
   if (req.mode === "navigate") {
     e.respondWith(
-      fetch(req)
+      fetch(req.url, { cache: 'no-cache', credentials: 'same-origin' })
         .then((res) => {
           const copy = res.clone();
           caches.open(CACHE).then((c) => c.put("./index.html", copy));
@@ -55,7 +55,8 @@ self.addEventListener("fetch", (e) => {
     return res;
   };
   if (fresh) {
-    e.respondWith(fetch(req).then(save).catch(() => caches.match(req)));
+    // no-cache: 브라우저가 10분간 쥐고 있는 옛 파일 대신 서버에 새 버전이 있는지 매번 확인
+    e.respondWith(fetch(req, { cache: 'no-cache' }).then(save).catch(() => caches.match(req)));
     return;
   }
   e.respondWith(
