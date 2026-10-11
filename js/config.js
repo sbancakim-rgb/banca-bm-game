@@ -309,6 +309,11 @@ const CATS = {
   econ: { label: '경제학', group: 'econ', icon: '🎓', npcs: ['jogyo', 'kimgyosu', 'parkgyosu'], byDiff: true, color: '#6a4c93', desc: '연수원 강의' },
   term: { label: '경제 용어', group: 'term', icon: '📖', npcs: ['yunpro', 'choiseonim', 'ochajang'], byDiff: true, color: '#c9831f', desc: '사무실 동료' }
 };
+/* 미니게임 보상 (하루 한 번씩) — 미로: 제한 시간 안에 도착 / 질주: 30초 이상 버티기 */
+const MINI_REWARD = { maze: { cash: 100, xp: 5 }, run: { cash: 100, xp: 5, need: 30000 } };
+/* 방카 상품 출제 비중: 주력 플래티넘행복연금 2 · 즉시연금 1 · 그 밖의 상품 0.5 (태그·질문으로 구분) */
+const PRODUCT_FOCUS = [{ re: /플래티넘/, w: 2 }, { re: /즉시연금|즉시형/, w: 1 }];
+const PRODUCT_OTHER_W = 0.5;
 const CAT_ORDER = ['banca_general', 'banca_product', 'banca_backoffice', 'market', 'econ', 'term'];
 const GROUPS = {
   banca: { label: '방카슈랑스', cats: ['banca_general', 'banca_product', 'banca_backoffice'] },

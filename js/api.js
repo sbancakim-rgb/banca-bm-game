@@ -90,6 +90,7 @@ const Api = (() => {
     saveProgress: (data, level, totalXp, meta, reset) => call('saveProgress', { data, level, totalXp, meta, reset: !!reset }),
     peerFaces: (uids, exprs) => call('peerFaces', { uids, exprs }).then((r) => r.faces || {}),
     ranking: (keys) => call('ranking', keys),
+    miniRank: (day) => call('miniRank', { day }),
     report: (p) => call('report', p),
     news: () => call('news').then((r) => r.items),
     changePassword: (old, next) => call('changePassword', { old, next }),
@@ -191,6 +192,14 @@ const Demo = (() => {
         d.progress[email] = b.data; store(d); return ok();
       }
       case 'peerFaces': return ok({ faces: {} });
+      case 'miniRank': {
+        const rows = Object.entries(d.progress).map(([e, raw]) => { try { const p = JSON.parse(raw); return p.name && p.mini ? { e, p } : null; } catch (er) { return null; } }).filter(Boolean);
+        const item = (r, ms) => ({ name: r.p.name, lv: r.p.lv || 1, me: r.e === email, uid: 'u:' + r.e, look: demoLook(r.p), face: false, ms });
+        return ok({
+          maze: rows.filter((r) => r.p.mini.maze && r.p.mini.maze.date === b.day && r.p.mini.maze.best).map((r) => item(r, r.p.mini.maze.best)).sort((a, c) => a.ms - c.ms).slice(0, 10),
+          run: rows.filter((r) => r.p.mini.run && r.p.mini.run.best).map((r) => item(r, r.p.mini.run.best)).sort((a, c) => c.ms - a.ms).slice(0, 10)
+        });
+      }
       case 'report': { const no = 'R' + Date.now().toString().slice(-8); d.reports.unshift({ no, at: new Date().toISOString(), email, qid: b.qid, cat: b.cat, snapshot: b.snapshot, kind: b.kind, reason: b.reason, status: '접수' }); store(d); return ok({ no }); }
       case 'news': return ok({ items: [
         { title: '[데모] 서버를 연결하면 구글 뉴스의 최신 경제 기사가 여기에 나와요', link: 'https://news.google.com/search?q=%EA%B8%B0%EC%A4%80%EA%B8%88%EB%A6%AC&hl=ko', source: '데모', date: new Date().toString(), topic: '기준금리' },

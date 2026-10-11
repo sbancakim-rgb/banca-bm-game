@@ -51,6 +51,14 @@ const Sprites = (() => {
     registerData: (key, map) => { data[key] = map; have[key] = new Set(Object.keys(map)); },
     init, char, bg: (n) => bgs[n] || null, has: (k) => !!have[k],
     isIllust: (k) => !!illust[k] || /^(illust|face):/.test(k), // 일러스트 시트에서 자른 그림 (반신 · 같은 비율)
+    // 동그란 얼굴 사진: 기본 표정에서 얼굴 전체가 들어가게 미리 잘라 둔 작은 그림
+    thumb: (k) => {
+      if (!k) return null;
+      if (data[k]) return data[k].thumb || null;
+      if (illust[k]) return `img/chars/thumb/${k}.webp`;
+      const m = /^illust:(.+)$/.exec(k);
+      return m && have[k] ? `img/player/thumb/${m[1]}.webp` : null;
+    },
     presets: (g) => presets[g] || [],
     count: () => Object.keys(have).length + Object.keys(bgs).length
   };

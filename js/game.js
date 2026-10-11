@@ -6,6 +6,12 @@
   const esc = (t) => String(t ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   // 일러스트(PNG)가 있으면 이미지, 없으면 SVG 임시 그림
   function charHTML(spec, expr = 'normal', opts = {}) {
+    if (opts.head) {
+      // 동그란 얼굴 칸: 항상 기본 표정, 얼굴 전체가 들어가는 썸네일 우선
+      const t = spec && Sprites.thumb(spec.key);
+      if (t) return `<img class="avthumb" src="${t}" alt="" draggable="false" onerror="this.remove()">`;
+      expr = 'normal';
+    }
     const src = spec && spec.key && Sprites.char(spec.key, expr);
     if (!src) return Art.portrait(spec, expr, opts);
     const cls = opts.head ? 'sprite head' : opts.bust ? 'sprite bust' : 'sprite';
@@ -259,8 +265,18 @@
     const fresh = sh.filter((q) => !seen(q));
     return old.length >= 20 ? [...old, ...fresh] : [...fresh, ...old];
   }
+  // 방카 상품은 상품별 비중대로 먼저 상품을 고르고, 그 안에서 문제를 고른다
+  const productGroup = (q) => { const t = (q.tags || []).join(' ') + ' ' + q.q; const i = PRODUCT_FOCUS.findIndex((g) => g.re.test(t)); return i < 0 ? 'etc' : i; };
+  function focusProducts(avail) {
+    if (!avail.length || avail.some((q) => q.cat !== 'banca_product')) return avail;
+    const groups = {}; avail.forEach((q) => (groups[productGroup(q)] = groups[productGroup(q)] || []).push(q));
+    const keys = Object.keys(groups), w = (k) => (k === 'etc' ? PRODUCT_OTHER_W : PRODUCT_FOCUS[k].w);
+    let r = Math.random() * keys.reduce((a, k) => a + w(k), 0);
+    for (const k of keys) { if ((r -= w(k)) < 0) return groups[k]; }
+    return groups[keys[0]];
+  }
   function takeByDiff(list, diff, used, preferSeen) {
-    const avail = list.filter((q) => !used.has(q.id));
+    const avail = focusProducts(list.filter((q) => !used.has(q.id)));
     const exact = rankForPick(avail.filter((q) => q.diff === diff), preferSeen);
     const q = exact[0] || rankForPick(avail, preferSeen).sort((a, b) => Math.abs(a.diff - diff) - Math.abs(b.diff - diff))[0];
     if (q) used.add(q.id);
@@ -665,7 +681,7 @@
   els.nav.querySelectorAll('button').forEach((b) => b.onclick = () => go(b.dataset.go));
   function go(k) {
     if (inSession) return;
-    ({ home: goHome, study: pageStudy, shop: pageShop, char: pageChar, settings: pageSettings, wrong: pageWrong, lib: pageLib, news: pageNews, admin: pageAdmin, rank: pageRank, submit: pageSubmit })[k]();
+    ({ home: goHome, study: pageStudy, shop: pageShop, char: pageChar, settings: pageSettings, wrong: pageWrong, lib: pageLib, news: pageNews, admin: pageAdmin, rank: pageRank, submit: pageSubmit, drive: pageDrive })[k]();
   }
   const backBtn = (to, label) => `<button class="back" data-back="${to}">← ${label}</button>`;
   const bindBack = () => els.screen.querySelectorAll('[data-back]').forEach((b) => b.onclick = () => go(b.dataset.back));
@@ -706,6 +722,7 @@
       }).join('')}</div>
       <div class="row" style="margin-top:12px"><button class="studycta" data-go2="study" style="margin-top:0">📚 <b>학습회</b>에서<br>계속 공부하기 →</button>
         <button class="studycta rankcta" data-go2="rank" style="margin-top:0">🏆 <b>최우수BM</b><br>주간·월간 랭킹 →</button></div>
+      <button class="studycta drivecta" data-go2="drive">🚗 <b>BM 드라이빙</b> · 출근길 미로 / 고속도로 질주 <small>미니게임 · 시간 대결 →</small></button>
     </div>
     <button class="chartap" id="charTap" aria-label="내 캐릭터에게 말 걸기"></button>`;
     els.screen.querySelectorAll('.card[data-cat]').forEach((c) => c.onclick = () => {
@@ -1041,6 +1058,69 @@
       Snd.tap();
       clearTimeout(tm); tm = setTimeout(() => { if (!fig.isConnected) return; fig.className = 'cvfig'; fig.innerHTML = charHTML(spec, restOf(spec)); box.querySelectorAll('.talk').forEach((x) => x.remove()); }, 3600);
     };
+  }
+
+  /* ---------------- 미니게임: BM 드라이빙 ---------------- */
+  const miniState = () => {
+    const m = S.mini || (S.mini = { maze: { date: '', best: 0 }, run: { best: 0 }, reward: { date: '', maze: false, run: false } });
+    if (m.reward.date !== today()) m.reward = { date: today(), maze: false, run: false };
+    if (m.maze.date !== today()) m.maze = { date: today(), best: 0 };
+    return m;
+  };
+  function miniResult(kind, res) {
+    const m = miniState(), lines = [];
+    if (kind === 'maze') {
+      if (!res.ok) return { msg: '다시 도전해 보세요! 길을 기억하면 훨씬 빨라져요.' };
+      if (!m.maze.best || res.ms < m.maze.best) { lines.push(m.maze.best ? `🎉 오늘 최고 기록 경신! (이전 ${Mini.fmt(m.maze.best)})` : '🎉 오늘 첫 도착!'); m.maze.best = res.ms; }
+    } else {
+      if (!m.run.best || res.ms > m.run.best) { lines.push(m.run.best ? `🎉 최고 기록 경신! (이전 ${Mini.fmt(m.run.best)})` : '🎉 첫 기록!'); m.run.best = res.ms; }
+    }
+    const rw = MINI_REWARD[kind];
+    if (!m.reward[kind] && (kind === 'maze' || res.ms >= rw.need)) {
+      m.reward[kind] = true; earn(rw.cash); const ups = addXp(rw.xp); inc('miniPlays');
+      lines.push(`오늘의 드라이빙 보상 +${won(rw.cash)} · +${rw.xp}XP`);
+      if (ups.length) lines.push(`⬆️ Lv.${S.lv} 달성!`);
+    } else if (!m.reward[kind] && kind === 'run') lines.push(`${rw.need / 1000}초 이상 버티면 오늘의 보상 +${won(rw.cash)}!`);
+    checkAch(); save(); syncNow(); renderHud();
+    return { msg: lines.join('<br>') };
+  }
+  async function playMini(kind) {
+    const m = miniState();
+    inSession = true; els.nav.classList.add('hidden');
+    try { await Mini.play(kind, { seed: 'maze|' + today(), best: kind === 'maze' ? m.maze.best : m.run.best, onResult: (r) => miniResult(kind, r) }); }
+    finally { inSession = false; els.nav.classList.remove('hidden'); pageDrive(); }
+  }
+  async function pageDrive() {
+    setNav('home');
+    const m = miniState(), day = today();
+    const card = (kind, icon, title, desc, best, rw) => `<button class="drivecard" data-mini="${kind}"><span class="dc-ic">${icon}</span><b>${title}</b><small>${desc}</small>
+      <span class="dc-best">${best ? `내 기록 ${Mini.fmt(best)}` : '아직 기록 없음'}</span><span class="dc-rw ${m.reward[kind] ? 'done' : ''}">${m.reward[kind] ? '✅ 오늘 보상 받음' : rw}</span></button>`;
+    els.screen.innerHTML = `<div class="page">${backBtn('home', '오늘 일정')}<h2>🚗 BM 드라이빙</h2>
+      <p class="muted">방카BM은 운전 실력도 실력! 지점을 누비며 동료들과 시간 대결을 해 보세요.</p>
+      <div class="drivecards">
+        ${card('maze', '🗺️', '출근길 미로', '본사에서 지점까지 60초 안에! 오늘의 미로는 모두 같아요', m.maze.best, `도착하면 +${won(MINI_REWARD.maze.cash)}`)}
+        ${card('run', '🏎️', '고속도로 질주', '1인칭 운전 · 날아오는 장애물 피하기 · 점점 빨라져요', m.run.best, `${MINI_REWARD.run.need / 1000}초 버티면 +${won(MINI_REWARD.run.cash)}`)}
+      </div>
+      <div class="seg" style="margin-top:14px"><button data-mr="maze" class="on">🗺️ 오늘의 미로 순위</button><button data-mr="run">🏎️ 질주 명예의 전당</button></div>
+      <div id="miniRank"><div class="loading"><div class="spin"></div>순위를 불러오는 중…</div></div></div>`;
+    bindBack();
+    els.screen.querySelectorAll('[data-mini]').forEach((b) => b.onclick = () => playMini(b.dataset.mini));
+    let tab = 'maze', data = null;
+    const show = () => {
+      const box = $('#miniRank'); if (!box || !data) return;
+      const list = data[tab] || [];
+      primePeerFaces(list);
+      box.innerHTML = list.length ? list.map((x, i) => `<div class="rankrow ${x.me ? 'me' : ''}"><span class="rk">${['🥇', '🥈', '🥉'][i] || i + 1}</span><span class="rkav" style="cursor:default">${avatar(x)}</span>
+        <span class="nm">${esc(x.name)}${x.me ? ' (나)' : ''}<small>Lv.${x.lv} ${rankOf(x.lv).title}</small></span><b class="mini-rec">${Mini.fmt(x.ms)}</b></div>`).join('')
+        : `<p class="muted" style="text-align:center;margin-top:24px">${tab === 'maze' ? '오늘 미로를 통과한 사람이 아직 없어요. 첫 기록의 주인공이 되어 보세요!' : '아직 기록이 없어요.'}</p>`;
+      const fl = needFull(list); if (fl.length) loadPeerFaces(fl.map((x) => x.uid), ['normal']).then(show);
+    };
+    els.screen.querySelectorAll('[data-mr]').forEach((b) => b.onclick = () => { tab = b.dataset.mr; els.screen.querySelectorAll('[data-mr]').forEach((x) => x.classList.toggle('on', x === b)); show(); });
+    try { await syncNow(); data = await Api.miniRank(day); } catch (e) { const box = $('#miniRank'); if (box) box.innerHTML = `<p class="muted">${esc(e.message)}</p>`; return; }
+    // 방금 낸 내 기록은 이 기기 값으로 바로 반영
+    const mine = (list, ms, asc) => { if (!ms) return list; let me = list.find((x) => x.me); if (!me) { me = { name: S.name, lv: S.lv, me: true, uid: '', ms }; list.push(me); } me.ms = asc ? Math.min(me.ms, ms) : Math.max(me.ms, ms); return list.sort((a, b) => (asc ? a.ms - b.ms : b.ms - a.ms)).slice(0, 10); };
+    data.maze = mine(data.maze || [], m.maze.best, true); data.run = mine(data.run || [], m.run.best, false);
+    show();
   }
 
   /* ---------------- 우편함 (응원 · 활동비 · 출제 보상) ---------------- */

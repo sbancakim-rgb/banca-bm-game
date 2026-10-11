@@ -399,7 +399,7 @@ input[type=email], input[type=password] { font: inherit; width: 100%; padding: 1
 .illusts button div { height: 92px; border-radius: 10px; overflow: hidden; background: linear-gradient(#dcebfa, #f7f9fc); margin-bottom: 4px; }
 .illusts img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 8%; }
 /* 일러스트 주인공: 작은 얼굴 동그라미·상반신 썸네일 위치 */
-img.sprite.head.illust { width: 250%; left: -75%; top: -54%; }
+img.sprite.head.illust { width: 167%; left: -33%; top: -8%; }
 img.sprite.bust.illust { width: 135%; left: -17%; top: -3%; }
 .box.facebox { margin-top: 12px; background: linear-gradient(135deg, #fff3c4, #ffe0ea); font-size: 14.5px; line-height: 1.5; }
 /* 말풍선: 얼굴을 가리지 않게 오른쪽 아래(어깨 옆, 일정 패널 바로 위)로 — 꼬리는 위쪽 얼굴을 향함 */
@@ -460,4 +460,34 @@ img.sprite.bust.illust { width: 135%; left: -17%; top: -3%; }
 .bossrow .avas { display: flex; flex: none; }
 .bossrow .avas .ava:not(:only-child) { width: 40px; height: 40px; }
 .bossrow .avas .ava + .ava { margin-left: -12px; }
-.avthumb { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.avthumb { display: block; position: absolute; left: 0; top: 0; width: 100%; height: 100%; object-fit: cover; }
+.hud-ava { position: relative; }
+
+/* BM 드라이빙 (미니게임) */
+.drivecta { display: block; width: 100%; margin-top: 10px; text-align: left; background: linear-gradient(135deg, #e6efff, #fff3c4); }
+.drivecta small { display: block; color: var(--ink2); font-size: 12px; margin-top: 2px; }
+.drivecards { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+.drivecard { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; text-align: left; background: #fff; border: 0; border-radius: 18px; padding: 14px 12px; box-shadow: 0 3px 12px rgba(60,20,60,.1); font: inherit; cursor: pointer; }
+.drivecard .dc-ic { font-size: 34px; } .drivecard b { font-size: 16px; } .drivecard small { color: var(--ink2); font-size: 12px; line-height: 1.4; }
+.drivecard .dc-best { margin-top: 4px; font-weight: 800; color: var(--blue); font-size: 13px; }
+.drivecard .dc-rw { font-size: 12px; color: #c2185b; font-weight: 700; } .drivecard .dc-rw.done { color: #2e7d32; }
+.mini-rec { font-variant-numeric: tabular-nums; color: var(--blue); }
+#mini { position: fixed; inset: 0; z-index: 60; display: flex; flex-direction: column; background: #1e1830; color: #fff; padding: calc(8px + var(--safe-t)) 12px calc(10px + var(--safe-b)); user-select: none; -webkit-user-select: none; touch-action: none; }
+.mini-top { display: flex; align-items: center; gap: 10px; height: 44px; }
+.mini-top b { flex: 1; font-family: 'Jua', sans-serif; font-size: 20px; font-weight: 400; }
+.mini-x { width: 38px; height: 38px; border-radius: 50%; border: 0; background: rgba(255,255,255,.15); color: #fff; font-size: 18px; }
+.mini-time { font-variant-numeric: tabular-nums; font-weight: 800; color: #ffd66b; }
+.mini-stage { position: relative; flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; }
+.mini-stage canvas { border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,.4); touch-action: none; }
+.mini-msg { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; }
+.mini-msg.on { display: flex; }
+.mini-count { font-family: 'Jua', sans-serif; font-size: 72px; color: #fff; text-shadow: 0 4px 16px rgba(0,0,0,.5); animation: pop .4s; }
+.mini-end { width: min(320px, 92%); background: #fff; color: var(--ink); border-radius: 22px; padding: 18px; text-align: center; box-shadow: 0 16px 40px rgba(0,0,0,.4); animation: pop .3s; }
+.mini-end h3 { margin: 0 0 6px; font-family: 'Jua', sans-serif; font-weight: 400; font-size: 24px; } .mini-end p { margin: 6px 0; line-height: 1.5; font-size: 14px; }
+.mini-end .row { margin-top: 12px; } .mini-end .row .btn { flex: 1; }
+.mini-pad { display: grid; gap: 8px; padding-top: 10px; }
+.mini-pad button { border: 0; border-radius: 16px; background: rgba(255,255,255,.14); color: #fff; font-size: 20px; font-weight: 800; min-height: 54px; touch-action: manipulation; }
+.mini-pad button:active { background: rgba(255,111,145,.6); }
+.mini-pad.two { grid-template-columns: 1fr 1fr; } .mini-pad.two button { min-height: 64px; font-size: 18px; }
+.mini-pad.four { grid-template-columns: repeat(3, 1fr); grid-template-areas: ". up ." "left down right"; max-width: 260px; margin: 0 auto; width: 100%; }
+.mini-pad.four [data-d="up"] { grid-area: up; } .mini-pad.four [data-d="left"] { grid-area: left; } .mini-pad.four [data-d="down"] { grid-area: down; } .mini-pad.four [data-d="right"] { grid-area: right; }
