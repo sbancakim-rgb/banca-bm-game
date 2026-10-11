@@ -213,6 +213,28 @@ const NPCS = {
     timeout: ['저 창구 들어가 봐야 해서요.'],
     end: { good: '좋아요, 다음 주 직원 교육 맡겨볼게요!', bad: '다음에 다시 이야기해요.' }
   },
+  vicemgr: {
+    name: '이 부지점장', role: '△△은행 OO지점 부지점장 · 일간 보스', bg: 'branch_office', time: 25,
+    spec: { gender: 'm', skin: SKIN.b, eye: 'narrow', eyeColor: '#2b2420', wrinkles: true,
+      hair: { style: 'male_side', color: '#3b3436' }, glasses: 'round', glassesColor: '#5a4a3a',
+      outfit: { type: 'suit', main: '#3a4256', tie: '#7a2e3a', acc: ['pin'] } },
+    intro: ['지점장님 보고 전에 제가 먼저 들어볼게요.', '우리 지점 직원들 교육 맡길 만한지, 꼼꼼히 확인 좀 하겠습니다.'],
+    ok: ['음, 이 정도면 지점장님께 보고드려도 되겠네요.', '정확하네요. 메모해 둘게요.'],
+    ng: ['어… 그건 제가 알기론 다른데요?', '그렇게 설명하면 민원 들어와요.'],
+    timeout: ['잠깐, 본부에서 전화가 와서요.'],
+    end: { good: '좋습니다. 지점장님께 잘 말씀드릴게요!', bad: '자료 보완해서 다음에 다시 오세요.' }
+  },
+  kimteam: {
+    name: '김 팀장', role: '△△은행 OO지점 개인금융팀장 · 일간 보스', bg: 'bank', time: 25,
+    spec: { gender: 'm', skin: SKIN.a, eye: 'round', eyeColor: '#3a2a20',
+      hair: { style: 'male_short', color: '#2a2226' },
+      outfit: { type: 'suit', main: '#2f3b4f', tie: '#2f7bbf', acc: ['pin'] } },
+    intro: ['창구가 바빠서 짧게 갈게요. 고객 질문에 바로 답할 수 있는지 볼게요.', '요즘 고객들이 보험 문의를 많이 하세요. 같이 점검해 봅시다!'],
+    ok: ['오, 이건 창구에서 바로 써먹겠네요!', '좋아요, 시원시원하네요.'],
+    ng: ['음… 고객님이 그렇게 물어보시면 곤란한데요.', '그건 좀 헷갈리게 설명하신 것 같아요.'],
+    timeout: ['번호표가 밀려서 가봐야겠어요.'],
+    end: { good: '다음 주 팀 회의 때 직원들 앞에서 한 번 설명해 주세요!', bad: '다음에 다시 맞춰 봅시다.' }
+  },
   wmcenter: {
     name: '윤 센터장', role: '△△은행 WM센터장 · 일간 보스', bg: 'vip', time: 18,
     spec: { gender: 'f', skin: SKIN.a, eye: 'sharp', eyeColor: '#3a2333', lashes: true, face: 'oval', age: 50,
@@ -300,8 +322,10 @@ const HONOR_TIERS = [
 
 /* 일간 보스 — 매일 1명 랜덤 (뒤로 갈수록 희귀하고 어려움) */
 const BOSS_TIERS = [
-  { id: 'teamlead', npc: 'teamlead', title: '은행 팀장', rate: 50, stars: 1, count: 5, diffs: [1, 1, 2, 2, 2], mult: 1.8, cash: 300,
-    cats: ['banca_general', 'market', 'term'], desc: '지점 직원 교육을 맡길지 고민하는 팀장님. 기본기 위주 5문제.' },
+  // 같은 등급 안에서 그날 누가 올지는 사람마다 무작위 (npcs 중 하나, 확률은 등급 확률을 나눠 가짐)
+  { id: 'teamlead', npc: 'teamlead', npcs: ['teamlead', 'vicemgr', 'kimteam'], title: '은행 팀장·부지점장', rate: 50, stars: 1, count: 5, diffs: [1, 1, 2, 2, 2], mult: 1.8, cash: 300,
+    cats: ['banca_general', 'market', 'term'], desc: '지점 직원 교육을 맡길지 고민하는 최 팀장 · 이 부지점장 · 김 팀장 중 한 명. 기본기 위주 5문제.',
+    ndesc: '직원 교육을 맡길 만한지 직접 확인하러 왔다. 기본기 위주 5문제.' },
   { id: 'branchmgr', npc: 'branchmgr', title: '은행 지점장', rate: 30, stars: 2, count: 6, diffs: [1, 2, 2, 2, 3, 3], mult: 2.2, cash: 600,
     cats: ['banca_general', 'market', 'econ', 'term'], desc: '지점 실적을 책임지는 지점장. 방카 규정과 시황 6문제.' },
   { id: 'wmcenter', npc: 'wmcenter', title: 'WM센터장', rate: 14, stars: 3, count: 7, diffs: [2, 2, 2, 3, 3, 3, 3], mult: 2.8, cash: 1200,

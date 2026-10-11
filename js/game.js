@@ -238,6 +238,11 @@
     toast(`☀️ 출근 보너스 +${won(CASH.daily)} (🔥 ${S.streak.count}일 연속)`);
   }
   const bossTier = () => BOSS_TIERS.find((b) => b.id === S.dailyBoss.tier) || BOSS_TIERS[0];
+  // 오늘 찾아온 보스 인물 (같은 등급에 여러 명이면 사람·날짜마다 고정된 무작위로 한 명)
+  function bossNpc(b = bossTier()) {
+    if (!b.npcs || !b.npcs.length) return b.npc;
+    return b.npcs[Math.floor(seeded(S.email + '|' + S.dailyBoss.date + '|npc') * b.npcs.length)] || b.npc;
+  }
 
   /* ---------------- 문제 풀 ---------------- */
   function pool() {
@@ -282,7 +287,7 @@
       const cats = shuffle(b.cats);
       b.diffs.forEach((d, i) => {
         const sub = list.filter((q) => q.cat === cats[i % cats.length]);
-        const q = takeByDiff(sub.length ? sub : list, d, used); q && plan.push({ q, npc: b.npc });
+        const q = takeByDiff(sub.length ? sub : list, d, used); q && plan.push({ q, npc: bossNpc(b) });
       });
     } else if (kind === 'review') {
       const ids = Object.keys(S.wrong);
@@ -469,8 +474,9 @@
 
     if (boss) {
       S.bossSeen[boss.id] = 1;
-      setBg(NPCS[boss.npc].bg); setChar(null);
-      await say(NARR, `${'★'.repeat(boss.stars)}${'☆'.repeat(5 - boss.stars)}  오늘의 보스 등장!\n「${boss.title}」\n${boss.desc}\nXP ×${boss.mult} · 승리 보상 ${won(boss.cash)}`);
+      setBg(NPCS[bossNpc(boss)].bg); setChar(null);
+      const bn = boss.npcs ? NPCS[bossNpc(boss)] : null; // 여러 명 중 오늘 온 사람
+      await say(NARR, `${'★'.repeat(boss.stars)}${'☆'.repeat(5 - boss.stars)}  오늘의 보스 등장!\n「${bn ? bn.name : boss.title}」${bn ? ' ' + bn.role.split(' · ')[0] : ''}\n${bn ? boss.ndesc : boss.desc}\nXP ×${boss.mult} · 승리 보상 ${won(boss.cash)}`);
     } else if (key === 'market' && kind !== 'practice') {
       setBg('bank'); setChar(null);
       await say(NARR, `오늘은 △△은행 OO지점 지원 근무 날.\n뉴스를 보고 온 고객들이 하나둘 창구로 모여든다…`);
@@ -684,8 +690,8 @@
       ${evs.length ? `<div class="events">${evs.map((e) => `<div class="event">${e.icon} ${e.title}<small>${e.desc}</small></div>`).join('')}</div>` : ''}
       <div class="bosswrap">
         <button class="boss ${bd ? 'done' : ''}" id="bossBtn">
-          <div class="ava">${charHTML(NPCS[b.npc].spec, 'smirk', { head: true })}</div>
-          <div><span class="tag">오늘의 보스 ${'★'.repeat(b.stars)}</span><div class="t">${b.title}</div>
+          <div class="ava">${charHTML(NPCS[bossNpc(b)].spec, 'smirk', { head: true })}</div>
+          <div><span class="tag">오늘의 보스 ${'★'.repeat(b.stars)}</span><div class="t">${b.npcs ? NPCS[bossNpc(b)].name : b.title}</div>
             <div class="d">${bd ? `오늘 완료 · ${bd.ok}/${bd.n} · +${bd.xp}XP${S.items.bossticket ? ' · 🎫 재도전 가능' : ''}` : `${b.count}문제 · XP ×${b.mult} · 승리 ${won(b.cash)}`}</div></div>
         </button>
         <button class="bossinfo" id="bossInfo" aria-label="보스 설명">!</button>
@@ -723,7 +729,8 @@
       <p class="muted" style="text-align:center;margin:4px 0 12px">매일 한 명이 무작위로 찾아와요. 아래로 갈수록 드물고 어려워요!</p>
       ${BOSS_TIERS.map((t) => {
         const seen = S.bossSeen[t.id], wins = S.cnt['boss_' + t.id] || 0;
-        return `<div class="bossrow ${seen ? '' : 'unseen'}"><div class="ava">${charHTML(NPCS[t.npc].spec, 'normal', { head: true })}</div>
+        const faces = (t.npcs || [t.npc]).map((k) => `<div class="ava">${charHTML(NPCS[k].spec, 'normal', { head: true })}</div>`).join('');
+        return `<div class="bossrow ${seen ? '' : 'unseen'}"><div class="avas">${faces}</div>
           <div><b>${t.title}</b> <span class="stars">${'★'.repeat(t.stars)}${'☆'.repeat(5 - t.stars)}</span>
           <div class="muted">${t.desc}</div><div class="muted">등장 ${t.rate}% · ${t.count}문제 · XP ×${t.mult} · 승리 ${won(t.cash)}${seen ? ` · 격파 ${wins}회` : ' · 아직 못 만남'}</div></div></div>`;
       }).join('')}

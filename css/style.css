@@ -457,3 +457,6 @@ img.sprite.bust.illust { width: 135%; left: -17%; top: -3%; }
 .tour-npc { align-self: flex-end; position: relative; width: 132px; height: 150px; margin-right: 6px; border-radius: 20px; overflow: hidden; background: linear-gradient(135deg, #fff3f7, #e6efff); box-shadow: 0 6px 18px rgba(40,10,40,.3), inset 0 0 0 3px #fff; }
 .tour-npc > svg, .tour-npc > .portrait { width: 100%; height: 100%; }
 .tour-npc.pop { animation: pop .35s cubic-bezier(.2,1.4,.4,1); }
+.bossrow .avas { display: flex; flex: none; }
+.bossrow .avas .ava:not(:only-child) { width: 40px; height: 40px; }
+.bossrow .avas .ava + .ava { margin-left: -12px; }
