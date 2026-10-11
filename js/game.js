@@ -1924,8 +1924,50 @@ Lv.${S.lv} ${rankOf(S.lv).title} ${S.name}의 모든 기록(경험치 ${S.totalX
     await say({ name: S.name, role: '인턴' }, '네! 열심히 하겠습니다!');
     S.story = true; save(); syncNow();
     els.vn.classList.remove('on');
-    goHome();
+    await menuTour();
     if (!maybeInstallGuide()) setTimeout(() => toast('💡 카드 하나를 눌러 오늘의 첫 일정을 시작하세요!', 3500), 600);
+  }
+
+  /* 첫 출근 직후 메뉴 안내: 오늘 일정(정 파트장) · 학습회(김프로) · 매점(황프로) */
+  async function menuTour() {
+    const STEPS = [
+      ['home', 'partjang', 'smirk', [
+        "여기가 '오늘 일정'이다. 출근하면 제일 먼저 여기부터 확인해.",
+        '카드 하나가 일정 하나다. 분야마다 하루에 한 번씩 문제를 풀 수 있고, 맞히면 경험치와 활동비가 쌓여서 승진하지.',
+        "가끔 '오늘의 보스'로 은행 높으신 분들이 찾아오고, 아래쪽에서 최우수BM 순위도 볼 수 있다. 긴장 늦추지 마라."]],
+      ['study', 'kimpro', 'smile', [
+        "'학습회'는 제가 안내할게요! 점수 부담 없이 연습문제를 풀면서 실력을 쌓는 곳이에요.",
+        "틀린 문제는 '오답노트'에 모이고, 오늘의 경제 기사랑 자료실도 여기 있어요. 경험치는 아주 조금이지만, 꾸준함이 최고의 무기죠!"]],
+      ['shop', 'hwangpro', 'happy', [
+        "'매점'은 저희 OP센터가 안내해 드릴게요~ 문제 맞히고 받은 활동비로 아이템을 살 수 있어요.",
+        '힌트 쪽지는 어려운 문제에, 병음료랑 홍삼 스틱은 오늘 끝낸 일정을 한 번 더 도전할 때 써요. 아껴 쓰세요!']]
+    ];
+    const npcBox = document.createElement('div');
+    npcBox.className = 'tour-npc';
+    els.vn.insertBefore(npcBox, els.vn.firstChild);
+    els.vn.classList.add('on', 'tour'); els.nav.classList.add('touring');
+    const show = (page, npc, expr) => {
+      go(page);
+      if (page !== 'home') els.place.innerHTML = ''; // 메뉴 화면 위에 날짜·장소 글씨가 겹치지 않게
+      els.nav.classList.remove('hidden');
+      els.nav.querySelectorAll('button').forEach((b) => b.classList.toggle('tour-hi', b.dataset.go === page));
+      npcBox.innerHTML = charHTML(NPCS[npc].spec, expr, { bust: true });
+      npcBox.className = 'tour-npc'; void npcBox.offsetWidth; npcBox.className = 'tour-npc pop';
+    };
+    try {
+      for (const [page, npc, expr, lines] of STEPS) {
+        show(page, npc, expr);
+        for (const line of lines) await say(whoOf(npc), line);
+      }
+      show('home', 'partjang', 'smile');
+      await say(whoOf('partjang'), '자, 설명은 여기까지. 이제 첫 일정부터 시작해 봐라!');
+    } finally {
+      npcBox.remove();
+      els.vn.classList.remove('on', 'tour'); els.nav.classList.remove('touring');
+      els.nav.querySelectorAll('.tour-hi').forEach((b) => b.classList.remove('tour-hi'));
+      S.toured = true; save();
+      goHome();
+    }
   }
 
   /* ---------------- 시작 ---------------- */
