@@ -19,6 +19,8 @@
   }
   function bgHTML(name) {
     const src = Sprites.bg(name);
+    const rm = !src && /^rank(\d)$/.exec(name);
+    if (rm) return officeSVG(+rm[1], { stage: true }); // 직급별 사무실 (내 직급이면 내가 꾸민 물품까지)
     return src ? `<img class="bgimg" src="${src}" alt="" draggable="false">` : Art.background(name);
   }
   const pick = (a) => a[Math.floor(Math.random() * a.length)];
@@ -35,6 +37,7 @@
   let S = null, syncTimer = null, hasFace = false;
   function save() {
     if (!S) return;
+    S.oc = officeOC(); // 동료가 내 사무실을 구경할 때 쓰는 요약
     S.updated = Date.now(); Store.save(S);
     clearTimeout(syncTimer); syncTimer = setTimeout(syncNow, 4000);
   }
@@ -324,7 +327,7 @@
   });
   const stageMode = (m) => { $('#stage').className = m || ''; };
   const jong = (t) => { const c = (t || '').charCodeAt(t.length - 1); return c >= 0xac00 && c <= 0xd7a3 && (c - 0xac00) % 28 > 0; };
-  const PLACES = { office: '○○생명 방카슈랑스사업부', bank: '△△은행 OO지점 창구', classroom: '금융연수원 강의실', booth: '방카 전용 상담 부스',
+  const PLACES = { rank0: '자료 창고', rank1: '△△은행 OO지점 창구', rank2: '△△은행 VIP 상담실', rank3: '지역단 회의실', rank4: '사업부장실', rank5: '부사장실', rank6: '사장실', office: '○○생명 방카슈랑스사업부', bank: '△△은행 OO지점 창구', classroom: '금융연수원 강의실', booth: '방카 전용 상담 부스',
     meeting: '지역단 상담실', private_office: '사업부장실', vp: '부사장실', ceo: '사장실', vip: '△△은행 WM센터 라운지', inspect: '△△은행 OO지점',
     branch_office: '△△은행 지점장실', hq: '△△은행 본점 은행장실', bok: '한국은행 금융통화위원회 회의실', title: '' };
   function setBg(name) {
@@ -700,7 +703,7 @@
     const evs = todayEvents(), open = CAT_ORDER.filter((c) => catCount(c) > 0);
     const doneN = open.filter((c) => S.daily.done[c]).length;
     const b = bossTier(), bd = S.dailyBoss.done, vig = (S.items.drink || 0) + (S.items.ginseng || 0);
-    els.screen.innerHTML = `<div class="sheet">
+    els.screen.innerHTML = `<button class="officebtn" id="officeGo">🏢 사무실 가기</button><div class="sheet">
       ${S.events && S.events.pending ? '<button class="newsflash" id="evGo">📨 새 소식이 도착했어요! <b>확인하기 →</b></button>' : ''}
       <h3><span>${greeting()},<br>${esc(S.name)} ${r.title}님!</span><small>오늘 ${doneN}/${open.length} 완료<br>🔥 ${S.streak.count}일 연속 출근</small></h3>
       ${evs.length ? `<div class="events">${evs.map((e) => `<div class="event">${e.icon} ${e.title}<small>${e.desc}</small></div>`).join('')}</div>` : ''}
@@ -731,6 +734,7 @@
       useVigor(k);
     });
     els.screen.querySelectorAll('[data-go2]').forEach((b) => b.onclick = () => go(b.dataset.go2));
+    $('#officeGo').onclick = () => { Snd.tap(); openOffice(); };
     $('#charTap').onclick = charTalk;
     const evGo = $('#evGo'); if (evGo) evGo.onclick = runEvent;
     checkInbox();
@@ -1037,8 +1041,16 @@
     const m = modal(`<div class="cview"><div class="loading" style="padding-top:40%"><div class="spin"></div>캐릭터를 불러오는 중…</div></div>
       <h2 style="font-size:22px">${esc(p.name)}</h2><p class="muted" style="text-align:center;margin:0 0 12px">${p.lv ? `Lv.${p.lv} ${rankOf(p.lv).title}` : '아직 입사 전'} · 캐릭터를 눌러 보세요!</p>
       ${opt.scene ? '<button class="btn full" id="cvScene" style="margin-bottom:8px">🎬 게임 화면으로 보기</button>' : ''}
+      ${p.lv ? '<button class="btn ghost full" id="cvOffice" style="margin-bottom:8px">🏢 사무실 구경하기</button>' : ''}
       <button class="btn ghost full" data-close>닫기</button>`);
     const sb = m.el.querySelector('#cvScene'); if (sb) sb.onclick = () => { m.close(); staffScene(p); };
+    const ob = m.el.querySelector('#cvOffice');
+    if (ob) ob.onclick = async () => {
+      if (p.me) { m.close(); return openOffice(); }
+      if (p.face) await loadPeerFaces([p.uid]);
+      const sp = peerSpec(p); m.close();
+      openOffice({ name: p.name, lv: p.lv, oc: (p.look || {}).oc, photo: p.thumb || Sprites.thumb(sp.key), person: Sprites.char(sp.key, 'normal') });
+    };
     if (p.face && !p.me) await loadPeerFaces([p.uid]);
     const box = m.el.querySelector('.cview'); if (!box || !box.isConnected) return;
     if (!faceReady(p)) { box.innerHTML = '<p class="muted" style="text-align:center;padding-top:40%">캐릭터 그림을 불러오지 못했어요.<br>잠시 후 다시 눌러 주세요.</p>'; return; }
@@ -1058,6 +1070,84 @@
       Snd.tap();
       clearTimeout(tm); tm = setTimeout(() => { if (!fig.isConnected) return; fig.className = 'cvfig'; fig.innerHTML = charHTML(spec, restOf(spec)); box.querySelectorAll('.talk').forEach((x) => x.remove()); }, 3600);
     };
+  }
+
+  /* ---------------- 사무실 ---------------- */
+  const rankIdx = (lv) => RANKS.indexOf(rankOf(lv));
+  // 내 사무실 요약 (서버에도 저장 → 동료가 구경)
+  function officeOC() {
+    if (!S) return null;
+    const o = S.office || {}, aw = Object.keys(S.awards || {});
+    const n = Object.values(S.stats || {}).reduce((a, x) => a + (x.n || 0), 0);
+    const bs = {}; BOSS_TIERS.forEach((t) => { const c = (S.cnt || {})['boss_' + t.id] || 0; if (c) bs[t.id] = c; });
+    return { i: OFFICE_ITEMS.filter((it) => (o.owned || {})[it.id] && (o.shown || {})[it.id] !== false).map((it) => it.id),
+      w: aw.filter((k) => k.startsWith('week:')).length, m: aw.filter((k) => k.startsWith('month:')).length, bs,
+      ach: Object.keys(S.ach || {}).length, bk: Math.floor(n / 40), run: ((S.mini || {}).run || {}).best || 0 };
+  }
+  function officeCard(oc, name, lv, photo) {
+    oc = oc || {};
+    const tro = [], certs = [];
+    for (let i = 0; i < (oc.m || 0); i++) tro.push({ e: '🏆', label: '월간 최우수BM 트로피' });
+    for (let i = 0; i < (oc.w || 0); i++) tro.push({ e: '🏆', label: '주간 최우수BM 트로피' });
+    BOSS_TIERS.slice().reverse().forEach((t) => { if ((oc.bs || {})[t.id]) tro.push({ e: t.stars >= 4 ? '🥇' : t.stars >= 2 ? '🥈' : '🥉', label: `${t.title} 격파 ${oc.bs[t.id]}회` }); });
+    if ((oc.run || 0) >= 60000) tro.push({ e: '🏎️', label: `고속도로 질주 ${Math.floor(oc.run / 1000)}초` });
+    RANKS.slice(1).forEach((r) => { if (lv >= r.lv) certs.push({ t: '임 명 장', label: `${r.title} 임명장 (Lv.${r.lv})` }); });
+    [10, 25, 50, 75, 100].forEach((k) => { if ((oc.ach || 0) >= k) certs.push({ t: '표 창 장', label: `업적 ${k}개 달성 표창장` }); });
+    return { name, title: rankOf(lv).title, photo, items: oc.i || [], trophies: tro, certs, books: oc.bk || 0 };
+  }
+  const myPhoto = () => Sprites.thumb(playerSpec().key);
+  function officeSVG(r, opts = {}) {
+    const mine = S && rankIdx(S.lv) === r;
+    const c = mine ? officeCard(officeOC(), S.name, S.lv, myPhoto()) : null;
+    if (c && opts.stage && !c.trophies.length) c.trophies = null; // 홈 배경에는 '트로피 자리' 안내를 띄우지 않음
+    return Office.svg(r, c, opts);
+  }
+  // 사무실 둘러보기 (owner 없으면 내 사무실)
+  function openOffice(owner) {
+    const me = !owner;
+    const lv = me ? S.lv : owner.lv || 1, r = rankIdx(lv);
+    const card = me ? officeCard(officeOC(), S.name, S.lv, myPhoto()) : officeCard(owner.oc, owner.name, lv, owner.photo);
+    const person = me ? Sprites.char(playerSpec().key, 'smile') : owner.person;
+    const el = document.createElement('div'); el.id = 'officeView';
+    const draw = () => {
+      const c = me ? officeCard(officeOC(), S.name, S.lv, myPhoto()) : card;
+      el.innerHTML = `<div class="ov-top"><button class="mini-x" data-x aria-label="닫기">✕</button><b>🏢 ${esc(c.name)} ${esc(c.title)}의 사무실</b></div>
+        <div class="ov-stage">${Office.svg(r, c, { person, fit: true })}<div class="ov-tip"></div></div>
+        <div class="ov-info">🏆 트로피 ${c.trophies.length} · 📜 상장 ${c.certs.length} · 📚 책 ${c.books}권 · 🪑 물품 ${c.items.length}개<small>${esc(Office.PLACE[r])} · 물건을 눌러 보세요</small></div>
+        <div class="ov-bar">${me ? '<button class="btn" data-deco>🪑 꾸미기</button><button class="btn ghost" data-case>🏆 진열장</button><button class="btn ghost" data-shop>🛒 매점</button>'
+          : '<button class="btn ghost" data-case>🏆 진열장</button><button class="btn" data-x>닫기</button>'}</div>`;
+      el.querySelectorAll('[data-x]').forEach((b) => b.onclick = close);
+      const tip = el.querySelector('.ov-tip');
+      el.querySelector('.ov-stage svg').addEventListener('click', (e) => {
+        const t = e.target.closest('[data-tip]'); if (!t) return;
+        tip.textContent = t.getAttribute('data-tip'); tip.classList.remove('on'); void tip.offsetWidth; tip.classList.add('on'); Snd.tap();
+      });
+      const cs = el.querySelector('[data-case]'); if (cs) cs.onclick = () => showCase(c);
+      const dc = el.querySelector('[data-deco]'); if (dc) dc.onclick = () => decoPanel(draw);
+      const sp = el.querySelector('[data-shop]'); if (sp) sp.onclick = () => { close(); go('shop'); };
+    };
+    const close = () => { el.remove(); if (me && $('#stage').className === 'home') setBg(RANKS[rankIdx(S.lv)].bg); };
+    document.body.appendChild(el); draw();
+  }
+  function showCase(c) {
+    modal(`<h2 style="font-size:22px">🏆 진열장</h2>
+      <h4 class="sec">트로피 ${c.trophies.length}개</h4>${c.trophies.length ? c.trophies.map((t) => `<div class="caserow">${t.e} ${esc(t.label)}</div>`).join('') : '<p class="muted">최우수BM에 뽑히거나 오늘의 보스를 이기면 트로피를 받아요.</p>'}
+      <h4 class="sec">상장 ${c.certs.length}개</h4>${c.certs.length ? c.certs.map((t) => `<div class="caserow">📜 ${esc(t.label)}</div>`).join('') : '<p class="muted">승진하거나 업적을 많이 모으면 상장이 걸려요.</p>'}
+      <h4 class="sec">📚 책 ${c.books}권</h4><p class="muted">문제를 40개 풀 때마다 책이 한 권씩 늘어요 (최대 16권 진열).</p>
+      <button class="btn full" data-close>닫기</button>`);
+  }
+  function decoPanel(redraw) {
+    const o = S.office || (S.office = { owned: {}, shown: {} });
+    const m = modal(`<h2 style="font-size:22px">🪑 사무실 꾸미기</h2><p class="muted" style="text-align:center">가진 물품을 비치하거나 창고에 보관할 수 있어요.</p>
+      <div class="decolist">${OFFICE_ITEMS.map((it) => {
+        const own = o.owned[it.id], on = own && o.shown[it.id] !== false;
+        return `<div class="decorow ${own ? '' : 'locked'}"><span class="di">${it.icon}</span><span class="dn"><b>${it.name}</b><small>${esc(it.desc)}</small></span>
+          ${own ? `<button class="btn mini ${on ? '' : 'ghost'}" data-tg="${it.id}">${on ? '비치 중' : '보관 중'}</button>` : `<span class="muted dp">매점 ${won(it.price)}</span>`}</div>`;
+      }).join('')}</div><button class="btn full" data-close style="margin-top:10px">완료</button>`, redraw);
+    m.el.querySelectorAll('[data-tg]').forEach((b) => b.onclick = () => {
+      const id = b.dataset.tg, on = o.shown[id] !== false;
+      o.shown[id] = !on; b.textContent = on ? '보관 중' : '비치 중'; b.classList.toggle('ghost', on); Snd.tap(); save(); redraw();
+    });
   }
 
   /* ---------------- 미니게임: BM 드라이빙 ---------------- */
@@ -1435,8 +1525,21 @@
         <div class="si">${it.icon}</div><div class="sn"><b>${it.name}</b><small>${esc(it.desc)}</small><span class="own">보유 ${S.items[it.id] || 0}개</span></div>
         <button class="btn mini ${S.money >= it.price ? '' : 'ghost'}" data-buy="${it.id}">${won(it.price)}</button></div>`).join('')}</div>
       <p class="muted">💡 문제용 아이템은 퀴즈 중 선택지 위 아이템 바에서 써요. 🧃 활기력 아이템은 완료한 일정 카드를 누르면 쓸 수 있어요.</p>
+      <h4 class="sec">🏢 사무실 꾸미기</h4>
+      <div class="shop">${OFFICE_ITEMS.map((it) => { const own = ((S.office || {}).owned || {})[it.id]; return `<div class="sitem">
+        <div class="si">${it.icon}</div><div class="sn"><b>${it.name}</b><small>${esc(it.desc)}</small>${own ? '<span class="own">✅ 보유 중 · 사무실에서 비치/보관</span>' : ''}</div>
+        ${own ? '<button class="btn mini ghost" data-office>사무실</button>' : `<button class="btn mini ${S.money >= it.price ? '' : 'ghost'}" data-deco="${it.id}">${won(it.price)}</button>`}</div>`; }).join('')}</div>
     </div>`;
     $('#sendMoney').onclick = () => sendMoneyModal();
+    els.screen.querySelectorAll('[data-office]').forEach((b) => b.onclick = () => openOffice());
+    els.screen.querySelectorAll('[data-deco]').forEach((b) => b.onclick = async () => {
+      const it = OFFICE_ITEMS.find((x) => x.id === b.dataset.deco);
+      if (S.money < it.price) return toast(`활동비가 ${won(it.price - S.money)} 부족해요`);
+      if (!(await confirmBox(`${it.icon} ${it.name}을(를) ${won(it.price)}에 살까요?\n사무실에 바로 비치돼요.`, '구매'))) return;
+      const o = S.office || (S.office = { owned: {}, shown: {} });
+      S.money -= it.price; o.owned[it.id] = Date.now(); o.shown[it.id] = true; inc('purchases');
+      Snd.coin(); toast(`${it.icon} ${it.name} 구매! 사무실에 비치했어요`); checkAch(); save(); renderHud(); pageShop();
+    });
     els.screen.querySelectorAll('[data-buy]').forEach((b) => b.onclick = () => {
       const it = ITEMS.find((x) => x.id === b.dataset.buy);
       if (S.money < it.price) return toast(`활동비가 ${won(it.price - S.money)} 부족해요`);

@@ -309,6 +309,23 @@ const CATS = {
   econ: { label: '경제학', group: 'econ', icon: '🎓', npcs: ['jogyo', 'kimgyosu', 'parkgyosu'], byDiff: true, color: '#6a4c93', desc: '연수원 강의' },
   term: { label: '경제 용어', group: 'term', icon: '📖', npcs: ['yunpro', 'choiseonim', 'ochajang'], byDiff: true, color: '#c9831f', desc: '사무실 동료' }
 };
+/* 사무실 꾸밈 물품 (매점에서 구매 → 사무실에 비치 · 보관 선택) */
+const OFFICE_ITEMS = [
+  { id: 'cactus', icon: '🌵', name: '미니 선인장', price: 500, desc: '책상 위의 작은 친구' },
+  { id: 'teddy', icon: '🧸', name: '곰인형', price: 800, desc: '야근할 때 위로가 돼요' },
+  { id: 'plant', icon: '🪴', name: '몬스테라 화분', price: 1500, desc: '사무실 공기 정화 담당' },
+  { id: 'globe', icon: '🌏', name: '지구본', price: 2000, desc: '글로벌 감각 UP' },
+  { id: 'laptop', icon: '💻', name: '최신 노트북', price: 2500, desc: '상품 설계도 척척' },
+  { id: 'coffee', icon: '☕', name: '커피머신', price: 3000, desc: '진열장 위 바리스타' },
+  { id: 'fish', icon: '🐠', name: '어항', price: 5000, desc: '보고만 있어도 힐링' },
+  { id: 'putter', icon: '⛳', name: '퍼팅 연습기', price: 6000, desc: '지점장님 라운딩 대비' },
+  { id: 'clock', icon: '🕰️', name: '앤티크 괘종시계', price: 7000, desc: '시간은 금이다' },
+  { id: 'painting', icon: '🖼️', name: '명화 액자', price: 8000, desc: '품격 있는 사무실의 완성' },
+  { id: 'dog', icon: '🐕', name: '사무실 강아지', price: 9000, desc: '출근하면 꼬리 흔들며 반겨요' },
+  { id: 'sofa', icon: '🛋️', name: '가죽 소파', price: 10000, desc: 'VIP 고객 응대용' },
+  { id: 'statue', icon: '🗿', name: '조각상', price: 15000, desc: '성공한 사람의 상징' },
+  { id: 'crystal', icon: '💎', name: '크리스탈 장식', price: 30000, desc: '사장실에 어울리는 최고급 장식' }
+];
 /* 미니게임 보상 (하루 한 번씩) — 미로: 제한 시간 안에 도착 / 질주: 30초 이상 버티기 */
 const MINI_REWARD = { maze: { cash: 100, xp: 5 }, run: { cash: 100, xp: 5, need: 30000 } };
 /* 방카 상품 출제 비중: 주력 플래티넘행복연금 2 · 즉시연금 1 · 그 밖의 상품 0.5 (태그·질문으로 구분) */
@@ -324,13 +341,13 @@ const GROUPS = {
 
 /* 직급 (레벨 → 외형/배경) */
 const RANKS = [
-  { lv: 1, title: '인턴', bg: 'office', look: { type: 'shirt', acc: ['lanyard'] }, perk: '사원증 · 셔츠' },
-  { lv: 5, title: '신입 BM', bg: 'office', look: { type: 'suit', main: '#2b3a67', tie: '#3c6fd1', acc: ['pin'] }, perk: '정장' },
-  { lv: 10, title: '방카 BM', bg: 'booth', look: { type: 'suit', main: '#25305a', tie: '#9b2335', acc: ['pin', 'namecard'] }, perk: '명함 · 상담 부스' },
-  { lv: 20, title: '지역단장', bg: 'meeting', look: { type: 'suit', main: '#2e3138', tie: '#6b2a2a', acc: ['badge_bronze', 'namecard'] }, perk: '브론즈 배지 · 상담실' },
-  { lv: 30, title: '사업부장', bg: 'private_office', look: { type: 'suit', main: '#1f2a44', tie: '#c9a227', acc: ['badge_gold', 'pocket_square'] }, perk: '골드 배지 · 개인 사무실' },
-  { lv: 40, title: '부사장', bg: 'vp', look: { type: 'suit', main: '#1c1c24', tie: '#7a1f2b', vest: true, acc: ['badge_gold', 'pocket_square'], square: '#c9302c' }, perk: '골드 배지 · 부사장실' },
-  { lv: 50, title: '사장', bg: 'ceo', look: { type: 'suit', main: '#111118', tie: '#c9a227', vest: true, acc: ['badge_gold', 'pocket_square', 'scarf'], square: '#c9a227' }, aura: true, perk: '사장실 · 전용 이펙트' }
+  { lv: 1, title: '인턴', bg: 'rank0', look: { type: 'shirt', acc: ['lanyard'] }, perk: '사원증 · 셔츠' },
+  { lv: 5, title: '신입 BM', bg: 'rank1', look: { type: 'suit', main: '#2b3a67', tie: '#3c6fd1', acc: ['pin'] }, perk: '정장' },
+  { lv: 10, title: '방카 BM', bg: 'rank2', look: { type: 'suit', main: '#25305a', tie: '#9b2335', acc: ['pin', 'namecard'] }, perk: '명함 · 상담 부스' },
+  { lv: 20, title: '지역단장', bg: 'rank3', look: { type: 'suit', main: '#2e3138', tie: '#6b2a2a', acc: ['badge_bronze', 'namecard'] }, perk: '브론즈 배지 · 상담실' },
+  { lv: 30, title: '사업부장', bg: 'rank4', look: { type: 'suit', main: '#1f2a44', tie: '#c9a227', acc: ['badge_gold', 'pocket_square'] }, perk: '골드 배지 · 개인 사무실' },
+  { lv: 40, title: '부사장', bg: 'rank5', look: { type: 'suit', main: '#1c1c24', tie: '#7a1f2b', vest: true, acc: ['badge_gold', 'pocket_square'], square: '#c9302c' }, perk: '골드 배지 · 부사장실' },
+  { lv: 50, title: '사장', bg: 'rank6', look: { type: 'suit', main: '#111118', tie: '#c9a227', vest: true, acc: ['badge_gold', 'pocket_square', 'scarf'], square: '#c9a227' }, aura: true, perk: '사장실 · 전용 이펙트' }
 ];
 const MAX_LV = 50;
 const xpNeed = (lv) => 80 + 25 * lv + 2 * lv * lv;

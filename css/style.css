@@ -491,3 +491,23 @@ img.sprite.bust.illust { width: 135%; left: -17%; top: -3%; }
 .mini-pad.two { grid-template-columns: 1fr 1fr; } .mini-pad.two button { min-height: 64px; font-size: 18px; }
 .mini-pad.four { grid-template-columns: repeat(3, 1fr); grid-template-areas: ". up ." "left down right"; max-width: 260px; margin: 0 auto; width: 100%; }
 .mini-pad.four [data-d="up"] { grid-area: up; } .mini-pad.four [data-d="left"] { grid-area: left; } .mini-pad.four [data-d="down"] { grid-area: down; } .mini-pad.four [data-d="right"] { grid-area: right; }
+
+/* 사무실 */
+.officebtn { position: absolute; z-index: 6; top: calc(68px + var(--safe-t)); right: 12px; border: 0; border-radius: 999px; padding: 8px 14px; font: inherit; font-weight: 800; font-size: 13px;
+  color: #5b3a10; background: linear-gradient(135deg, #fff3c4, #ffd66b); box-shadow: 0 4px 14px rgba(60,30,0,.25), inset 0 0 0 2px #fff; cursor: pointer; animation: hop 2.4s ease-in-out infinite; }
+#officeView { position: fixed; inset: 0; z-index: 55; display: flex; flex-direction: column; background: #1e1830; padding: calc(8px + var(--safe-t)) 10px calc(10px + var(--safe-b)); }
+.ov-top { display: flex; align-items: center; gap: 10px; height: 44px; color: #fff; }
+.ov-top b { flex: 1; font-family: 'Jua', sans-serif; font-weight: 400; font-size: 19px; }
+.ov-stage { position: relative; flex: 1; min-height: 0; display: flex; justify-content: center; }
+.ov-stage svg { height: 100%; width: auto; max-width: 100%; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,.4); }
+.ov-tip { position: absolute; left: 50%; top: 12px; transform: translateX(-50%); background: rgba(20,15,30,.88); color: #fff; padding: 8px 14px; border-radius: 999px; font-size: 13px; font-weight: 700; opacity: 0; pointer-events: none; white-space: nowrap; }
+.ov-tip.on { animation: ovtip 2.2s ease both; }
+@keyframes ovtip { 0% { opacity: 0; transform: translate(-50%, 6px); } 12%, 80% { opacity: 1; transform: translate(-50%, 0); } 100% { opacity: 0; } }
+.ov-info { color: #fff; text-align: center; font-size: 13px; font-weight: 700; padding: 8px 0 6px; }
+.ov-info small { display: block; color: #b9b0cc; font-weight: 500; margin-top: 2px; }
+.ov-bar { display: flex; gap: 8px; } .ov-bar .btn { flex: 1; }
+.caserow { padding: 8px 10px; background: #faf6f8; border-radius: 10px; margin-bottom: 6px; font-size: 14px; }
+.decolist { max-height: 52vh; overflow-y: auto; }
+.decorow { display: flex; align-items: center; gap: 10px; padding: 8px 4px; border-bottom: 1px solid #f1e4ea; }
+.decorow .di { font-size: 28px; width: 38px; text-align: center; } .decorow .dn { flex: 1; display: flex; flex-direction: column; } .decorow .dn small { color: var(--ink2); font-size: 12px; }
+.decorow.locked { opacity: .55; } .decorow .dp { font-size: 12px; }

@@ -1,12 +1,12 @@
 /* Service worker — required for Chrome's install prompt.
    Bump CACHE whenever you ship changed files, or returning viewers keep
    the old shell: a cache-first worker will happily serve last week's app. */
-const CACHE = "bmq-v35";
+const CACHE = "bmq-v36";
 const SHELL = [
   "./", "./index.html", "./manifest.webmanifest",
   "./icons/icon-192.png", "./icons/icon-512.png", "./icons/apple-touch-icon.png",
   "./css/style.css", "./js/env.js", "./js/art.js", "./js/config.js", "./js/data/library.js",
-  "./js/sprites.js", "./js/store.js", "./js/api.js", "./js/mini.js", "./js/game.js"
+  "./js/sprites.js", "./js/store.js", "./js/api.js", "./js/office.js", "./js/mini.js", "./js/game.js"
 ];
 
 self.addEventListener("install", (e) => {
