@@ -534,3 +534,13 @@ img.sprite.bust.illust { width: 135%; left: -17%; top: -3%; }
 .ov-person > img { height: 74%; }
 .ov-hint { top: 12px; bottom: auto; white-space: nowrap; }
 .ov-tip { top: 48px; }
+
+/* 관리자: 배경 미리보기 */
+.bggrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 8px; }
+.bgcard { display: flex; flex-direction: column; gap: 3px; padding: 6px; border: 0; border-radius: 14px; background: #fff; box-shadow: 0 2px 8px rgba(60,20,60,.08); font: inherit; text-align: left; cursor: pointer; }
+.bgcard .bgthumb { position: relative; display: block; aspect-ratio: 3 / 4; border-radius: 10px; overflow: hidden; background: #ddd; }
+.bgcard .bgthumb > * { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.bgcard b { font-size: 12.5px; } .bgcard small { font-size: 11px; color: var(--ink2); }
+#bgView { position: fixed; inset: 0; z-index: 55; display: flex; flex-direction: column; background: #1e1830; padding: calc(8px + var(--safe-t)) 10px calc(10px + var(--safe-b)); }
+#bgView .bgv-stage { position: relative; flex: 1; border-radius: 16px; overflow: hidden; }
+#bgView .bgv-stage > * { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }

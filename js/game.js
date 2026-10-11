@@ -82,10 +82,12 @@
     const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg;
     els.toast.appendChild(t); setTimeout(() => t.remove(), ms);
   }
+  let modalClose = null;
   function modal(html, onClose) {
     els.modal.innerHTML = `<div class="mcard">${html}</div>`;
     els.modal.classList.add('on');
-    const close = () => { els.modal.classList.remove('on'); els.modal.innerHTML = ''; onClose && onClose(); };
+    const close = () => { els.modal.classList.remove('on'); els.modal.innerHTML = ''; modalClose = null; onClose && onClose(); };
+    modalClose = close;
     els.modal.querySelectorAll('[data-close]').forEach((b) => b.onclick = close);
     return { el: els.modal.firstElementChild, close };
   }
@@ -682,8 +684,10 @@
   /* ---------------- 화면 전환 ---------------- */
   function setNav(k) { els.nav.classList.remove('hidden'); els.nav.querySelectorAll('button').forEach((b) => b.classList.toggle('on', b.dataset.go === k)); }
   els.nav.querySelectorAll('button').forEach((b) => b.onclick = () => go(b.dataset.go));
+  let curPage = 'title';
   function go(k) {
     if (inSession) return;
+    curPage = k;
     ({ home: goHome, study: pageStudy, shop: pageShop, char: pageChar, settings: pageSettings, wrong: pageWrong, lib: pageLib, news: pageNews, admin: pageAdmin, rank: pageRank, submit: pageSubmit, drive: pageDrive })[k]();
   }
   const backBtn = (to, label) => `<button class="back" data-back="${to}">← ${label}</button>`;
@@ -694,6 +698,7 @@
     return h < 11 ? '좋은 아침이에요' : h < 14 ? '점심은 드셨나요' : h < 18 ? '오후도 힘내요' : '야근 중이신가요';
   }
   function goHome() {
+    curPage = 'home';
     ensureDay(); rollEvent(); save();
     const r = rankOf(S.lv);
     stageMode('home'); setBg(r.bg); setChar(playerSpec(), rest(), 'enter'); renderHud(); setNav('home');
@@ -1199,7 +1204,7 @@
     const m = miniState();
     inSession = true; els.nav.classList.add('hidden');
     try { await Mini.play(kind, { seed: 'maze|' + today(), best: kind === 'maze' ? m.maze.best : m.run.best, onResult: (r) => miniResult(kind, r) }); }
-    finally { inSession = false; els.nav.classList.remove('hidden'); pageDrive(); }
+    finally { inSession = false; els.nav.classList.remove('hidden'); go('drive'); }
   }
   async function pageDrive() {
     setNav('home');
@@ -1777,7 +1782,7 @@ Lv.${S.lv} ${rankOf(S.lv).title} ${S.name}의 모든 기록(경험치 ${S.totalX
   async function pageAdmin() {
     if (!(Api.user || {}).admin) return goHome();
     setNav('settings');
-    const tabs = [['users', '👥 회원'], ['chars', '🎭 캐릭터'], ['reports', '⚠️ 이의 제기'], ['subs', '✍️ 제출 문제'], ['questions', '📝 문제'], ['auto', '🤖 자동 관리'], ['lib', '📚 공용 자료']];
+    const tabs = [['users', '👥 회원'], ['chars', '🎭 캐릭터'], ['reports', '⚠️ 이의 제기'], ['subs', '✍️ 제출 문제'], ['questions', '📝 문제'], ['bgs', '🖼️ 배경'], ['auto', '🤖 자동 관리'], ['lib', '📚 공용 자료']];
     els.screen.innerHTML = `<div class="page">${backBtn('settings', '설정')}<h2>🛠️ 관리자</h2>
       <div class="seg">${tabs.map(([k, l]) => `<button data-t="${k}" class="${admTab === k ? 'on' : ''}">${l}</button>`).join('')}</div>
       <div id="admBody"><div class="loading"><div class="spin"></div>불러오는 중…</div></div></div>`;
@@ -1791,6 +1796,7 @@ Lv.${S.lv} ${rankOf(S.lv).title} ${S.name}의 모든 기록(경험치 ${S.totalX
       else if (admTab === 'questions') await admQuestions(body);
       else if (admTab === 'subs') await admSubmissions(body);
       else if (admTab === 'auto') await admAuto(body);
+      else if (admTab === 'bgs') admBgs(body);
       else await admLib(body);
     } catch (e) { body.innerHTML = `<p class="muted">${esc(e.message)}</p>`; }
   }
@@ -1849,7 +1855,7 @@ Lv.${S.lv} ${rankOf(S.lv).title} ${S.name}의 모든 기록(경험치 ${S.totalX
       els.choices.innerHTML = ''; els.dlg.classList.remove('asking'); els.meta.innerHTML = ''; els.timer.classList.remove('on');
       els.vn.classList.remove('on'); inSession = false; setChar(null);
       els.hud.classList.remove('hidden'); renderHud();
-      admTab = 'chars'; pageAdmin();
+      admTab = 'chars'; go('admin');
     }
     return again;
   }
@@ -1906,6 +1912,21 @@ Lv.${S.lv} ${rankOf(S.lv).title} ${S.name}의 모든 기록(경험치 ${S.totalX
       }
     });
     if (again) staffScene(p);
+  }
+  function admBgs(body) {
+    const scenes = Object.keys(PLACES).filter((k) => !/^rank/.test(k) && k !== 'title');
+    body.innerHTML = `<p class="muted">게임에 나오는 배경을 미리 볼 수 있어요. 사무실은 내 캐릭터로 실제 화면처럼 둘러볼 수 있어요.</p>
+      <h4 class="sec">🏢 직급별 사무실</h4><div class="bggrid">${RANKS.map((r, i) => `<button class="bgcard" data-rk="${i}"><span class="bgthumb">${bgHTML('rank' + i)}</span><b>${r.title}</b><small>Lv.${r.lv}~ · ${esc(Office.PLACE[i])}</small></button>`).join('')}</div>
+      <h4 class="sec">🎬 장면 배경</h4><div class="bggrid">${scenes.map((k) => `<button class="bgcard" data-sc="${k}"><span class="bgthumb">${bgHTML(k)}</span><b>${esc(PLACES[k])}</b><small>${k}</small></button>`).join('')}</div>`;
+    body.querySelectorAll('[data-rk]').forEach((b) => b.onclick = () => {
+      const r = +b.dataset.rk;
+      openOffice({ name: S.name, lv: RANKS[r].lv, oc: officeOC(), photo: myPhoto(), person: Sprites.char(playerSpec().key, 'smile') });
+    });
+    body.querySelectorAll('[data-sc]').forEach((b) => b.onclick = () => {
+      const v = document.createElement('div'); v.id = 'bgView';
+      v.innerHTML = `<div class="ov-top"><button class="mini-x" data-x>✕</button><b>🎬 ${esc(PLACES[b.dataset.sc])}</b></div><div class="bgv-stage">${bgHTML(b.dataset.sc)}</div>`;
+      document.body.appendChild(v); v.querySelector('[data-x]').onclick = () => v.remove();
+    });
   }
   async function admAuto(body) {
     const items = await Api.admin.autoLog();
@@ -2136,6 +2157,7 @@ Lv.${S.lv} ${rankOf(S.lv).title} ${S.name}의 모든 기록(경험치 ${S.totalX
 
   /* ---------------- 로그인 / 타이틀 / 캐릭터 생성 / 프롤로그 ---------------- */
   function loginScreen(msg) {
+    curPage = 'login';
     els.hud.classList.add('hidden'); els.nav.classList.add('hidden'); stageMode('');
     setBg('title'); setChar(NPCS.hwangpro.spec, 'smile', 'enter');
     els.screen.innerHTML = `<div class="logo"><div class="k">BANCASSURANCE QUIZ RPG</div><h1>방카BM<br><em>성장기</em></h1><p>인턴에서 사장까지, 지식으로 승진하라!</p></div>
@@ -2190,6 +2212,7 @@ Lv.${S.lv} ${rankOf(S.lv).title} ${S.name}의 모든 기록(경험치 ${S.totalX
     titleScreen();
   }
   function titleScreen() {
+    curPage = 'title';
     els.hud.classList.add('hidden'); els.nav.classList.add('hidden'); stageMode('');
     setBg('title'); setChar(playerSpec(), rest(), 'enter');
     els.screen.innerHTML = `<div class="logo"><div class="k">BANCASSURANCE QUIZ RPG</div><h1>방카BM<br><em>성장기</em></h1><p>인턴에서 사장까지, 지식으로 승진하라!</p></div>
@@ -2200,6 +2223,7 @@ Lv.${S.lv} ${rankOf(S.lv).title} ${S.name}의 모든 기록(경험치 ${S.totalX
   }
   /* 신입사원 등록: 캐릭터 꾸미기 (입사 후에는 변경 불가) */
   function createScreen() {
+    curPage = 'create';
     stageMode('creating'); setBg('office');
     els.hud.classList.add('hidden'); els.nav.classList.add('hidden');
     const render = () => {
@@ -2299,8 +2323,53 @@ Lv.${S.lv} ${rankOf(S.lv).title} ${S.name}의 모든 기록(경험치 ${S.totalX
     }
   }
 
+  /* ---------------- 뒤로가기 (휴대폰 뒤로 버튼 · 브라우저 뒤로) ----------------
+     창 → 미니게임·사무실 → 퀴즈(그만할지 묻기) → 하위 메뉴 → 오늘 일정 → '퇴근하시겠습니까?' 순서로 한 단계씩 */
+  const PARENT = { study: 'home', shop: 'home', char: 'home', settings: 'home', rank: 'home', drive: 'home',
+    wrong: 'study', lib: 'study', news: 'study', submit: 'study', admin: 'settings' };
+  let exiting = false;
+  async function handleBack() {
+    if (els.modal.classList.contains('on')) {
+      const no = els.modal.querySelector('[data-n], [data-close], #igLater');
+      if (no) no.click(); else if (modalClose) modalClose();
+      return;
+    }
+    for (const id of ['bgView', 'officeView', 'mini']) {
+      const ov = document.getElementById(id);
+      if (ov) { const x = ov.querySelector('[data-x], .mini-x'); if (x) x.click(); else ov.remove(); return; }
+    }
+    const quit = $('#quit');
+    if (inSession) { if (quit && !els.sess.classList.contains('hidden')) quit.click(); return; } // 대화·안내 중에는 무시
+    if (PARENT[curPage]) return go(PARENT[curPage]);
+    // 오늘 일정(메인) · 시작 화면 · 로그인 화면 → 퇴근 확인
+    if (await confirmBox('오늘 업무를 마치고 퇴근할까요?\n(기록은 자동으로 저장돼요)', '퇴근하기', '계속 근무')) leaveWork();
+  }
+  async function leaveWork() {
+    exiting = true;
+    await syncNow();
+    history.back(); // 앱으로 실행 중이면 여기서 닫힌다
+    setTimeout(() => { // 닫히지 않는 환경(일반 브라우저 첫 화면 등)
+      try { window.close(); } catch (e) { }
+      if (document.visibilityState === 'hidden') return;
+      exiting = false; history.pushState({ bmq: 1 }, '');
+      els.hud.classList.add('hidden'); els.nav.classList.add('hidden'); els.sess.classList.add('hidden'); stageMode(''); setChar(null);
+      els.screen.innerHTML = `<div class="title-wrap" style="text-align:center"><div class="box">🌙 <b>수고하셨어요! 퇴근 완료</b><br><span class="muted">기록은 저장됐어요. 이제 앱(창)을 닫으셔도 돼요.</span></div>
+        <button class="btn" id="rework">다시 출근하기</button></div>`;
+      $('#rework').onclick = () => location.reload();
+    }, 450);
+  }
+  function setupBack() {
+    try { history.replaceState({ bmq: 0 }, ''); history.pushState({ bmq: 1 }, ''); } catch (e) { return; }
+    addEventListener('popstate', () => {
+      if (exiting) return;
+      history.pushState({ bmq: 1 }, ''); // 다시 막아 두고
+      handleBack();
+    });
+  }
+
   /* ---------------- 시작 ---------------- */
   async function boot() {
+    setupBack();
     const allKeys = []; // 등장인물 그림은 img/chars/index.json 목록으로 불러옴
     const allBgs = [...new Set([...Object.values(NPCS).map((n) => n.bg).filter(Boolean), ...RANKS.map((r) => r.bg), 'title'])];
     await Sprites.init(allKeys, allBgs).catch(() => { });
