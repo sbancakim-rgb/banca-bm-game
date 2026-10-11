@@ -513,3 +513,24 @@ img.sprite.bust.illust { width: 135%; left: -17%; top: -3%; }
 .decorow.locked { opacity: .55; } .decorow .dp { font-size: 12px; }
 .autorow { display: flex; gap: 10px; background: #fff; border-radius: 12px; padding: 10px 12px; margin-bottom: 8px; box-shadow: 0 2px 8px rgba(60,20,60,.06); font-size: 13.5px; line-height: 1.5; }
 .autorow .ai { font-size: 20px; } .autorow small { display: block; }
+
+/* 사무실 둘러보기 (그림) */
+.ov-top .ov-hide { border: 0; border-radius: 999px; padding: 7px 12px; font: inherit; font-size: 12.5px; font-weight: 800; color: #3a2a10; background: #ffd66b; cursor: pointer; }
+.ov-stage { overflow: hidden; border-radius: 16px; }
+.ov-pan { position: absolute; inset: 0; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; -webkit-overflow-scrolling: touch; cursor: grab; }
+.ov-pan::-webkit-scrollbar { display: none; }
+.ov-room { position: relative; height: 100%; aspect-ratio: 1408 / 768; font-size: 1.6vh; }
+.ov-room img { height: 100%; width: 100%; display: block; user-select: none; -webkit-user-drag: none; }
+.ov-prop { position: absolute; line-height: 1; transform: translate(-50%, -100%); filter: drop-shadow(0 4px 6px rgba(0,0,0,.35)); cursor: pointer; }
+.ov-fish { font-size: 3em; padding: .15em .3em; border-radius: .3em; background: rgba(190,232,255,.75); border: .1em solid #7fb3d8; } .ov-fish small { font-size: .6em; }
+.ov-person { position: absolute; left: 50%; bottom: 0; transform: translateX(-50%); height: 88%; width: min(92%, 420px); pointer-events: none; display: flex; justify-content: center; transition: opacity .35s, transform .35s; }
+.ov-person > img { position: absolute; bottom: 9%; height: 82%; width: auto; filter: drop-shadow(0 8px 18px rgba(0,0,0,.35)); }
+.ov-front { position: absolute; left: 0; right: 0; bottom: 0; height: 30%; pointer-events: auto; }
+.ov-front svg { width: 100%; height: 100%; }
+#officeView.nochar .ov-person { opacity: 0; transform: translate(-50%, 30px); }
+.ov-hint { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); background: rgba(20,15,30,.7); color: #fff; font-size: 12px; font-weight: 700; padding: 6px 12px; border-radius: 999px; pointer-events: none; animation: pop .4s; }
+.ov-top b { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 17px; }
+.ov-top .ov-hide { flex: none; }
+.ov-person > img { height: 74%; }
+.ov-hint { top: 12px; bottom: auto; white-space: nowrap; }
+.ov-tip { top: 48px; }

@@ -33,10 +33,8 @@ const Sprites = (() => {
           presets[g].push(c.id);
         }));
       }).catch(() => { }),
-      ...bgNames.map(async (b) => {
-        if (await probe(`img/bg/${b}.jpg`)) bgs[b] = `img/bg/${b}.jpg`;
-        else if (await probe(`img/bg/${b}.png`)) bgs[b] = `img/bg/${b}.png`;
-      })
+      // 배경 그림: img/bg/index.json 목록에 있는 것만 (예: 직급별 사무실 rank0~rank6)
+      fetch('img/bg/index.json', { cache: 'no-cache' }).then((r) => (r.ok ? r.json() : null)).then((man) => { if (man) Object.assign(bgs, man); }).catch(() => { })
     ]);
     ['m', 'f'].forEach((g) => presets[g].sort((a, b) => parseInt(a.slice(1)) - parseInt(b.slice(1))));
   }

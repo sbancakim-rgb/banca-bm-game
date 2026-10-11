@@ -9,7 +9,7 @@ const Office = (() => {
   let seq = 0;
   const esc = (t) => String(t ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const emo = (e, x, y, s, tip) => `<text x="${x}" y="${y}" font-size="${s}" text-anchor="middle"${tip ? ` data-tip="${esc(tip)}"` : ''} style="cursor:${tip ? 'pointer' : 'default'}">${e}</text>`;
-  const PLACE = ['창고', '△△은행 OO지점 창구 앞', '△△은행 VIP 상담실', '지역단 회의실', '사업부장실', '부사장실', '사장실'];
+  const PLACE = ['서류 창고', '△△은행 OO지점 창구 앞', '회의실', 'VIP 상담실', '사업부장실', '부사장실', '사장실'];
 
   function sky(u, x, y, w, h, night) {
     let s = `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="url(#${u}sky)"/>`;
@@ -52,7 +52,7 @@ const Office = (() => {
       <text x="200" y="196" text-anchor="middle" font-size="11" fill="#3c6b66">정기예금 연 2.9%</text><text x="200" y="216" text-anchor="middle" font-size="11" fill="#3c6b66">연금보험 상담 OK</text><text x="200" y="240" text-anchor="middle" font-size="22">🏦</text>
       <rect x="0" y="300" width="400" height="180" fill="#bfe1dc"/><path d="M0,300 H400" stroke="#8cc1ba" stroke-width="4"/>
       <rect x="0" y="480" width="400" height="220" fill="#c9b49a"/>${Array.from({ length: 6 }, (_, i) => `<path d="M${i * 80},480 L${i * 80 - 40},700" stroke="#b7a184" stroke-width="2"/>`).join('')}`,
-    // 2 방카 BM: VIP 상담실
+    // 2 지역단장: VIP 상담실 (아래에서 방카BM과 순서를 바꿈)
     (u) => `<rect width="400" height="480" fill="#efe2cf"/>${Array.from({ length: 20 }, (_, i) => `<path d="M${i * 20 + 10},0 V320" stroke="#e5d4bb" stroke-width="6"/>`).join('')}
       <rect x="0" y="320" width="400" height="160" fill="#c9a77e"/><path d="M0,320 H400" stroke="#9c7a52" stroke-width="6"/>${Array.from({ length: 8 }, (_, i) => `<rect x="${i * 50 + 8}" y="336" width="34" height="126" rx="3" fill="none" stroke="#b18e64" stroke-width="3"/>`).join('')}
       <rect x="140" y="56" width="120" height="170" fill="#fff" stroke="#c9a77e" stroke-width="6"/><rect x="146" y="62" width="108" height="158" fill="url(#${u}sky)"/>${sky(u, 146, 140, 108, 80)}
@@ -60,7 +60,7 @@ const Office = (() => {
       <path d="M352,250 v170" stroke="#5a4632" stroke-width="4"/><path d="M332,250 h40 l-8,-36 h-24 Z" fill="#ffe8b0" stroke="#c9a46a" stroke-width="2"/><circle cx="352" cy="240" r="46" fill="url(#${u}glow)" opacity=".7"/>
       <rect x="0" y="480" width="400" height="220" fill="#7a5a44"/><rect x="40" y="520" width="320" height="170" rx="10" fill="#9c3d3d" opacity=".55"/>
       <text x="200" y="36" text-anchor="middle" font-size="13" font-weight="800" fill="#9c7a52">VIP LOUNGE</text>`,
-    // 3 지역단장: 회의실
+    // 3 방카BM: 회의실 (아래에서 순서를 바꿈)
     (u) => `<rect width="400" height="480" fill="#eef1f5"/>
       <rect x="120" y="50" width="160" height="110" rx="4" fill="#1f2433"/><rect x="126" y="56" width="148" height="98" fill="#fff"/>
       ${[[140, 60], [165, 45], [190, 72], [215, 58], [240, 85]].map(([x, h]) => `<rect x="${x}" y="${142 - h}" width="16" height="${h}" fill="#4f7cff"/>`).join('')}<text x="200" y="72" text-anchor="middle" font-size="10" fill="#333" font-weight="800">지역단 방카 실적</text>
@@ -92,6 +92,8 @@ const Office = (() => {
       <rect x="30" y="505" width="340" height="185" rx="12" fill="#6b1d2a" stroke="url(#${u}gold)" stroke-width="6"/><rect x="60" y="530" width="280" height="135" rx="8" fill="none" stroke="#e2b33c" stroke-width="2" stroke-dasharray="8 6"/>
       <text x="200" y="22" text-anchor="middle" font-size="12" font-weight="900" fill="#8a6a1a">CEO</text>`
   ];
+
+  [ROOM[2], ROOM[3]] = [ROOM[3], ROOM[2]]; // 방카BM = 회의실, 지역단장 = VIP 상담실
 
   /* ---- 진열장(왼쪽): 트로피 2칸 + 책 2칸 ---- */
   function cabinet(u, r, card) {
@@ -199,5 +201,15 @@ const Office = (() => {
     ['plant', 'statue', 'dog', 'putter', 'sofa'].forEach((k) => items.has(k) && (s += SPOT[k](u)));
     return `<svg viewBox="0 0 400 700" preserveAspectRatio="xMidYMid ${opts.fit ? 'meet' : 'slice'}" xmlns="http://www.w3.org/2000/svg">${s}</svg>`;
   }
-  return { svg, PLACE };
+  // 사무실 그림 위, 캐릭터 앞에 놓는 '내 책상' 띠: 명패 · 액자 · 책상 위 소품
+  function front(r, card) {
+    r = Math.max(0, Math.min(6, r | 0));
+    const u = 'ft' + (++seq) + '_', items = new Set((card && card.items) || []);
+    let s = defs(u, false) + desk(u, r, card);
+    DESK_ITEMS.forEach((k) => items.has(k) && (s += SPOT[k](u)));
+    if (items.has('coffee')) s += emo('☕', 330, 484, 26, '커피머신');
+    if (items.has('crystal')) s += emo('💎', 72, 480, 26, '크리스탈 장식');
+    return `<svg viewBox="40 420 320 112" preserveAspectRatio="xMidYMax meet" xmlns="http://www.w3.org/2000/svg">${s}</svg>`;
+  }
+  return { svg, front, PLACE };
 })();

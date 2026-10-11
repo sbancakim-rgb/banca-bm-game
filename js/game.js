@@ -327,7 +327,7 @@
   });
   const stageMode = (m) => { $('#stage').className = m || ''; };
   const jong = (t) => { const c = (t || '').charCodeAt(t.length - 1); return c >= 0xac00 && c <= 0xd7a3 && (c - 0xac00) % 28 > 0; };
-  const PLACES = { rank0: '자료 창고', rank1: '△△은행 OO지점 창구', rank2: '△△은행 VIP 상담실', rank3: '지역단 회의실', rank4: '사업부장실', rank5: '부사장실', rank6: '사장실', office: '○○생명 방카슈랑스사업부', bank: '△△은행 OO지점 창구', classroom: '금융연수원 강의실', booth: '방카 전용 상담 부스',
+  const PLACES = { rank0: '서류 창고', rank1: '△△은행 OO지점 창구', rank2: '회의실', rank3: 'VIP 상담실', rank4: '사업부장실', rank5: '부사장실', rank6: '사장실', office: '○○생명 방카슈랑스사업부', bank: '△△은행 OO지점 창구', classroom: '금융연수원 강의실', booth: '방카 전용 상담 부스',
     meeting: '지역단 상담실', private_office: '사업부장실', vp: '부사장실', ceo: '사장실', vip: '△△은행 WM센터 라운지', inspect: '△△은행 OO지점',
     branch_office: '△△은행 지점장실', hq: '△△은행 본점 은행장실', bok: '한국은행 금융통화위원회 회의실', title: '' };
   function setBg(name) {
@@ -1109,16 +1109,37 @@
     const card = me ? officeCard(officeOC(), S.name, S.lv, myPhoto()) : officeCard(owner.oc, owner.name, lv, owner.photo);
     const person = me ? Sprites.char(playerSpec().key, 'smile') : owner.person;
     const el = document.createElement('div'); el.id = 'officeView';
+    const photo = Sprites.bg('rank' + r); // 사무실 그림이 있으면 그림 위에서 둘러보기 (좌우로 밀기)
+    let hide = false;
     const draw = () => {
       const c = me ? officeCard(officeOC(), S.name, S.lv, myPhoto()) : card;
-      el.innerHTML = `<div class="ov-top"><button class="mini-x" data-x aria-label="닫기">✕</button><b>🏢 ${esc(c.name)} ${esc(c.title)}의 사무실</b></div>
-        <div class="ov-stage">${Office.svg(r, c, { person, fit: true })}<div class="ov-tip"></div></div>
-        <div class="ov-info">🏆 트로피 ${c.trophies.length} · 📜 상장 ${c.certs.length} · 📚 책 ${c.books}권 · 🪑 물품 ${c.items.length}개<small>${esc(Office.PLACE[r])} · 물건을 눌러 보세요</small></div>
+      const it = new Set(c.items), OI = (id) => OFFICE_ITEMS.find((x) => x.id === id) || {};
+      const prop = (id, x, y, sz) => (it.has(id) ? `<span class="ov-prop" style="left:${x}%;top:${y}%;font-size:${sz}em" data-tip="${esc(OI(id).name)}">${OI(id).icon}</span>` : '');
+      const stage = photo ? `<div class="ov-pan"><div class="ov-room"><img src="${photo}" alt="" draggable="false">
+          ${prop('plant', 3, 82, 7)}${prop('statue', 14, 84, 6)}${it.has('fish') ? `<span class="ov-prop ov-fish" style="left:24%;top:80%" data-tip="어항">🐠<small>🐟</small></span>` : ''}
+          ${prop('putter', 70, 87, 5)}${prop('sofa', 84, 82, 7.5)}${prop('dog', 58, 86, 5.5)}${prop('painting', 3, 10, 5)}${prop('clock', 92, 8, 4)}</div></div>
+          <div class="ov-person">${person ? `<img src="${person}" alt="" draggable="false">` : ''}<div class="ov-front">${Office.front(r, c)}</div></div>`
+        : Office.svg(r, c, { person, fit: true });
+      el.className = hide ? 'nochar' : '';
+      el.innerHTML = `<div class="ov-top"><button class="mini-x" data-x aria-label="닫기">✕</button><b>🏢 ${esc(c.name)}의 사무실</b>
+          ${photo ? `<button class="ov-hide" data-hide>${hide ? '🙋 캐릭터 보이기' : '🙈 캐릭터 치우기'}</button>` : ''}</div>
+        <div class="ov-stage">${stage}<div class="ov-tip"></div>${photo ? '<div class="ov-hint">↔ 좌우로 밀어서 둘러보세요</div>' : ''}</div>
+        <div class="ov-info">🏆 트로피 ${c.trophies.length} · 📜 상장 ${c.certs.length} · 📚 책 ${c.books}권 · 🪑 물품 ${c.items.length}개<small>${esc(c.title)} · ${esc(Office.PLACE[r])} · 물건을 눌러 보세요</small></div>
         <div class="ov-bar">${me ? '<button class="btn" data-deco>🪑 꾸미기</button><button class="btn ghost" data-case>🏆 진열장</button><button class="btn ghost" data-shop>🛒 매점</button>'
           : '<button class="btn ghost" data-case>🏆 진열장</button><button class="btn" data-x>닫기</button>'}</div>`;
       el.querySelectorAll('[data-x]').forEach((b) => b.onclick = close);
       const tip = el.querySelector('.ov-tip');
-      el.querySelector('.ov-stage svg').addEventListener('click', (e) => {
+      const hb = el.querySelector('[data-hide]'); if (hb) hb.onclick = () => { hide = !hide; Snd.tap(); el.classList.toggle('nochar', hide); hb.textContent = hide ? '🙋 캐릭터 보이기' : '🙈 캐릭터 치우기'; };
+      const pan = el.querySelector('.ov-pan');
+      if (pan) {
+        requestAnimationFrame(() => { pan.scrollLeft = (pan.scrollWidth - pan.clientWidth) / 2; });
+        let dx = null; // PC: 마우스로 끌어서 둘러보기
+        pan.addEventListener('pointerdown', (e) => { if (e.pointerType === 'mouse') dx = e.clientX + pan.scrollLeft; });
+        pan.addEventListener('pointermove', (e) => { if (dx != null) pan.scrollLeft = dx - e.clientX; });
+        addEventListener('pointerup', () => { dx = null; });
+        pan.addEventListener('scroll', () => { const h = el.querySelector('.ov-hint'); if (h) h.remove(); }, { once: true });
+      }
+      el.querySelector('.ov-stage').addEventListener('click', (e) => {
         const t = e.target.closest('[data-tip]'); if (!t) return;
         tip.textContent = t.getAttribute('data-tip'); tip.classList.remove('on'); void tip.offsetWidth; tip.classList.add('on'); Snd.tap();
       });

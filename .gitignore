@@ -14,3 +14,5 @@ backend/
 hair_gallery.html
 # 등장인물 원본 시트(잘라서 img/chars 로 반영)
 img/새 폴더/
+# 사무실 배경 원본 (img/bg/rank*.webp 로 변환해 사용)
+img/사무실/
