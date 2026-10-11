@@ -119,7 +119,7 @@ const Api = (() => {
 const Demo = (() => {
   const DB = 'bmq_demo_db';
   const ADMIN = 'admin@demo.local', ADMIN_PW = 'demo1234';
-  const FILES = ['q_banca_general', 'q_banca_general_2', 'q_banca_tax', 'q_banca_doc_tax', 'q_banca_product', 'q_banca_backoffice', 'q_market', 'q_market_2', 'q_market_3', 'q_econ', 'q_econ_2', 'q_term', 'q_term_2'];
+  const FILES = ['q_banca_general', 'q_banca_general_2', 'q_banca_tax', 'q_banca_doc_tax', 'q_banca_product', 'q_banca_backoffice', 'q_market', 'q_market_2', 'q_market_3', 'q_econ', 'q_econ_2', 'q_term', 'q_term_2', 'q_banca_product_2', 'q_banca_backoffice_2', 'q_banca_general_3', 'q_econ_3', 'q_term_3', 'q_market_4'];
   const load = () => { try { return JSON.parse(localStorage.getItem(DB)) || {}; } catch (e) { return {}; } };
   const store = (d) => { try { localStorage.setItem(DB, JSON.stringify(d)); } catch (e) { } };
   const norm = (e) => String(e || '').trim().toLowerCase();
