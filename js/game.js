@@ -1517,7 +1517,7 @@ Lv.${S.lv} ${rankOf(S.lv).title} ${S.name}의 모든 기록(경험치 ${S.totalX
       $('#npg').onclick = async () => { const p = $('#np').value; if (p.length < 5) return toast('5자 이상'); try { await Api.admin.saveUser({ email: b.dataset.pw, password: p }); m.close(); toast('변경했어요'); } catch (e) { toast(e.message); } };
     });
     body.querySelectorAll('[data-act]').forEach((b) => b.onclick = async () => { await Api.admin.saveUser({ email: b.dataset.act, active: b.dataset.on !== '1' }); pageAdmin(); });
-    body.querySelectorAll('[data-rm]').forEach((b) => b.onclick = async () => { if (await confirmBox(`${b.dataset.rm} 회원을 삭제할까요?\n(진행 기록은 '진행' 시트에 남아요)`, '삭제')) { await Api.admin.deleteUser(b.dataset.rm); pageAdmin(); } });
+    body.querySelectorAll('[data-rm]').forEach((b) => b.onclick = async () => { if (await confirmBox(`${b.dataset.rm} 회원을 완전히 삭제할까요?\n\n회원 목록 · 진행 기록 · 우편함 · 실물 캐릭터 그림이 모두 지워지고 되돌릴 수 없어요.`, '완전 삭제')) { try { await Api.admin.deleteUser(b.dataset.rm); toast('삭제했어요'); } catch (e) { toast(e.message); } pageAdmin(); } });
   }
   async function loadAdmQ(force) { if (!admQ || force) admQ = await Api.admin.questions(); return admQ; }
   let repFilter = '접수';

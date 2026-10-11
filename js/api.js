@@ -214,7 +214,7 @@ const Demo = (() => {
         if (b.user.admin != null) x.admin = b.user.admin;
         d.users[e] = x; store(d); return ok();
       }
-      case 'adminUserDelete': delete d.users[norm(b.email)]; store(d); return ok();
+      case 'adminUserDelete': { const e = norm(b.email); if (e === ADMIN) throw new Error('관리자 계정은 삭제할 수 없어요'); delete d.users[e]; delete d.progress[e]; d.mail = d.mail.filter((m) => m.to !== e && m.from !== e); store(d); return ok(); }
       case 'adminReports': return ok({ items: d.reports });
       case 'adminReportResolve': {
         if (b.question) d.qedits[b.question.id] = b.question;
