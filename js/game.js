@@ -1394,16 +1394,114 @@
   /* ---- 설정 ---- */
   let deferredInstall = null;
   addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferredInstall = e; });
+  addEventListener('appinstalled', () => { deferredInstall = null; try { localStorage.setItem('bmq_install_seen', '1'); } catch (e) { } if (els.modal.classList.contains('on') && $('.ig')) els.modal.querySelector('[data-close]')?.click(); toast('📲 설치 완료! 이제 홈 화면의 아이콘으로 실행하세요', 4000); });
   const standalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+
+  /* ---------------- 앱 설치 안내 (첫 출근 후 · 설정에서 다시 보기) ---------------- */
+  function browserEnv() {
+    const ua = navigator.userAgent;
+    const ios = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    const android = /Android/i.test(ua), kakao = /KAKAOTALK/i.test(ua);
+    const inapp = kakao || /NAVER\(inapp|Instagram|FBAN|FBAV|Line\/|DaumApps|everytimeApp|BAND\/|; wv\)/i.test(ua);
+    return { ios, android, kakao, inapp, samsung: /SamsungBrowser/i.test(ua), iosChrome: ios && /CriOS/i.test(ua), iosOther: ios && /FxiOS|EdgiOS|Whale/i.test(ua) };
+  }
+  // 휴대폰 모양 미리보기: 누를 곳에 반짝이는 동그라미
+  function phoneMock(m) {
+    const dot = (cls) => `<i class="ig-dot ${cls}"></i>`;
+    let inner = '';
+    if (m.at) inner = `<div class="ig-bar top"><span>🔒 banca-bm-game</span><b>${m.topIcon || '⋮'}</b></div><div class="ig-page"></div>
+      <div class="ig-bar bottom">${m.bottomIcons || '<b>‹</b><b>›</b><b>⬆︎</b><b>📖</b><b>⧉</b>'}</div>${dot(m.at)}`;
+    else if (m.menu) inner = `<div class="ig-sheet">${m.menu.map((t) => `<div class="${t[0] === '*' ? 'hi' : ''}">${esc(t.replace(/^\*/, ''))}</div>`).join('')}</div>`;
+    else if (m.dialog) inner = `<div class="ig-page dim"></div><div class="ig-dlg"><div class="ig-ico">🏆</div><b>${esc(m.dialog[0])}</b><div class="ig-btns"><span>취소</span><span class="hi">${esc(m.dialog[1])}</span></div></div>`;
+    else if (m.home) inner = `<div class="ig-home">${['📞', '💬', '📷', '🗓️', '🎵', '🏆'].map((x, i) => `<span class="${i === 5 ? 'hi' : ''}">${x}${i === 5 ? '<small>방카BM</small>' : ''}</span>`).join('')}</div>`;
+    return `<div class="ig-phone">${inner}</div>`;
+  }
+  function installSteps(env) {
+    const url = location.href.split('#')[0];
+    if (env.inapp) {
+      const where = env.kakao ? '카카오톡' : '이 앱';
+      const ext = env.ios ? 'Safari' : '크롬(Chrome)';
+      const open = env.kakao ? 'kakaotalk://web/openExternal?url=' + encodeURIComponent(url)
+        : env.android ? 'intent://' + url.replace(/^https?:\/\//, '') + '#Intent;scheme=https;package=com.android.chrome;end' : '';
+      return [
+        { t: `${where} 안에서는 설치가 안 돼요`, d: `앱으로 설치하려면 <b>${ext}</b>에서 열어야 해요.<br>아래 버튼을 눌러 주세요.`, btn: open ? { label: `🌐 ${ext}로 열기`, go: () => { location.href = open; } } : null, m: { at: env.ios ? 'br' : 'tr', topIcon: '⋮' } },
+        { t: '버튼이 안 되면 직접 열기', d: env.ios ? `화면 <b>오른쪽 아래 ⋯ (또는 공유)</b> 버튼 → <b>'다른 브라우저로 열기'</b> 또는 <b>'Safari로 열기'</b>를 눌러 주세요.`
+          : `화면 <b>오른쪽 위 ⋮</b> 버튼 → <b>'다른 브라우저로 열기'</b>를 누르고 <b>Chrome</b>을 골라 주세요.`,
+          m: { menu: ['링크 복사', '공유하기', '*다른 브라우저로 열기', '새로고침'] } },
+        { t: `${ext}에서 다시 로그인`, d: `${ext}가 열리면 같은 이메일로 한 번 더 로그인해 주세요.<br>설치 안내가 이어서 나와요. 기록은 그대로예요!`, m: { at: 'none' } }
+      ];
+    }
+    if (env.ios) {
+      const chrome = env.iosChrome;
+      return [
+        { t: chrome ? '주소창 오른쪽 공유 버튼' : '아래쪽 공유 버튼 누르기', d: chrome ? `주소창 <b>오른쪽의 공유 버튼 (□↑)</b>을 눌러 주세요.`
+          : `화면 <b>아래쪽의 공유 버튼 (□↑)</b>을 눌러 주세요.<br><span class="muted">안 보이면 오른쪽 아래 <b>⋯</b> → <b>공유</b></span>`,
+          m: chrome ? { at: 'tr', topIcon: '⬆︎' } : { at: 'bc' } },
+        { t: "'홈 화면에 추가' 누르기", d: `메뉴를 <b>위로 올려서</b> <b>'홈 화면에 추가'</b>를 찾아 눌러 주세요.`, m: { menu: ['복사', '읽기 목록에 추가', '책갈피 추가', '*홈 화면에 추가', '페이지에서 찾기'] } },
+        { t: "오른쪽 위 '추가' 누르기", d: `<b>'웹 앱으로 열기'</b>가 켜져 있는지 확인하고, 오른쪽 위 <b>'추가'</b>를 누르면 끝!`, m: { dialog: ['홈 화면에 추가', '추가'] } },
+        { t: '홈 화면에서 실행', d: `홈 화면에 생긴 <b>방카BM</b> 아이콘으로 들어오면 앱처럼 전체 화면으로 열려요.`, m: { home: true } }
+      ];
+    }
+    const quick = deferredInstall ? [{ t: '버튼 한 번이면 설치 끝!', d: `아래 <b>[앱 설치하기]</b>를 누르고, 뜨는 창에서 <b>'설치'</b>를 눌러 주세요.`,
+      btn: { label: '📲 앱 설치하기', go: async (next) => { const e = deferredInstall; if (!e) return next(); deferredInstall = null; e.prompt(); try { const c = await e.userChoice; if (c.outcome === 'accepted') next(true); } catch (er) { } } },
+      m: { dialog: ['앱을 설치하시겠어요?', '설치'] } }] : [];
+    if (env.samsung) return quick.length ? quick.concat([{ t: '홈 화면에서 실행', d: '홈 화면에 생긴 <b>방카BM</b> 아이콘으로 들어오세요.', m: { home: true } }]) : [
+      { t: '아래쪽 메뉴 버튼 누르기', d: `화면 <b>오른쪽 아래 ≡ (메뉴)</b> 버튼을 눌러 주세요.`, m: { at: 'br', bottomIcons: '<b>‹</b><b>›</b><b>⌂</b><b>⧉</b><b>≡</b>' } },
+      { t: "'현재 페이지 추가' → '홈 화면'", d: `<b>'현재 페이지 추가'</b> (또는 '페이지 추가')를 누른 뒤 <b>'홈 화면'</b>을 골라 주세요.`, m: { menu: ['북마크', '방문 기록', '*현재 페이지 추가', '설정'] } },
+      { t: "'추가' 누르기", d: `확인 창에서 <b>'추가'</b>를 누르면 끝!`, m: { dialog: ['홈 화면에 추가', '추가'] } },
+      { t: '홈 화면에서 실행', d: '홈 화면에 생긴 <b>방카BM</b> 아이콘으로 들어오세요.', m: { home: true } }];
+    if (env.android) return quick.length ? quick.concat([{ t: '홈 화면에서 실행', d: '홈 화면에 생긴 <b>방카BM</b> 아이콘으로 들어오면 앱처럼 열려요.', m: { home: true } }]) : [
+      { t: '오른쪽 위 ⋮ 누르기', d: `크롬 주소창 <b>오른쪽 위의 ⋮</b> 버튼을 눌러 주세요.`, m: { at: 'tr', topIcon: '⋮' } },
+      { t: "'홈 화면에 추가' 누르기", d: `메뉴에서 <b>'홈 화면에 추가'</b> 또는 <b>'앱 설치'</b>를 눌러 주세요.`, m: { menu: ['새 탭', '방문 기록', '다운로드', '*홈 화면에 추가', '설정'] } },
+      { t: "'설치' 누르기", d: `확인 창에서 <b>'설치'</b>(또는 '추가')를 누르면 끝!`, m: { dialog: ['앱 설치', '설치'] } },
+      { t: '홈 화면에서 실행', d: '홈 화면에 생긴 <b>방카BM</b> 아이콘으로 들어오면 앱처럼 열려요.', m: { home: true } }];
+    // PC
+    return quick.length ? quick : [
+      { t: '주소창의 설치 아이콘', d: `주소창 <b>오른쪽 끝의 설치 아이콘 (⊕ 또는 🖥️)</b>을 누르거나, 메뉴 <b>⋮ → '앱 설치'</b>를 눌러 주세요.`, m: { at: 'tr', topIcon: '⊕' } },
+      { t: "'설치' 누르기", d: `확인 창에서 <b>'설치'</b>를 누르면 바탕화면·시작 메뉴에서 바로 열 수 있어요.`, m: { dialog: ['앱을 설치하시겠어요?', '설치'] } }];
+  }
+  // 이 기기에서 아직 안내를 안 봤고 앱으로 실행 중이 아니면 안내 (카톡에서 넘어온 뒤 크롬에서 다시 로그인한 경우 포함)
+  function maybeInstallGuide() {
+    let seen = false; try { seen = localStorage.getItem('bmq_install_seen') === '1'; } catch (e) { }
+    if (standalone() || seen) return false;
+    setTimeout(() => installGuide(true), 700);
+    return true;
+  }
+  function installGuide(first) {
+    if (standalone()) return toast('이미 앱으로 실행 중이에요 👍');
+    const steps = installSteps(browserEnv());
+    let i = 0;
+    const m = modal('<div class="ig"></div>');
+    const box = m.el.querySelector('.ig');
+    const seen = () => { try { localStorage.setItem('bmq_install_seen', '1'); } catch (e) { } };
+    const draw = () => {
+      const st = steps[i], last = i === steps.length - 1;
+      box.innerHTML = `<div class="ig-head">📲 앱으로 설치하기 <span>${i + 1} / ${steps.length}</span></div>
+        <div class="ig-prog">${steps.map((_, k) => `<i class="${k <= i ? 'on' : ''}"></i>`).join('')}</div>
+        ${phoneMock(st.m)}
+        <h3>${st.t}</h3><p>${st.d}</p>
+        ${st.btn ? `<button class="btn full" id="igGo">${st.btn.label}</button>` : ''}
+        <div class="row" style="margin-top:10px">
+          ${i > 0 ? '<button class="btn ghost full" id="igPrev">← 이전</button>' : `<button class="btn ghost full" id="igLater">${first ? '나중에 할게요' : '닫기'}</button>`}
+          ${last ? '<button class="btn full" id="igDone">완료했어요</button>' : '<button class="btn full" id="igNext">다음 →</button>'}
+        </div>
+        ${first ? '<p class="muted" style="text-align:center;margin:10px 0 0;font-size:12px">설정 → 📲 앱으로 설치에서 언제든 다시 볼 수 있어요</p>' : ''}`;
+      const go = (k) => { i = Math.max(0, Math.min(steps.length - 1, k)); draw(); };
+      const b = (id, fn) => { const el = box.querySelector(id); if (el) el.onclick = fn; };
+      b('#igGo', () => st.btn.go((done) => (done ? (seen(), m.close(), toast('📲 설치 중이에요! 홈 화면을 확인해 주세요', 3500)) : go(i + 1))));
+      b('#igNext', () => go(i + 1)); b('#igPrev', () => go(i - 1));
+      b('#igLater', () => { seen(); m.close(); }); b('#igDone', () => { seen(); m.close(); toast('잘하셨어요! 다음부터는 홈 화면 아이콘으로 출근하세요 🏢', 3500); });
+    };
+    draw();
+  }
   function pageSettings() {
     setNav('settings');
     const iOS = /iPad|iPhone|iPod/.test(navigator.userAgent), u = Api.user || {};
     els.screen.innerHTML = `<div class="page"><h2>⚙️ 설정</h2>
       ${Api.demo ? '<div class="box demo">🧪 로컬 데모 모드 — 서버(구글 시트)에 연결되지 않았어요. 기록은 이 브라우저에만 저장돼요.</div>' : ''}
       ${u.admin ? '<button class="btn full" id="adm" style="margin-bottom:12px">🛠️ 관리자 메뉴 (회원 · 캐릭터 · 이의 제기 · 문제 · 자료실)</button>' : ''}
-      ${standalone() ? '' : `<div class="box"><h4>📲 앱으로 설치</h4>
-        ${iOS ? '<p class="muted">사파리 하단 <b>공유 버튼</b> → <b>홈 화면에 추가</b>를 누르면 앱처럼 전체화면으로 실행돼요.</p>'
-        : `<p class="muted">홈 화면에 설치하면 주소창 없이 앱처럼 실행돼요.</p><button class="btn full" id="inst">앱 설치하기</button>`}</div>`}
+      ${standalone() ? '' : `<div class="box"><h4>📲 앱으로 설치</h4><p class="muted">홈 화면에 설치하면 주소창 없이 앱처럼 전체 화면으로 실행돼요.</p>
+        <button class="btn full" id="inst">설치 방법 차근차근 보기</button></div>`}
       <div class="box"><h4>👤 내 정보</h4><div class="muted" style="margin-bottom:8px">${esc(u.email || '')}</div>
         <div class="row"><input type="text" id="nm" value="${esc(S.name)}" maxlength="8"><button class="btn" id="nmSave" style="flex:none">이름 변경</button></div>
         <div class="row" style="margin-top:8px"><button class="btn ghost full" id="pw">🔑 비밀번호 변경</button></div>
@@ -1417,7 +1515,7 @@
     </div>`;
     const adm = $('#adm'); if (adm) adm.onclick = () => go('admin');
     const inst = $('#inst');
-    if (inst) inst.onclick = () => { if (deferredInstall) { deferredInstall.prompt(); deferredInstall = null; } else toast('브라우저 메뉴(⋮) → "앱 설치" 또는 "홈 화면에 추가"를 눌러 주세요'); };
+    if (inst) inst.onclick = () => installGuide(false);
     $('#nmSave').onclick = () => { const v = $('#nm').value.trim(); if (!v) return; S.name = v; save(); renderHud(); toast('이름을 바꿨어요'); };
     $('#snd').onclick = () => { S.sound = !S.sound; save(); pageSettings(); renderHud(); };
     $('#sync').onclick = async () => { await syncNow(); toast('저장했어요'); };
@@ -1768,7 +1866,7 @@ Lv.${S.lv} ${rankOf(S.lv).title} ${S.name}의 모든 기록(경험치 ${S.totalX
     els.screen.innerHTML = `<div class="logo"><div class="k">BANCASSURANCE QUIZ RPG</div><h1>방카BM<br><em>성장기</em></h1><p>인턴에서 사장까지, 지식으로 승진하라!</p></div>
       <div class="title-wrap"><button class="btn" id="cont">출근하기 · Lv.${S.lv} ${esc(S.name)}</button>
       <button class="btn ghost" id="out">다른 계정으로 로그인</button></div>`;
-    $('#cont').onclick = () => { Snd.tap(); eventRoll = true; goHome(); };
+    $('#cont').onclick = () => { Snd.tap(); eventRoll = true; goHome(); maybeInstallGuide(); };
     $('#out').onclick = async () => { await syncNow(); Api.logout(); S = null; loginScreen(); };
   }
   /* 신입사원 등록: 캐릭터 꾸미기 (입사 후에는 변경 불가) */
@@ -1827,7 +1925,7 @@ Lv.${S.lv} ${rankOf(S.lv).title} ${S.name}의 모든 기록(경험치 ${S.totalX
     S.story = true; save(); syncNow();
     els.vn.classList.remove('on');
     goHome();
-    setTimeout(() => toast('💡 카드 하나를 눌러 오늘의 첫 일정을 시작하세요!', 3500), 600);
+    if (!maybeInstallGuide()) setTimeout(() => toast('💡 카드 하나를 눌러 오늘의 첫 일정을 시작하세요!', 3500), 600);
   }
 
   /* ---------------- 시작 ---------------- */
