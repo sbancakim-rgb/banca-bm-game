@@ -9,7 +9,7 @@
     const src = spec && spec.key && Sprites.char(spec.key, expr);
     if (!src) return Art.portrait(spec, expr, opts);
     const cls = opts.head ? 'sprite head' : opts.bust ? 'sprite bust' : 'sprite';
-    return `<img class="${cls}${spec.aura ? ' aura' : ''}${/^(illust|face):/.test(spec.key) ? ' illust' : ''}" src="${src}" alt="" draggable="false">`;
+    return `<img class="${cls}${spec.aura ? ' aura' : ''}${Sprites.isIllust(spec.key) ? ' illust' : ''}" src="${src}" alt="" draggable="false">`;
   }
   function bgHTML(name) {
     const src = Sprites.bg(name);
@@ -1981,7 +1981,7 @@ Lv.${S.lv} ${rankOf(S.lv).title} ${S.name}의 모든 기록(경험치 ${S.totalX
 
   /* ---------------- 시작 ---------------- */
   async function boot() {
-    const allKeys = [...Object.keys(NPCS).filter((k) => NPCS[k].spec), ...['m', 'f'].flatMap((g) => RANKS.map((_, i) => `player_${g}_${i}`))];
+    const allKeys = []; // 등장인물 그림은 img/chars/index.json 목록으로 불러옴
     const allBgs = [...new Set([...Object.values(NPCS).map((n) => n.bg).filter(Boolean), ...RANKS.map((r) => r.bg), 'title'])];
     await Sprites.init(allKeys, allBgs).catch(() => { });
     if (!Api.loggedIn()) return loginScreen();

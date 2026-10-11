@@ -12,3 +12,5 @@ backend/SeedIndex.gs
 # 서버 코드는 Apps Script에서 관리 (관리자 이메일·시트 ID 포함)
 backend/
 hair_gallery.html
+# 등장인물 원본 시트(잘라서 img/chars 로 반영)
+img/새 폴더/
