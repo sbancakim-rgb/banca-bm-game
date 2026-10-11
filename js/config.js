@@ -176,7 +176,32 @@ const NPCS = {
     ok: ['호오… 제법이군.', '좋아. 그 정도는 돼야지.'],
     ng: ['실망이군. 그 정도로는 내 돈을 못 맡겨.', '흠, 다른 회사 BM을 불러야 하나.'],
     timeout: ['내 시간은 비싸네.'],
-    end: { good: '좋네. 자네 회사 상품으로 일시납 10억 하지.', bad: '다음에 다시 보세. 준비해 오게.' }
+    end: { good: '좋네. 자네 회사 상품으로 일시납 10억 하지.', bad: '다음에 다시 보세. 준비해 오게.' },
+    call: '자네가 그 소문난 BM인가? 전화로 하나만 묻지. 틀리면 끊네.'
+  },
+  vipkim: {
+    name: 'VIP 김회장님', role: '중견기업 회장 · VIP 고객', bg: 'vip', time: 20,
+    spec: { gender: 'm', skin: SKIN.c, eye: 'round', wrinkles: true, browColor: '#8a8a94',
+      hair: { style: 'bald', color: '#9a9aa4' }, glasses: 'half', glassesColor: '#8a6a2a',
+      outfit: { type: 'suit', main: '#3a2a22', tie: '#8c1c2c', vest: true, acc: ['pocket_square'], square: '#e8e2d0' } },
+    intro: ['허허, 우리 회사 법인 자금이랑 내 노후 자금까지 상담 좀 해 볼까?', '사업 40년 하면서 말 잘하는 사람은 많이 봤네. 실력을 보여 주게.'],
+    ok: ['허허, 이 친구 물건이네!', '좋아, 우리 회사 재무팀장보다 낫구먼.'],
+    ng: ['어허, 그건 아니지.', '그렇게 설명하면 우리 직원들 다 헷갈리겠네.'],
+    timeout: ['회의가 있어서 이만 끊겠네.'],
+    end: { good: '좋아, 다음 주에 회사로 한번 오게. 임원들 앞에서 설명 좀 해 주게.', bad: '다음에 공부 더 해서 오게나.' },
+    call: '허허, 자네가 요즘 그렇게 똑똑하다는 BM인가? 내 하나만 물어보지.'
+  },
+  vipmadam: {
+    name: 'VIP 사모님', role: '자산가 VIP 고객', bg: 'vip', time: 20,
+    spec: { gender: 'f', skin: SKIN.a, eye: 'almond', lashes: true, wrinkles: true,
+      hair: { style: 'perm', color: '#4a3a32' }, earrings: '#f5e6c4',
+      outfit: { type: 'suit', main: '#6b2140', shirt: '#fff7f2', necklace: '#f5e6c4', acc: ['pin'] } },
+    intro: ['어머, 우리 PB가 BM님 칭찬을 그렇게 하더라고요. 정말인지 볼까요?', '요즘 자녀 증여랑 연금 때문에 고민이 많아요. 잘 설명해 주실 수 있죠?'],
+    ok: ['어머, 설명을 참 쉽게 하시네요!', '역시 소문대로네요. 호호.'],
+    ng: ['어머, 그건 우리 PB 얘기랑 다른데요?', '음… 그건 좀 불안한데요.'],
+    timeout: ['어머, 골프 약속에 늦겠어요.'],
+    end: { good: '호호, 우리 모임 사모님들한테도 소개해 드릴게요!', bad: '다음에 다시 얘기해요~' },
+    call: '어머, BM님이세요? 지인한테 번호 받았어요. 궁금한 게 하나 있는데요…'
   },
   inspector: {
     name: '미스터리 쇼퍼', role: '불완전판매 점검 · 보스', bg: 'inspect', time: 18,

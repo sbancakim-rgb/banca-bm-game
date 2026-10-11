@@ -894,10 +894,11 @@
       await grant({ items: { [prize]: 1 } });
       await say(w, '부럽다~ 나는 꽝이야 ㅠㅠ');
     } },
-    { id: 'vipcall', w: 5, bg: 'vip', npc: 'vip', run: async (w) => {
+    // VIP 전화: 정회장님 · 김회장님 · VIP 사모님 중 한 명
+    { id: 'vipcall', w: 5, bg: 'vip', npc: 'vip', npcs: ['vip', 'vipkim', 'vipmadam'], run: async (w, nk) => {
       await say(NARR, '📞 낯선 번호로 전화가 온다…');
-      await say(w, '자네가 그 소문난 BM인가? 전화로 하나만 묻지. 틀리면 끊네.');
-      await eventQuiz('vip', (q) => q.diff === 3 && ['banca_general', 'market', 'econ'].includes(q.cat), { xp: 80, cash: 1000, honor: 20 });
+      await say(w, NPCS[nk].call);
+      await eventQuiz(nk, (q) => q.diff === 3 && ['banca_general', 'market', 'econ'].includes(q.cat), { xp: 80, cash: 1000, honor: 20 });
     } },
     { id: 'umbrella', w: 6, bg: 'bank', npc: 'teamlead', run: async (w) => {
       await say(NARR, '갑자기 소나기가 쏟아진다. 은행 앞에서 우산 없이 서 있는 팀장님이 보인다.');
@@ -911,8 +912,9 @@
     S.events.pending = null; save();
     if (!ev) return goHome();
     inSession = true; stageMode(''); els.screen.innerHTML = ''; els.nav.classList.add('hidden'); els.vn.classList.add('on');
-    setBg(ev.bg); setChar(ev.npc ? NPCS[ev.npc].spec : null, 'smile', 'enter');
-    try { await ev.run(ev.npc ? whoOf(ev.npc) : NARR); } catch (e) { console.error(e); }
+    const nk = ev.npcs ? pick(ev.npcs) : ev.npc; // 여러 명 중 한 명이 등장하는 이벤트
+    setBg(ev.bg); setChar(nk ? NPCS[nk].spec : null, 'smile', 'enter');
+    try { await ev.run(nk ? whoOf(nk) : NARR, nk); } catch (e) { console.error(e); }
     els.vn.classList.remove('on'); els.choices.innerHTML = ''; inSession = false;
     goHome();
   }
