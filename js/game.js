@@ -137,7 +137,11 @@
     const look = clone(r.look);
     if (f && look.type === 'suit') { delete look.tie; look.necklace = '#f5e6c4'; }
     if (f && look.type === 'shirt') look.shirt = '#fdf7fb';
-    const illust = faceKey && Sprites.has(faceKey) ? faceKey : P.illust && P.illust[0] === P.gender && Sprites.has('illust:' + P.illust) ? 'illust:' + P.illust : null;
+    // 주인공 그림: 실물 캐릭터 → 고른 일러스트 → 성별 기본 일러스트 (코드로 그린 캐릭터는 쓰지 않음)
+    const pre = Sprites.presets(P.gender)[0] || Sprites.presets(P.gender === 'f' ? 'm' : 'f')[0];
+    const illust = faceKey && Sprites.has(faceKey) ? faceKey
+      : P.illust && P.illust[0] === P.gender && Sprites.has('illust:' + P.illust) ? 'illust:' + P.illust
+      : pre ? 'illust:' + pre : null;
     return { key: illust || `player_${P.gender}_${RANKS.indexOf(r)}`, gender: P.gender, skin: P.skin,
       eye: fc.eye, eyeScale: fc.eyeScale, face: fc.face, eyeColor: fc.eyeColor, lashes: !!fc.lashes, blush: !!fc.blush, brow: fc.brow, thickBrows: fc.thickBrows,
       age: P.age, glasses: P.glasses || null, glassesColor: P.glassesColor,
@@ -933,6 +937,7 @@
       }
     }
     const cur = rankTab === 'week' ? r.week : r.month, last = rankTab === 'week' ? r.lastWeek : r.lastMonth;
+    primePeerFaces(cur.list);
     const cheer = r.cheer || { left: 0, to: [] };
     const medal = (i) => ['🥇', '🥈', '🥉'][i] || `${i + 1}`;
     const page = els.screen.querySelector('.page'); if (!page) return;
@@ -947,7 +952,7 @@
     els.screen.querySelectorAll('[data-rt]').forEach((b) => b.onclick = () => { rankTab = b.dataset.rt; pageRank(); });
     els.screen.querySelectorAll('[data-av]').forEach((b) => b.onclick = () => charViewer(cur.list[+b.dataset.av]));
     // 실물 캐릭터 사진은 기본 표정만 먼저 받아서 바꿔 끼운다
-    const fl = cur.list.filter((x) => x.face && !x.me);
+    const fl = cur.list.filter((x) => !faceReady(x));
     if (fl.length) loadPeerFaces(fl.map((x) => x.uid), ['normal']).then(() => {
       els.screen.querySelectorAll('button.rkav').forEach((b) => { const x = cur.list[+b.dataset.av]; if (x && x.face && !x.me) b.innerHTML = avatar(x); });
     });
@@ -956,19 +961,41 @@
   }
 
   /* ---------------- 동료 캐릭터 보기 (최우수BM 사진 · 관리자 캐릭터 메뉴) ---------------- */
-  const FACE_EXPRS = ['normal', 'smile', 'angry', 'worried'], peerFace = {};
+  const FACE_EXPRS = ['normal', 'smile', 'angry', 'worried'], peerFace = {}, peerVer = {};
+  const PFK = (uid) => 'bmq_pf_' + uid;
+  // 이 기기에 받아 둔 동료 그림 중 버전이 같은 것은 바로 쓴다 (다시 받지 않음)
+  function primePeerFaces(list) {
+    list.filter((x) => x.face && !x.me).forEach((x) => {
+      peerVer[x.uid] = x.fv || '';
+      if (peerFace[x.uid] && peerFace[x.uid].__v === x.fv) return;
+      try {
+        const c = JSON.parse(localStorage.getItem(PFK(x.uid)));
+        if (c && c.v === x.fv && c.m && c.m.normal) { peerFace[x.uid] = Object.assign({ __v: c.v }, c.m); Sprites.registerData('face:' + x.uid, c.m); }
+        else if (peerFace[x.uid] && peerFace[x.uid].__v !== x.fv) { delete peerFace[x.uid]; }
+      } catch (e) { }
+    });
+  }
   async function loadPeerFaces(uids, exprs = FACE_EXPRS) {
     const need = [...new Set(uids)].filter((u) => !peerFace[u] || exprs.some((e) => !peerFace[u][e]));
     if (!need.length) return;
     try {
       const got = await Api.peerFaces(need, exprs);
-      Object.entries(got).forEach(([u, m]) => { peerFace[u] = Object.assign(peerFace[u] || {}, m); Sprites.registerData('face:' + u, peerFace[u]); });
+      Object.entries(got).forEach(([u, m]) => {
+        const v = peerVer[u] || '';
+        const cur = peerFace[u] && peerFace[u].__v === v ? peerFace[u] : { __v: v };
+        peerFace[u] = Object.assign(cur, m);
+        const pics = Object.assign({}, peerFace[u]); delete pics.__v;
+        Sprites.registerData('face:' + u, pics);
+        try { localStorage.setItem(PFK(u), JSON.stringify({ v, m: pics })); } catch (e) { } // 저장 공간이 모자라면 이번만 쓰고 넘어감
+      });
     } catch (e) { }
   }
   // p: { name, lv, look, uid, face, me }
   const peerSpec = (p) => (p.me ? playerSpec(p.lv || S.lv) : specOf(p.look || {}, p.lv || 1, p.face ? 'face:' + p.uid : null));
   const restOf = (spec) => (/^(illust|face):/.test(spec.key) ? 'normal' : 'smile');
-  const avatar = (p) => { const sp = peerSpec(p); return charHTML(sp, restOf(sp), { head: true }); };
+  // 실물 캐릭터 그림이 아직 없으면 빈 동그라미 (다른 그림을 먼저 보여주지 않음)
+  const faceReady = (p) => p.me || !p.face || Sprites.has('face:' + p.uid);
+  const avatar = (p) => { if (!faceReady(p)) return '<i class="avwait"></i>'; const sp = peerSpec(p); return charHTML(sp, restOf(sp), { head: true }); };
   function peerLines(p) {
     const lv = p.lv || 1, fill = (t) => t.replace(/\{이름\}/g, p.name).replace(/\{직급\}/g, rankOf(lv).title).replace(/\{레벨\}/g, lv);
     const L = (TALK && TALK.length ? TALK : TALK_DEFAULT).filter((r) => (!r.cond || r.cond === '항상') && !/\{(연속|보스)\}/.test(r.text))
@@ -981,6 +1008,7 @@
       <button class="btn ghost full" data-close>닫기</button>`);
     if (p.face && !p.me) await loadPeerFaces([p.uid]);
     const box = m.el.querySelector('.cview'); if (!box || !box.isConnected) return;
+    if (!faceReady(p)) { box.innerHTML = '<p class="muted" style="text-align:center;padding-top:40%">캐릭터 그림을 불러오지 못했어요.<br>잠시 후 다시 눌러 주세요.</p>'; return; }
     const spec = peerSpec(p), L = peerLines(p);
     let last = -1, taps = [], tm = null;
     box.innerHTML = `<div class="cvfig">${charHTML(spec, restOf(spec))}</div>`;
@@ -1451,12 +1479,13 @@ Lv.${S.lv} ${rankOf(S.lv).title} ${S.name}의 모든 기록(경험치 ${S.totalX
     const items = await Api.admin.chars();
     const me = (Api.user || {}).email;
     items.forEach((x) => { x.me = x.email === me; });
+    primePeerFaces(items);
     body.innerHTML = items.length ? `<p class="muted">회원들의 캐릭터예요. 게임을 시작하지 않았어도 실물 캐릭터를 등록했다면 보여요. 눌러서 크게 보세요.</p>
       <div class="chargrid">${items.map((x, i) => `<button class="charcard" data-ci="${i}"><span class="rkav">${avatar(x)}</span><b>${esc(x.name)}</b>
         <small>${x.lv ? `Lv.${x.lv} ${rankOf(x.lv).title}` : '입사 전'}${x.face ? ' · 📷 실물' : ''}${x.active ? '' : ' · 중지'}</small></button>`).join('')}</div>`
       : '<p class="muted">아직 캐릭터가 있는 회원이 없어요.</p>';
     body.querySelectorAll('[data-ci]').forEach((b) => b.onclick = () => charViewer(items[+b.dataset.ci]));
-    const fl = items.filter((x) => x.face && !x.me);
+    const fl = items.filter((x) => !faceReady(x));
     if (fl.length) loadPeerFaces(fl.map((x) => x.uid), ['normal']).then(() => {
       body.querySelectorAll('[data-ci]').forEach((b) => { const x = items[+b.dataset.ci]; if (x.face && !x.me) b.querySelector('.rkav').innerHTML = avatar(x); });
     });
@@ -1746,48 +1775,24 @@ Lv.${S.lv} ${rankOf(S.lv).title} ${S.name}의 모든 기록(경험치 ${S.totalX
   function createScreen() {
     stageMode('creating'); setBg('office');
     els.hud.classList.add('hidden'); els.nav.classList.add('hidden');
-    let tab = S.illust ? 'illust' : 'custom';
-    const sw = (arr, key, cur) => arr.map((c) => `<button data-${key}="${c}" class="${cur === c ? 'on' : ''}" style="background:${c}"></button>`).join('');
     const render = () => {
+      const presets = Sprites.presets(S.gender);
+      if (!hasFace && !(S.illust && presets.includes(S.illust))) S.illust = presets[0] || null;
       setChar(playerSpec(), rest());
-      const sprite = Sprites.has(`player_${S.gender}_0`);
-      const presets = Sprites.presets(S.gender), canPick = !hasFace && presets.length > 0;
-      if (!canPick) tab = 'custom';
-      const tabs = canPick ? `<div class="seg looktab"><button data-tab="custom" class="${tab === 'custom' ? 'on' : ''}">✏️ 직접 꾸미기</button><button data-tab="illust" class="${tab === 'illust' ? 'on' : ''}">🖼️ 일러스트 고르기</button></div>` : '';
       const illustPart = `<label>일러스트 캐릭터</label><div class="illusts">${presets.map((id, i) => `<button data-il="${id}" class="${S.illust === id ? 'on' : ''}"><div><img src="${Sprites.char('illust:' + id, 'normal')}" alt=""></div>${i + 1}번</button>`).join('')}</div>
         <p class="muted">입사 후에는 캐릭터를 바꿀 수 없으니 신중하게 골라 주세요!</p>`;
-      const hairPart = `
-        <label>헤어스타일</label><div class="seg">${PLAYER_HAIR[S.gender].map((h) => `<button data-h="${h.style}" class="${S.hairStyle === h.style ? 'on' : ''}">${h.label}</button>`).join('')}</div>
-        <label>머리색</label><div class="swatches">${sw(HAIR_COLORS, 'c', S.hairColor)}</div>
-        <label>안경</label><div class="seg">${GLASSES.map((g) => `<button data-gl="${g.v}" class="${(S.glasses || '') === g.v ? 'on' : ''}">${g.label}</button>`).join('')}</div>
-        ${S.glasses ? `<label>안경테 색</label><div class="swatches">${sw(GLASS_COLORS, 'gc', S.glassesColor)}</div>` : ''}`;
-      const facePart = `
-        <label>얼굴</label><div class="faces">${FACES[S.gender].map((f) => `<button data-f="${f.id}" class="${S.face === f.id ? 'on' : ''}"><div>${Art.portrait({ ...playerSpec(), eye: f.eye, eyeScale: f.eyeScale, face: f.face, eyeColor: f.eyeColor, lashes: !!f.lashes, blush: !!f.blush, brow: f.brow, thickBrows: f.thickBrows }, 'smile', { head: true })}</div>${f.label}</button>`).join('')}</div>
-        <label>피부톤</label><div class="swatches">${sw(Object.values(SKIN), 's', S.skin)}</div>
-        <label>나이대</label><div class="seg">${AGES.map((a) => `<button data-a="${a.v}" class="${S.age === a.v ? 'on' : ''}">${a.label}</button>`).join('')}</div>`;
       els.screen.innerHTML = `<div class="create"><h3 class="cute" style="margin:0 0 4px;font-size:22px">신입사원 등록</h3>
         <div class="muted">○○생명 방카슈랑스사업부에 오신 걸 환영합니다!</div>
         <label>이름</label><input type="text" id="nm" maxlength="8" placeholder="이름 (최대 8자)" value="${esc(S.name)}">
         <label>성별</label><div class="seg">${[['f', '여성'], ['m', '남성']].map(([v, l]) => `<button data-g="${v}" class="${S.gender === v ? 'on' : ''}">${l}</button>`).join('')}</div>
-        ${tabs}
         ${hasFace ? `<div class="box facebox">🎉 <b>${esc((Api.user || {}).name || S.name || '')}님만의 캐릭터</b>가 준비되어 있어요!<div class="muted">관리자가 만들어 둔 전용 캐릭터라 외모는 바꿀 수 없어요.</div></div>`
-          : tab === 'illust' ? illustPart
-          : sprite ? '<p class="muted">일러스트 캐릭터를 사용 중이라 세부 외모는 고정이에요.</p>'
-          : hairPart + facePart}
+          : illustPart}
         ${hasFace ? '' : '<p class="muted" style="margin-top:12px">⚠️ 입사 후에는 외모를 바꿀 수 없어요.</p>'}
         <div class="row" style="margin-top:16px"><button class="btn full" id="go">첫 출근하기 →</button></div></div>`;
       const nm = $('#nm'); if (nm) nm.oninput = (e) => S.name = e.target.value;
       const on = (sel, fn) => els.screen.querySelectorAll(sel).forEach((b) => b.onclick = () => { fn(b); render(); });
-      on('[data-g]', (b) => { S.gender = b.dataset.g; S.hairStyle = PLAYER_HAIR[S.gender][0].style; S.face = FACES[S.gender][0].id; if (S.illust && S.illust[0] !== S.gender) S.illust = tab === 'illust' && Sprites.presets(S.gender)[0] || null; });
-      on('[data-tab]', (b) => { tab = b.dataset.tab; S.illust = tab === 'illust' ? (S.illust || presets[0]) : null; });
+      on('[data-g]', (b) => { S.gender = b.dataset.g; S.illust = hasFace ? null : Sprites.presets(S.gender)[0] || null; });
       on('[data-il]', (b) => S.illust = b.dataset.il);
-      on('[data-a]', (b) => S.age = +b.dataset.a);
-      on('[data-f]', (b) => S.face = b.dataset.f);
-      on('[data-h]', (b) => S.hairStyle = b.dataset.h);
-      on('[data-c]', (b) => S.hairColor = b.dataset.c);
-      on('[data-s]', (b) => S.skin = b.dataset.s);
-      on('[data-gl]', (b) => S.glasses = b.dataset.gl);
-      on('[data-gc]', (b) => S.glassesColor = b.dataset.gc);
       if (!S.name && hasFace && (Api.user || {}).name) { S.name = String(Api.user.name).slice(0, 8); const n = $('#nm'); if (n) n.value = S.name; }
       $('#go').onclick = () => {
         S.name = (S.name || '').trim();
