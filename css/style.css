@@ -460,3 +460,4 @@ img.sprite.bust.illust { width: 135%; left: -17%; top: -3%; }
 .bossrow .avas { display: flex; flex: none; }
 .bossrow .avas .ava:not(:only-child) { width: 40px; height: 40px; }
 .bossrow .avas .ava + .ava { margin-left: -12px; }
+.avthumb { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }

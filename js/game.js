@@ -961,7 +961,7 @@
     els.screen.querySelectorAll('[data-rt]').forEach((b) => b.onclick = () => { rankTab = b.dataset.rt; pageRank(); });
     els.screen.querySelectorAll('[data-av]').forEach((b) => b.onclick = () => charViewer(cur.list[+b.dataset.av]));
     // 실물 캐릭터 사진은 기본 표정만 먼저 받아서 바꿔 끼운다
-    const fl = cur.list.filter((x) => !faceReady(x));
+    const fl = needFull(cur.list);
     if (fl.length) loadPeerFaces(fl.map((x) => x.uid), ['normal']).then(() => {
       els.screen.querySelectorAll('button.rkav').forEach((b) => { const x = cur.list[+b.dataset.av]; if (x && x.face && !x.me) b.innerHTML = avatar(x); });
     });
@@ -1004,17 +1004,24 @@
   const restOf = (spec) => (/^(illust|face):/.test(spec.key) ? 'normal' : 'smile');
   // 실물 캐릭터 그림이 아직 없으면 빈 동그라미 (다른 그림을 먼저 보여주지 않음)
   const faceReady = (p) => p.me || !p.face || Sprites.has('face:' + p.uid);
-  const avatar = (p) => { if (!faceReady(p)) return '<i class="avwait"></i>'; const sp = peerSpec(p); return charHTML(sp, restOf(sp), { head: true }); };
+  const avatar = (p) => {
+    if (!p.me && p.thumb) return `<img class="avthumb" src="${p.thumb}" alt="" draggable="false">`; // 서버가 함께 보낸 작은 얼굴 사진
+    if (!faceReady(p)) return '<i class="avwait"></i>';
+    const sp = peerSpec(p); return charHTML(sp, restOf(sp), { head: true });
+  };
+  const needFull = (list) => list.filter((x) => !x.thumb && !faceReady(x)); // 썸네일이 없을 때만 큰 그림을 받아 표시
   function peerLines(p) {
     const lv = p.lv || 1, fill = (t) => t.replace(/\{이름\}/g, p.name).replace(/\{직급\}/g, rankOf(lv).title).replace(/\{레벨\}/g, lv);
     const L = (TALK && TALK.length ? TALK : TALK_DEFAULT).filter((r) => (!r.cond || r.cond === '항상') && !/\{(연속|보스)\}/.test(r.text))
       .map((r) => [TALK_TYPE[r.type] || 'say', TALK_EXPR[r.expr] || 'normal', fill(String(r.text))]);
     return L.length ? L : [['say', 'smile', '오늘도 힘내 봅시다!']];
   }
-  async function charViewer(p) {
+  async function charViewer(p, opt = {}) {
     const m = modal(`<div class="cview"><div class="loading" style="padding-top:40%"><div class="spin"></div>캐릭터를 불러오는 중…</div></div>
       <h2 style="font-size:22px">${esc(p.name)}</h2><p class="muted" style="text-align:center;margin:0 0 12px">${p.lv ? `Lv.${p.lv} ${rankOf(p.lv).title}` : '아직 입사 전'} · 캐릭터를 눌러 보세요!</p>
+      ${opt.scene ? '<button class="btn full" id="cvScene" style="margin-bottom:8px">🎬 게임 화면으로 보기</button>' : ''}
       <button class="btn ghost full" data-close>닫기</button>`);
+    const sb = m.el.querySelector('#cvScene'); if (sb) sb.onclick = () => { m.close(); staffScene(p); };
     if (p.face && !p.me) await loadPeerFaces([p.uid]);
     const box = m.el.querySelector('.cview'); if (!box || !box.isConnected) return;
     if (!faceReady(p)) { box.innerHTML = '<p class="muted" style="text-align:center;padding-top:40%">캐릭터 그림을 불러오지 못했어요.<br>잠시 후 다시 눌러 주세요.</p>'; return; }
@@ -1582,20 +1589,118 @@ Lv.${S.lv} ${rankOf(S.lv).title} ${S.name}의 모든 기록(경험치 ${S.totalX
       else await admLib(body);
     } catch (e) { body.innerHTML = `<p class="muted">${esc(e.message)}</p>`; }
   }
+  let admCharTab = 'staff';
+  const NPC_GROUPS = [
+    ['🏢 사업부', ['partjang', 'kimpro', 'hwangpro', 'yunpro', 'choiseonim', 'ochajang']],
+    ['🏦 은행 방문 고객', ['ajumma', 'ajeossi', 'worker', 'harabeoji', 'halmeoni']],
+    ['🎓 금융연수원', ['jogyo', 'kimgyosu', 'parkgyosu']],
+    ['⭐ 오늘의 보스', ['teamlead', 'vicemgr', 'kimteam', 'branchmgr', 'wmcenter', 'bankceo', 'bokgov']],
+    ['💎 VIP 전화', ['vip', 'vipkim', 'vipmadam']]
+  ];
   async function admChars(body) {
-    const items = await Api.admin.chars();
+    body.innerHTML = `<div class="seg"><button data-act="staff" class="${admCharTab === 'staff' ? 'on' : ''}">👥 직원 캐릭터</button><button data-act="npc" class="${admCharTab === 'npc' ? 'on' : ''}">🎬 등장인물</button></div><div id="acBody"></div>`;
+    body.querySelectorAll('[data-act]').forEach((b) => b.onclick = () => { admCharTab = b.dataset.act; admChars(body); });
+    const box = body.querySelector('#acBody');
+    if (admCharTab === 'npc') return admNpcs(box);
     const me = (Api.user || {}).email;
-    items.forEach((x) => { x.me = x.email === me; });
-    primePeerFaces(items);
-    body.innerHTML = items.length ? `<p class="muted">회원들의 캐릭터예요. 게임을 시작하지 않았어도 실물 캐릭터를 등록했다면 보여요. 눌러서 크게 보세요.</p>
-      <div class="chargrid">${items.map((x, i) => `<button class="charcard" data-ci="${i}"><span class="rkav">${avatar(x)}</span><b>${esc(x.name)}</b>
-        <small>${x.lv ? `Lv.${x.lv} ${rankOf(x.lv).title}` : '입사 전'}${x.face ? ' · 📷 실물' : ''}${x.active ? '' : ' · 중지'}</small></button>`).join('')}</div>`
-      : '<p class="muted">아직 캐릭터가 있는 회원이 없어요.</p>';
-    body.querySelectorAll('[data-ci]').forEach((b) => b.onclick = () => charViewer(items[+b.dataset.ci]));
-    const fl = items.filter((x) => !faceReady(x));
-    if (fl.length) loadPeerFaces(fl.map((x) => x.uid), ['normal']).then(() => {
-      body.querySelectorAll('[data-ci]').forEach((b) => { const x = items[+b.dataset.ci]; if (x.face && !x.me) b.querySelector('.rkav').innerHTML = avatar(x); });
+    const render = (items) => {
+      if (!box.isConnected) return;
+      items.forEach((x) => { x.me = x.email === me; });
+      primePeerFaces(items);
+      box.innerHTML = items.length ? `<p class="muted">회원들의 캐릭터예요. 게임을 시작하지 않았어도 실물 캐릭터를 등록했다면 보여요. 눌러서 크게 보거나 게임 화면으로 볼 수 있어요.</p>
+        <div class="chargrid">${items.map((x, i) => `<button class="charcard" data-ci="${i}"><span class="rkav">${avatar(x)}</span><b>${esc(x.name)}</b>
+          <small>${x.lv ? `Lv.${x.lv} ${rankOf(x.lv).title}` : '입사 전'}${x.face ? ' · 📷 실물' : ''}${x.active ? '' : ' · 중지'}</small></button>`).join('')}</div>`
+        : '<p class="muted">아직 캐릭터가 있는 회원이 없어요.</p>';
+      box.querySelectorAll('[data-ci]').forEach((b) => b.onclick = () => charViewer(items[+b.dataset.ci], { scene: true }));
+      const fl = needFull(items);
+      if (fl.length) loadPeerFaces(fl.map((x) => x.uid), ['normal']).then(() => {
+        box.querySelectorAll('[data-ci]').forEach((b) => { const x = items[+b.dataset.ci]; if (x.face && !x.me && !x.thumb) b.querySelector('.rkav').innerHTML = avatar(x); });
+      });
+    };
+    // 이 기기에 저장해 둔 지난 목록을 바로 보여 주고, 서버에서 새 목록이 오면 바꾼다
+    let cached = null; try { cached = JSON.parse(localStorage.getItem('bmq_admchars')); } catch (e) { }
+    if (cached) render(cached); else box.innerHTML = '<div class="loading"><div class="spin"></div>불러오는 중…</div>';
+    try {
+      const items = await Api.admin.chars();
+      try { localStorage.setItem('bmq_admchars', JSON.stringify(items)); } catch (e) { }
+      render(items);
+    } catch (e) { if (!cached) throw e; toast('최신 목록을 불러오지 못해 저장된 목록을 보여드려요'); }
+  }
+  function admNpcs(box) {
+    const thumb = (k) => (Sprites.has(k) ? `<img class="avthumb" src="img/chars/thumb/${k}.webp" alt="" loading="lazy" onerror="this.remove()">` : charHTML(NPCS[k].spec, 'normal', { head: true }));
+    box.innerHTML = `<p class="muted">게임에 나오는 등장인물이에요. 누르면 <b>실제 게임 화면</b>으로 등장 장면 · 문제 출제 · 정답/오답 반응을 미리 볼 수 있어요. (기록에는 남지 않아요)</p>
+      ${NPC_GROUPS.map(([g, ks]) => `<h4 class="sec">${g}</h4><div class="chargrid">${ks.filter((k) => NPCS[k]).map((k) => `<button class="charcard" data-npc="${k}"><span class="rkav">${thumb(k)}</span><b>${esc(NPCS[k].name)}</b>
+        <small>${esc(NPCS[k].role.split(' · ')[0])}</small></button>`).join('')}</div>`).join('')}`;
+    box.querySelectorAll('[data-npc]').forEach((b) => b.onclick = () => npcScene(b.dataset.npc));
+  }
+
+  /* ---- 미리보기: 실제 게임 화면 그대로 (경험치 · 활동비 · 기록은 바뀌지 않음) ---- */
+  async function previewStage(run) {
+    inSession = true;
+    els.screen.innerHTML = ''; els.hud.classList.add('hidden'); els.nav.classList.add('hidden'); stageMode(''); els.vn.classList.add('on');
+    let again = false;
+    try { again = await run(); } catch (e) { console.error(e); }
+    finally {
+      els.choices.innerHTML = ''; els.dlg.classList.remove('asking'); els.meta.innerHTML = ''; els.timer.classList.remove('on');
+      els.vn.classList.remove('on'); inSession = false; setChar(null);
+      els.hud.classList.remove('hidden'); renderHud();
+      admTab = 'chars'; pageAdmin();
+    }
+    return again;
+  }
+  const EXPR_TOUR = [['normal', '기본'], ['smile', '웃음'], ['angry', '화남'], ['worried', '당황']];
+  async function npcScene(k) {
+    const n = NPCS[k], who = whoOf(k), tag = (t) => `🎬 미리보기 · ${t}`;
+    const tier = BOSS_TIERS.find((t) => t.npc === k || (t.npcs || []).includes(k));
+    const cat = CAT_ORDER.find((c) => (CATS[c].npcs || []).includes(k));
+    const vip = !!n.call;
+    const pool = Api.cachedQuestions().filter((q) => (tier ? tier.cats.includes(q.cat) : cat ? q.cat === cat : vip ? q.diff === 3 && ['banca_general', 'market', 'econ'].includes(q.cat) : true));
+    const again = await previewStage(async () => {
+      setBg(n.bg); setChar(null);
+      if (tier) await say(NARR, `${tag('오늘의 보스')}\n${'★'.repeat(tier.stars)}${'☆'.repeat(5 - tier.stars)}  오늘의 보스 등장!\n「${n.name}」 ${n.role.split(' · ')[0]}\n${tier.npcs ? tier.ndesc : tier.desc}`);
+      else if (vip) await say(NARR, `${tag('랜덤 이벤트')}\n📞 낯선 번호로 전화가 온다…`);
+      else await say(NARR, `${tag(cat ? `${CATS[cat].icon} ${CATS[cat].label} 일정` : '등장 장면')}\n실제 게임과 같은 화면이에요. 기록에는 남지 않아요.`);
+      setChar(n.spec, 'normal', 'enter');
+      await say(who, vip ? n.call : pick(n.intro || ['…']));
+      const q = pick(pool);
+      if (q) {
+        const r = await ask(q, who, n, n.time || 20, { sess: {}, noItems: true });
+        els.dlg.classList.remove('asking'); els.meta.innerHTML = ''; revealAnswer(q);
+        if (r.correct) { setChar(n.spec, 'happy', 'hop'); fx(`<div class="stamp ok">${tier || q.cat === 'market' ? '계약 성사!' : '정답!'}</div>`, 1100); Snd.ok(); await say(who, pick(n.ok)); }
+        else { setChar(n.spec, 'angry', 'shake'); fx(`<div class="stamp ng">${r.timeout ? '시간 초과' : '오답'}</div>`, 1100); Snd.ng(); await say(who, pick(r.timeout ? n.timeout : n.ng)); }
+        els.choices.innerHTML = '';
+      }
+      setChar(n.spec, 'smile'); await say(who, n.end ? n.end.good : '수고했어요!');
+      for (;;) {
+        const c = await choose(['😀 표정 4가지 보기', '🗨️ 대사 모두 보기', '🔁 처음부터 다시', '← 캐릭터 목록으로']);
+        if (c === 0) for (const [e, l] of EXPR_TOUR) { setChar(n.spec, e, 'hop'); await say(NARR, `표정: ${l}`); }
+        else if (c === 1) {
+          const L = [...(n.intro || []).map((t) => ['normal', '등장', t]), ...(n.ok || []).map((t) => ['happy', '정답', t]), ...(n.ng || []).map((t) => ['angry', '오답', t]),
+            ...(n.timeout || []).map((t) => ['worried', '시간 초과', t]), ...(n.end ? [['smile', '마무리(잘했을 때)', n.end.good], ['worried', '마무리(못했을 때)', n.end.bad]] : []), ...(n.call ? [['normal', '전화', n.call]] : [])];
+          for (const [e, l, t] of L) { setChar(n.spec, e); await say({ name: n.name, role: l }, t); }
+        } else return c === 2;
+      }
     });
+    if (again) npcScene(k);
+  }
+  async function staffScene(p) {
+    if (p.face && !p.me) await loadPeerFaces([p.uid]);
+    const spec = peerSpec(p), me = { name: p.name, role: rankOf(p.lv || 1).title };
+    const again = await previewStage(async () => {
+      setBg('office'); setChar(null);
+      await say(NARR, `🎬 미리보기 · 주인공 화면\n${p.name}님이 게임을 할 때 이렇게 보여요. 기록에는 남지 않아요.`);
+      setChar(spec, restOf(spec), 'enter');
+      const L = shuffle(peerLines(p)).slice(0, 3);
+      for (const [, e, t] of L) { setChar(spec, e, e === 'angry' ? 'shake' : 'hop'); await say(me, t); }
+      setChar(spec, 'happy', 'hop'); fx('<div class="stamp ok">정답!</div>', 1100); Snd.ok(); await say(me, '좋았어, 맞혔다!');
+      setChar(spec, 'worried', 'shake'); fx('<div class="stamp ng">오답</div>', 1100); Snd.ng(); await say(me, '(앗… 이건 다시 공부해야겠다.)');
+      for (;;) {
+        const c = await choose(['😀 표정 4가지 보기', '🔁 처음부터 다시', '← 캐릭터 목록으로']);
+        if (c === 0) for (const [e, l] of EXPR_TOUR) { setChar(spec, e, 'hop'); await say(NARR, `표정: ${l}`); }
+        else return c === 1;
+      }
+    });
+    if (again) staffScene(p);
   }
   async function admUsers(body) {
     const users = await Api.admin.users();
