@@ -32,18 +32,22 @@
     S.updated = Date.now(); Store.save(S);
     clearTimeout(syncTimer); syncTimer = setTimeout(syncNow, 4000);
   }
+  let lastSynced = 0; // 마지막으로 서버에 저장한 시점 (바뀐 게 없으면 저장 요청을 보내지 않음)
   async function syncNow(reset) {
     if (!S || !Api.loggedIn() || (!S.name && !reset)) return;
+    if (!reset && S.updated && S.updated === lastSynced) return;
     ensurePeriod();
+    const at = S.updated;
     try {
       const r = await Api.saveProgress(JSON.stringify(S), S.lv, S.totalXp, { name: S.name, ...S.period }, reset);
-      if (r && r.stale) adoptRemote(r.data);
+      if (r && r.stale) adoptRemote(r.data); else lastSynced = at;
     } catch (e) { if (reset) throw e; }
   }
   // 서버에 더 진행된 기록이 있으면(다른 기기에서 플레이) 그걸로 바꾼다 — 진행한 기록은 절대 뒤로 가지 않음
   function adoptRemote(data) {
     let R; try { R = Object.assign(Store.fresh(S.email), JSON.parse(data)); } catch (e) { return; }
     R.email = S.email; S = R; Store.save(S);
+    lastSynced = S.updated;
     if (!R.name) { toast('다른 기기에서 캐릭터를 초기화했어요', 3200); inSession = false; els.vn.classList.remove('on'); return createScreen(); }
     toast('☁️ 다른 기기에서 더 진행한 기록을 불러왔어요', 3200);
     if (!inSession && $('#stage').className === 'home') goHome(); else if (typeof renderHud === 'function') renderHud();
@@ -739,9 +743,9 @@
   let talkLast = -1, talkTaps = [], talkTimer = null;
   // 멘트는 구글 시트 '멘트' 탭에서 불러온다 (실패하면 마지막 저장본 → 기본값)
   let TALK = null;
-  function loadTalk() {
+  function loadTalk(items) {
+    if (items && items.length) { TALK = items; try { localStorage.setItem('bmq_talk', JSON.stringify(items)); } catch (e) { } return; }
     try { TALK = JSON.parse(localStorage.getItem('bmq_talk')) || null; } catch (e) { }
-    Api.talk().then((items) => { if (items && items.length) { TALK = items; try { localStorage.setItem('bmq_talk', JSON.stringify(items)); } catch (e) { } } }).catch(() => { });
   }
   const TALK_TYPE = { '말': 'say', '생각': 'think' };
   const TALK_EXPR = { '기본': 'normal', '미소': 'smile', '활짝': 'happy', '씩': 'smirk', '놀람': 'surprised', '걱정': 'worried', '화남': 'angry' };
@@ -908,9 +912,17 @@
     setNav('home');
     els.screen.innerHTML = `<div class="page">${backBtn('home', '오늘 일정')}<h2>🏆 최우수BM</h2><div class="loading"><div class="spin"></div>순위를 불러오는 중…</div></div>`;
     bindBack();
-    await syncNow();
     let r;
-    try { r = await Api.ranking(periodKeys()); } catch (e) { toast(e.message); return; }
+    try { [, r] = await Promise.all([syncNow(), Api.ranking(periodKeys())]); } catch (e) { toast(e.message); return; }
+    // 저장과 동시에 불러왔으니 내 최신 실적은 이 기기 값으로 반영
+    const pd = ensurePeriod();
+    [[r.week, pd.week === r.week.key ? pd.weekXp : 0], [r.month, pd.month === r.month.key ? pd.monthXp : 0]].forEach(([box, xp]) => {
+      if (!(xp > 0)) return;
+      let mine = box.list.find((x) => x.me);
+      if (!mine) { mine = { name: S.name, lv: S.lv, me: true, uid: '', xp: 0 }; box.list.push(mine); }
+      mine.xp = Math.max(mine.xp, xp); mine.lv = S.lv; mine.name = S.name;
+      box.list.sort((a, c) => c.xp - a.xp);
+    });
     S.awards = S.awards || {};
     for (const [k, w] of [['week', r.lastWeek], ['month', r.lastMonth]]) {
       const id = `${k}:${w.key}`;
@@ -1690,20 +1702,20 @@ Lv.${S.lv} ${rankOf(S.lv).title} ${S.name}의 모든 기록(경험치 ${S.totalX
   async function enterGame() {
     const u = Api.user;
     els.hud.classList.add('hidden'); els.nav.classList.add('hidden');
-    busy('문제를 불러오는 중…');
-    try { await Api.questions(); } catch (e) { toast(e.message, 3500); }
-    loadTalk();
-    // 실물 캐릭터(관리자가 비공개 폴더에 등록) — 받아 두고 다음엔 캐시로 바로 표시
-    const FK = 'bmq_face_' + u.email;
-    try { const c = JSON.parse(localStorage.getItem(FK)); if (c) { Sprites.registerData('face:me', c); hasFace = true; } } catch (e) { }
-    try {
-      const face = await Api.myFace();
-      if (face) { Sprites.registerData('face:me', face); hasFace = true; try { localStorage.setItem(FK, JSON.stringify(face)); } catch (e) { } }
-      else { hasFace = false; try { localStorage.removeItem(FK); } catch (e) { } }
-    } catch (e) { }
+    busy('출근 준비 중…');
+    // 실물 캐릭터(관리자가 비공개 폴더에 등록) — 이 기기에 받아 둔 그림을 먼저 쓰고, 바뀐 경우에만 다시 받는다
+    const FK = 'bmq_face_' + u.email, FVK = Api.faceVerKey(u.email);
+    try { const c = JSON.parse(localStorage.getItem(FK)); if (c) { Sprites.registerData('face:me', c); hasFace = true; } else localStorage.removeItem(FVK); } catch (e) { }
+    // 문제 · 진행 · 멘트 · 그림을 한 번의 요청으로
+    let b = null, failed = false;
+    try { b = await Api.boot(); } catch (e) { failed = true; }
+    if (failed) { try { await Api.questions(); } catch (e) { toast(e.message, 3500); } } // 오프라인이면 저장해 둔 문제로
+    loadTalk(b && b.talk);
+    if (b && b.face) { Sprites.registerData('face:me', b.face); hasFace = true; try { localStorage.setItem(FK, JSON.stringify(b.face)); localStorage.setItem(FVK, JSON.stringify(b.faceVer)); } catch (e) { } }
+    else if (b && !b.faceVer && !Api.demo) { hasFace = false; try { localStorage.removeItem(FK); localStorage.removeItem(FVK); } catch (e) { } }
     const local = Store.load(u.email);
-    let remote = null, failed = false;
-    try { const d = await Api.loadProgress(); if (d) remote = Object.assign(Store.fresh(u.email), JSON.parse(d)); } catch (e) { failed = true; }
+    let remote = null;
+    if (b && b.data) { try { remote = Object.assign(Store.fresh(u.email), JSON.parse(b.data)); } catch (e) { failed = true; } }
     if (failed && !(local && local.name)) {
       // 서버 기록을 확인하지 못했는데 새로 만들면 기존 기록을 덮어쓸 수 있다 → 다시 시도만 허용
       els.screen.innerHTML = `<div class="title-wrap" style="text-align:center"><div class="box">⚠️ 서버에서 내 기록을 불러오지 못했어요.<br><span class="muted">인터넷 연결을 확인한 뒤 다시 시도해 주세요.</span></div>
@@ -1715,6 +1727,7 @@ Lv.${S.lv} ${rankOf(S.lv).title} ${S.name}의 모든 기록(경험치 ${S.totalX
     S = pickSave(local, remote) || Store.fresh(u.email);
     S.email = u.email;
     Store.save(S);
+    if (S === remote) lastSynced = S.updated;
     if (S.name && remote && S !== remote) syncNow();
     if (!S.name) return createScreen();
     if (!S.story) return prologue();

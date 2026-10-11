@@ -12,7 +12,8 @@ const Api = (() => {
     set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { } },
     del: (k) => { try { localStorage.removeItem(k); } catch (e) { } }
   };
-  let token = ls.get(TK), user = ls.get(UK);
+  let token = ls.get(TK), user = ls.get(UK), pendingBoot = null;
+  const FVK = (email) => 'bmq_facever_' + String(email || '').trim().toLowerCase();
 
   async function call(action, body = {}) {
     if (demo) return Demo.handle(action, body, token);
@@ -42,15 +43,37 @@ const Api = (() => {
     return (qmem = r.items);
   }
 
+  function absorbBoot(b) {
+    const qc = ls.get(QC);
+    if (b.items) { ls.set(QC, { ver: b.ver, items: b.items }); qmem = b.items; }
+    else if (qc) qmem = qc.items;
+    delete b.items;
+    return b;
+  }
+
   return {
     demo,
     get user() { return user; },
     loggedIn: () => !!token,
     async login(email, password) {
-      const r = await call('login', { email, password });
+      const qc = ls.get(QC);
+      const r = await call('login', { email, password, ver: qc && qc.ver, faceVer: ls.get(FVK(email)) || '' });
       token = r.token; user = r.user; ls.set(TK, token); ls.set(UK, user);
+      pendingBoot = r.boot ? absorbBoot(r.boot) : null; // 로그인 응답에 시작 데이터가 함께 옴
       return user;
     },
+    /** 게임 시작 데이터 한 번에: { ver, data, talk, face, faceVer } (문제는 내부 캐시에 반영) */
+    async boot() {
+      if (pendingBoot) { const b = pendingBoot; pendingBoot = null; return b; }
+      if (demo) {
+        await questions();
+        const r = await call('loadProgress');
+        return { data: r.data, talk: null, face: null, faceVer: '' };
+      }
+      const qc = ls.get(QC);
+      return absorbBoot(await call('boot', { ver: qc && qc.ver, faceVer: ls.get(FVK(user && user.email)) || '' }));
+    },
+    faceVerKey: FVK,
     async me() { const r = await call('me'); user = r.user; ls.set(UK, user); return user; },
     logout() { token = null; user = null; ls.del(TK); ls.del(UK); ls.del(QC); },
     questions, cachedQuestions: () => qmem || [],
