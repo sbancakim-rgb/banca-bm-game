@@ -108,6 +108,7 @@ const Api = (() => {
       info: () => call('adminInfo'),
       submissions: () => call('adminSubmissions').then((r) => r.items),
       chars: () => call('adminChars').then((r) => r.items),
+      autoLog: () => call('adminAutoLog').then((r) => r.items),
       resolveSubmission: (no, status, memo, question) => call('adminSubmissionResolve', { no, status, memo, question })
     }
   };
@@ -237,6 +238,7 @@ const Demo = (() => {
       case 'adminLibrarySave': { const it = b.item; if (!it.id) it.id = 'L' + Date.now(); const i = d.lib.findIndex((x) => x.id === it.id); if (i >= 0) d.lib[i] = it; else d.lib.push(it); store(d); return ok(); }
       case 'adminInfo': return ok({ sheetUrl: '' });
       case 'adminSubmissions': return ok({ items: d.subs });
+      case 'adminAutoLog': return ok({ items: [{ at: Date.now(), act: '추가', id: 'auto-demo-01', cat: '실제 경제 환경', q: '(데모) 자동 출제 예시 문제', why: '새 소식 반영', src: '데모' }] });
       case 'adminChars': return ok({ items: Object.entries(d.users).map(([e, x]) => { let p = null; try { p = JSON.parse(d.progress[e] || 'null'); } catch (er) { }
         return { email: e, uid: 'u:' + e, name: (p && p.name) || x.name || e, member: x.name || '', lv: p && p.name ? p.lv || 1 : 0, look: p ? demoLook(p) : null, face: false, active: x.active }; }).filter((x) => x.look || x.face) });
       case 'adminSubmissionResolve': {

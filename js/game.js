@@ -1756,7 +1756,7 @@ Lv.${S.lv} ${rankOf(S.lv).title} ${S.name}의 모든 기록(경험치 ${S.totalX
   async function pageAdmin() {
     if (!(Api.user || {}).admin) return goHome();
     setNav('settings');
-    const tabs = [['users', '👥 회원'], ['chars', '🎭 캐릭터'], ['reports', '⚠️ 이의 제기'], ['subs', '✍️ 제출 문제'], ['questions', '📝 문제'], ['lib', '📚 공용 자료']];
+    const tabs = [['users', '👥 회원'], ['chars', '🎭 캐릭터'], ['reports', '⚠️ 이의 제기'], ['subs', '✍️ 제출 문제'], ['questions', '📝 문제'], ['auto', '🤖 자동 관리'], ['lib', '📚 공용 자료']];
     els.screen.innerHTML = `<div class="page">${backBtn('settings', '설정')}<h2>🛠️ 관리자</h2>
       <div class="seg">${tabs.map(([k, l]) => `<button data-t="${k}" class="${admTab === k ? 'on' : ''}">${l}</button>`).join('')}</div>
       <div id="admBody"><div class="loading"><div class="spin"></div>불러오는 중…</div></div></div>`;
@@ -1769,6 +1769,7 @@ Lv.${S.lv} ${rankOf(S.lv).title} ${S.name}의 모든 기록(경험치 ${S.totalX
       else if (admTab === 'reports') await admReports(body);
       else if (admTab === 'questions') await admQuestions(body);
       else if (admTab === 'subs') await admSubmissions(body);
+      else if (admTab === 'auto') await admAuto(body);
       else await admLib(body);
     } catch (e) { body.innerHTML = `<p class="muted">${esc(e.message)}</p>`; }
   }
@@ -1884,6 +1885,16 @@ Lv.${S.lv} ${rankOf(S.lv).title} ${S.name}의 모든 기록(경험치 ${S.totalX
       }
     });
     if (again) staffScene(p);
+  }
+  async function admAuto(body) {
+    const items = await Api.admin.autoLog();
+    const d2 = (t) => { const d = new Date(t); return isNaN(d) ? '' : `${d.getMonth() + 1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+    const ic = { '추가': '➕', '중지': '⛔', '다시 사용': '♻️' };
+    body.innerHTML = `<div class="box"><h4>🤖 자동 관리</h4><p class="muted" style="margin:0">매일 아침 · 매주 월요일에 최신 뉴스와 공식 발표를 확인해서 <b>틀리게 된 문제는 중지</b>하고 <b>새 소식은 문제로 추가</b>해요.
+      방카 상품 · 백오피스는 관리자님이 주신 자료로만 바꿔요. 중지된 문제는 '문제' 탭에서 언제든 다시 '사용'으로 돌릴 수 있어요.</p></div>
+      ${items.length ? items.map((x) => `<div class="autorow"><span class="ai">${ic[x.act] || '•'}</span><div><b>${esc(x.act)} · ${esc(x.id)}</b> <small class="muted">${d2(x.at)} · ${esc(x.cat)}</small>
+        <div>${esc(x.q)}</div>${x.why ? `<small class="muted">사유: ${esc(x.why)}</small>` : ''}${x.src ? `<small class="muted">근거: ${esc(x.src)}</small>` : ''}</div></div>`).join('')
+        : '<p class="muted">아직 자동 관리 기록이 없어요.</p>'}`;
   }
   async function admUsers(body) {
     const users = await Api.admin.users();
