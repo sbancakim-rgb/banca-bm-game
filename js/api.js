@@ -13,6 +13,7 @@ const Api = (() => {
     del: (k) => { try { localStorage.removeItem(k); } catch (e) { } }
   };
   let token = ls.get(TK), user = ls.get(UK), pendingBoot = null;
+  const OPK = 'bmq_opening'; // 직원 캐릭터 오프닝 (로그인한 기기에만 저장)
   const FVK = (email) => 'bmq_facever_' + String(email || '').trim().toLowerCase();
 
   async function call(action, body = {}) {
@@ -44,6 +45,8 @@ const Api = (() => {
   }
 
   function absorbBoot(b) {
+    if (b.opening) ls.set(OPK, { v: b.openingVer, d: b.opening }); else if (b.openingVer === '') ls.del(OPK);
+    delete b.opening;
     const qc = ls.get(QC);
     if (b.items) { ls.set(QC, { ver: b.ver, items: b.items }); qmem = b.items; }
     else if (qc) qmem = qc.items;
@@ -57,7 +60,7 @@ const Api = (() => {
     loggedIn: () => !!token,
     async login(email, password) {
       const qc = ls.get(QC);
-      const r = await call('login', { email, password, ver: qc && qc.ver, faceVer: ls.get(FVK(email)) || '' });
+      const r = await call('login', { email, password, ver: qc && qc.ver, faceVer: ls.get(FVK(email)) || '', openingVer: (ls.get(OPK) || {}).v || '' });
       token = r.token; user = r.user; ls.set(TK, token); ls.set(UK, user);
       pendingBoot = r.boot ? absorbBoot(r.boot) : null; // 로그인 응답에 시작 데이터가 함께 옴
       return user;
@@ -71,9 +74,10 @@ const Api = (() => {
         return { data: r.data, talk: null, face: null, faceVer: '' };
       }
       const qc = ls.get(QC);
-      return absorbBoot(await call('boot', { ver: qc && qc.ver, faceVer: ls.get(FVK(user && user.email)) || '' }));
+      return absorbBoot(await call('boot', { ver: qc && qc.ver, faceVer: ls.get(FVK(user && user.email)) || '', openingVer: (ls.get(OPK) || {}).v || '' }));
     },
     faceVerKey: FVK,
+    opening: () => 'img/opening.webp', // 오프닝 그림 (공개 · 로그인 전에도 보임)
     async me() { const r = await call('me'); user = r.user; ls.set(UK, user); return user; },
     logout() { token = null; user = null; ls.del(TK); ls.del(UK); ls.del(QC); },
     questions, cachedQuestions: () => qmem || [],

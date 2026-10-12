@@ -113,6 +113,24 @@
     }
   }
   const busy = (msg) => { els.screen.innerHTML = `<div class="loading"><div class="spin"></div>${esc(msg)}</div>`; };
+  const LOGO = `<div class="k">BANCASSURANCE QUIZ RPG</div><h1>방카BM <em>성장기</em></h1><p>인턴에서 사장까지, 지식으로 승진하라!</p>`;
+  // 오프닝(직원 캐릭터 단체 그림): 로그인한 뒤 · 로딩하는 동안에만 보여 준다
+  function openingOverlay(msg) {
+    let el = $('#opening');
+    if (!el) { el = document.createElement('div'); el.id = 'opening'; document.body.appendChild(el); }
+    const img = Api.opening();
+    el.innerHTML = `${img ? `<img src="${img}" alt="" draggable="false">` : ''}<div class="op-fade"></div><div class="op-bottom"><div class="logo2">${LOGO}</div><div class="op-load"><div class="spin"></div>${esc(msg || '')}</div></div>`;
+    el.dataset.at = img ? Date.now() : '';
+    return el;
+  }
+  async function closeOpening(minMs = 1600) {
+    const el = $('#opening'); if (!el) return;
+    if (!el.dataset.at && Api.opening()) { openingOverlay('출근 준비 완료!'); }
+    const at = Number($('#opening').dataset.at || 0);
+    if (at) await sleep(Math.max(0, minMs - (Date.now() - at))); // 그림이 뜬 뒤 잠깐은 보여 주기
+    const o = $('#opening'); if (!o) return;
+    o.classList.add('out'); setTimeout(() => o.remove(), 450);
+  }
 
   /* ---------------- 사운드 ---------------- */
   const Snd = (() => {
@@ -2159,8 +2177,8 @@ Lv.${S.lv} ${rankOf(S.lv).title} ${S.name}의 모든 기록(경험치 ${S.totalX
   function loginScreen(msg) {
     curPage = 'login';
     els.hud.classList.add('hidden'); els.nav.classList.add('hidden'); stageMode('');
-    setBg('title'); setChar(NPCS.hwangpro.spec, 'smile', 'enter');
-    els.screen.innerHTML = `<div class="logo"><div class="k">BANCASSURANCE QUIZ RPG</div><h1>방카BM<br><em>성장기</em></h1><p>인턴에서 사장까지, 지식으로 승진하라!</p></div>
+    els.bg.innerHTML = `<img class="bgimg opening" src="${Api.opening()}" alt="" draggable="false">`; els.place.innerHTML = ''; setChar(null);
+    els.screen.innerHTML = `<div class="op-fade"></div><div class="login2" id="l2"><div class="logo2">${LOGO}</div>
       <form class="login" id="lf" autocomplete="on">
         <h3 class="cute">사원 로그인</h3>
         <input type="email" id="le" placeholder="등록된 이메일" autocomplete="username" required>
@@ -2168,19 +2186,25 @@ Lv.${S.lv} ${rankOf(S.lv).title} ${S.name}의 모든 기록(경험치 ${S.totalX
         <button class="btn full" id="lgo">로그인</button>
         <p class="muted">관리자가 등록한 이메일만 들어올 수 있어요. 계정이 없다면 관리자에게 요청하세요.</p>
         ${Api.demo ? `<p class="muted demo">🧪 로컬 데모 모드 — 관리자 계정: ${Demo.ADMIN} / ${Demo.ADMIN_PW}</p>` : ''}
-      </form>`;
-    if (msg) toast(msg, 3500);
+      </form><button class="btn l2-open" id="l2go">로그인하기</button></div>`;
+    $('#l2go').onclick = () => { Snd.tap(); $('#l2').classList.add('open'); setTimeout(() => { const e = $('#le'); if (e) e.focus(); }, 350); };
+    if (msg) { toast(msg, 3500); $('#l2').classList.add('open'); }
     $('#lf').onsubmit = async (e) => {
       e.preventDefault();
       $('#lgo').disabled = true; $('#lgo').textContent = '확인 중…';
-      try { await Api.login($('#le').value, $('#lp').value); await enterGame(); }
-      catch (er) { toast(er.message, 3200); const b = $('#lgo'); if (b) { b.disabled = false; b.textContent = '로그인'; } }
+      openingOverlay('로그인 중…');
+      try {
+        await Api.login($('#le').value, $('#lp').value);
+        openingOverlay('출근 준비 중…'); // 처음 로그인이면 여기서 오프닝 그림이 도착
+        await enterGame();
+      } catch (er) { closeOpening(0); toast(er.message, 3200); const b = $('#lgo'); if (b) { b.disabled = false; b.textContent = '로그인'; } }
     };
   }
   async function enterGame() {
     const u = Api.user;
     els.hud.classList.add('hidden'); els.nav.classList.add('hidden');
     busy('출근 준비 중…');
+    if (Api.opening() && !$('#opening')) openingOverlay('출근 준비 중…');
     // 실물 캐릭터(관리자가 비공개 폴더에 등록) — 이 기기에 받아 둔 그림을 먼저 쓰고, 바뀐 경우에만 다시 받는다
     const FK = 'bmq_face_' + u.email, FVK = Api.faceVerKey(u.email);
     try { const c = JSON.parse(localStorage.getItem(FK)); if (c) { Sprites.registerData('face:me', c); hasFace = true; } else localStorage.removeItem(FVK); } catch (e) { }
@@ -2195,6 +2219,7 @@ Lv.${S.lv} ${rankOf(S.lv).title} ${S.name}의 모든 기록(경험치 ${S.totalX
     let remote = null;
     if (b && b.data) { try { remote = Object.assign(Store.fresh(u.email), JSON.parse(b.data)); } catch (e) { failed = true; } }
     if (failed && !(local && local.name)) {
+      closeOpening(0);
       // 서버 기록을 확인하지 못했는데 새로 만들면 기존 기록을 덮어쓸 수 있다 → 다시 시도만 허용
       els.screen.innerHTML = `<div class="title-wrap" style="text-align:center"><div class="box">⚠️ 서버에서 내 기록을 불러오지 못했어요.<br><span class="muted">인터넷 연결을 확인한 뒤 다시 시도해 주세요.</span></div>
         <button class="btn" id="retry">다시 시도</button><button class="btn ghost" id="out">다른 계정으로 로그인</button></div>`;
@@ -2207,6 +2232,7 @@ Lv.${S.lv} ${rankOf(S.lv).title} ${S.name}의 모든 기록(경험치 ${S.totalX
     Store.save(S);
     if (S === remote) lastSynced = S.updated;
     if (S.name && remote && S !== remote) syncNow();
+    closeOpening(); // 다음 화면이 준비됐으니 오프닝을 걷는다 (그림이 뜬 뒤 잠깐은 보여 줌)
     if (!S.name) return createScreen();
     if (!S.story) return prologue();
     titleScreen();
@@ -2214,9 +2240,11 @@ Lv.${S.lv} ${rankOf(S.lv).title} ${S.name}의 모든 기록(경험치 ${S.totalX
   function titleScreen() {
     curPage = 'title';
     els.hud.classList.add('hidden'); els.nav.classList.add('hidden'); stageMode('');
-    setBg('title'); setChar(playerSpec(), rest(), 'enter');
-    els.screen.innerHTML = `<div class="logo"><div class="k">BANCASSURANCE QUIZ RPG</div><h1>방카BM<br><em>성장기</em></h1><p>인턴에서 사장까지, 지식으로 승진하라!</p></div>
-      <div class="title-wrap"><button class="btn" id="cont">출근하기 · Lv.${S.lv} ${esc(S.name)}</button>
+    const op = Api.opening();
+    if (op) { els.bg.innerHTML = `<img class="bgimg opening" src="${op}" alt="" draggable="false">`; els.place.innerHTML = ''; setChar(null); }
+    else { setBg('title'); setChar(playerSpec(), rest(), 'enter'); }
+    els.screen.innerHTML = `${op ? '<div class="op-fade"></div>' : ''}<div class="title-wrap ${op ? 'withop' : ''}"><div class="logo2">${LOGO}</div>
+      <button class="btn" id="cont">출근하기 · Lv.${S.lv} ${esc(S.name)}</button>
       <button class="btn ghost" id="out">다른 계정으로 로그인</button></div>`;
     $('#cont').onclick = () => { Snd.tap(); eventRoll = true; goHome(); maybeInstallGuide(); };
     $('#out').onclick = async () => { await syncNow(); Api.logout(); S = null; loginScreen(); };
@@ -2380,7 +2408,7 @@ Lv.${S.lv} ${rankOf(S.lv).title} ${S.name}의 모든 기록(경험치 ${S.totalX
       if (!Api.user) return loginScreen(e.message);
       toast('오프라인: 저장된 기록으로 시작해요');
     }
-    enterGame();
+    await enterGame();
   }
   boot();
   window.__bmq = { get S() { return S; }, runSession, goHome, go };

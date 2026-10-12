@@ -544,3 +544,33 @@ img.sprite.bust.illust { width: 135%; left: -17%; top: -3%; }
 #bgView { position: fixed; inset: 0; z-index: 55; display: flex; flex-direction: column; background: #1e1830; padding: calc(8px + var(--safe-t)) 10px calc(10px + var(--safe-b)); }
 #bgView .bgv-stage { position: relative; flex: 1; border-radius: 16px; overflow: hidden; }
 #bgView .bgv-stage > * { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+
+/* 오프닝 · 로그인 */
+.logo2 { text-align: center; }
+.logo2 .k { font-family: 'Jua', sans-serif; font-size: 15px; color: #fff; letter-spacing: 2px; text-shadow: 0 2px 6px rgba(20,40,90,.6); }
+.logo2 h1 { font-family: 'Jua', sans-serif; font-weight: 400; margin: 4px 0 0; font-size: 44px; line-height: 1.1; color: #fff; text-shadow: 0 3px 0 #ff6f91, 0 6px 18px rgba(20,40,90,.5); }
+.logo2 h1 em { font-style: normal; color: #fff4b8; }
+.logo2 p { color: #fff; font-weight: 700; margin: 8px 0 0; font-size: 14px; text-shadow: 0 1px 4px rgba(0,0,0,.45); }
+.login2 { position: absolute; inset: 0; z-index: 26; }
+.login2 .logo2 { position: absolute; left: 0; right: 0; bottom: calc(120px + var(--safe-b)); transition: bottom .55s cubic-bezier(.2,.9,.3,1), transform .55s; }
+.login2.open .logo2 { bottom: calc(100% - 210px - var(--safe-t)); transform: scale(.92); }
+.login2 .l2-open { position: absolute; left: 50%; bottom: calc(40px + var(--safe-b)); transform: translateX(-50%); width: min(320px, calc(100% - 40px)); font-size: 18px; transition: opacity .3s; }
+.login2.open .l2-open { opacity: 0; pointer-events: none; }
+.login2 .login { transform: translateY(120%); opacity: 0; transition: transform .5s cubic-bezier(.2,.9,.3,1), opacity .3s; pointer-events: none; }
+.login2.open .login { transform: none; opacity: 1; pointer-events: auto; }
+.title-wrap.withop { justify-content: flex-end; }
+.title-wrap .logo2 { margin-bottom: 14px; }
+#bg img.bgimg.opening { object-position: 50% 20%; filter: none; }
+.op-fade { position: absolute; left: 0; right: 0; bottom: 0; height: 52%; z-index: 25; pointer-events: none; background: linear-gradient(180deg, rgba(20,30,70,0), rgba(20,30,70,.55) 45%, rgba(20,25,55,.85)); }
+#opening { position: fixed; inset: 0; z-index: 70; background: linear-gradient(180deg, #7fb6ff, #dbeaff); animation: opin .4s ease both; }
+#opening img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 20%; animation: opzoom 6s ease-out both; }
+#opening .op-fade { position: absolute; }
+#opening .op-bottom { position: absolute; left: 0; right: 0; bottom: calc(36px + var(--safe-b)); z-index: 26; display: flex; flex-direction: column; align-items: center; gap: 14px; }
+#opening .op-load { display: flex; align-items: center; gap: 10px; color: #fff; font-weight: 700; text-shadow: 0 1px 4px rgba(0,0,0,.4); }
+#opening .op-load .spin { width: 22px; height: 22px; margin: 0; }
+#opening.out { animation: opout .45s ease both; }
+@keyframes opin { from { opacity: 0; } to { opacity: 1; } }
+@keyframes opout { to { opacity: 0; } }
+@keyframes opzoom { from { transform: scale(1.06); } to { transform: scale(1); } }
+.login2::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 240px; background: linear-gradient(180deg, rgba(20,30,70,.6), rgba(20,30,70,0)); opacity: 0; transition: opacity .5s; pointer-events: none; }
+.login2.open::before { opacity: 1; }
