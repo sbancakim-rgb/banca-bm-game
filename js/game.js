@@ -113,13 +113,14 @@
     }
   }
   const busy = (msg) => { els.screen.innerHTML = `<div class="loading"><div class="spin"></div>${esc(msg)}</div>`; };
+  const opBg = (src) => `<img class="bgimg opblur" src="${src}" alt="" draggable="false"><img class="bgimg opening" src="${src}" alt="" draggable="false">`;
   const LOGO = `<div class="k">BANCASSURANCE QUIZ RPG</div><h1>방카BM <em>성장기</em></h1><p>인턴에서 사장까지, 지식으로 승진하라!</p>`;
   // 오프닝(직원 캐릭터 단체 그림): 로그인한 뒤 · 로딩하는 동안에만 보여 준다
   function openingOverlay(msg) {
     let el = $('#opening');
     if (!el) { el = document.createElement('div'); el.id = 'opening'; document.body.appendChild(el); }
     const img = Api.opening();
-    el.innerHTML = `${img ? `<img src="${img}" alt="" draggable="false">` : ''}<div class="op-fade"></div><div class="op-bottom"><div class="logo2">${LOGO}</div><div class="op-load"><div class="spin"></div>${esc(msg || '')}</div></div>`;
+    el.innerHTML = `${img ? opBg(img) : ''}<div class="op-fade"></div><div class="op-bottom"><div class="logo2">${LOGO}</div><div class="op-load"><div class="spin"></div>${esc(msg || '')}</div></div>`;
     el.dataset.at = img ? Date.now() : '';
     return el;
   }
@@ -2177,7 +2178,7 @@ Lv.${S.lv} ${rankOf(S.lv).title} ${S.name}의 모든 기록(경험치 ${S.totalX
   function loginScreen(msg) {
     curPage = 'login';
     els.hud.classList.add('hidden'); els.nav.classList.add('hidden'); stageMode('');
-    els.bg.innerHTML = `<img class="bgimg opening" src="${Api.opening()}" alt="" draggable="false">`; els.place.innerHTML = ''; setChar(null);
+    els.bg.innerHTML = opBg(Api.opening()); els.place.innerHTML = ''; setChar(null);
     els.screen.innerHTML = `<div class="op-fade"></div><div class="login2" id="l2"><div class="logo2">${LOGO}</div>
       <form class="login" id="lf" autocomplete="on">
         <h3 class="cute">사원 로그인</h3>
@@ -2241,7 +2242,7 @@ Lv.${S.lv} ${rankOf(S.lv).title} ${S.name}의 모든 기록(경험치 ${S.totalX
     curPage = 'title';
     els.hud.classList.add('hidden'); els.nav.classList.add('hidden'); stageMode('');
     const op = Api.opening();
-    if (op) { els.bg.innerHTML = `<img class="bgimg opening" src="${op}" alt="" draggable="false">`; els.place.innerHTML = ''; setChar(null); }
+    if (op) { els.bg.innerHTML = opBg(op); els.place.innerHTML = ''; setChar(null); }
     else { setBg('title'); setChar(playerSpec(), rest(), 'enter'); }
     els.screen.innerHTML = `${op ? '<div class="op-fade"></div>' : ''}<div class="title-wrap ${op ? 'withop' : ''}"><div class="logo2">${LOGO}</div>
       <button class="btn" id="cont">출근하기 · Lv.${S.lv} ${esc(S.name)}</button>
