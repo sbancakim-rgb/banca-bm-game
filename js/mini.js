@@ -173,7 +173,7 @@ const Mini = (() => {
 
   /* ---------- 2. 고속도로 질주 (1인칭) ---------- */
   const OBS = {
-    cone: { e: '🚧', s: 0.9 }, box: { e: '📦', s: 0.9 }, car: { e: '🚙', s: 1.25 }, tire: { e: '🛞', s: 0.8, fly: true }, rock: { e: '🪨', s: 0.9, fly: true }, bar: { e: '🚧', s: 0.9, wide: true }
+    cone: { e: '🚧', s: 0.9 }, box: { e: '📦', s: 0.9 }, car: { e: '🚙', s: 1.25 }, tire: { e: '🛞', s: 1.15, fly: true }, rock: { e: '🪨', s: 1.15, fly: true }, bar: { e: '🚧', s: 0.9, wide: true }
   };
   function run(opts) {
     return new Promise((done) => {
@@ -184,17 +184,24 @@ const Mini = (() => {
       let lane, lx, obs, t, dist, spawnT, raf, running = false, last = 0, crashAt = 0;
       const offDir = controls(sh, (d) => { if (!running) return; if (d === 'left') lane = Math.max(-1, lane - 1); if (d === 'right') lane = Math.min(1, lane + 1); });
       sh.onTap = (e) => { if (!running) return; const r = sh.cv.getBoundingClientRect(); if (e.clientX < r.left + r.width / 2) lane = Math.max(-1, lane - 1); else lane = Math.min(1, lane + 1); };
-      const speed = () => Math.min(1.9, 0.5 + t * 0.016);           // 화면 깊이/초
-      const gap = () => Math.max(0.42, 1.25 - t * 0.014);            // 장애물 간격(초)
+      const FLY_AT = 120;                                             // 움직이는 장애물은 2분 뒤부터
+      const speed = () => Math.min(1.7, 0.5 + t * 0.0095);          // 화면 깊이/초 (천천히 빨라짐)
+      const gap = () => Math.max(0.5, 1.2 - t * 0.006);               // 장애물 간격(초)
       function spawn() {
-        const pool = ['cone']; if (t > 10) pool.push('box', 'car'); if (t > 22) pool.push('tire'); if (t > 35) pool.push('rock', 'bar');
+        // 2분 전: 서 있는 장애물만, 시간이 갈수록 '동시에 막히는 차선'이 늘어남 (한 차선은 항상 비워 둠)
+        const pool = ['cone']; if (t > 10) pool.push('box', 'car'); if (t > 40) pool.push('bar'); if (t > FLY_AT) pool.push('tire', 'rock');
         const type = pool[Math.floor(Math.random() * pool.length)];
         const L = Math.floor(Math.random() * 3) - 1;
         if (type === 'bar') { // 두 차선을 막는 공사 구간: 한 차선은 반드시 비워 둔다
           const free = Math.floor(Math.random() * 3) - 1;
           [-1, 0, 1].filter((x) => x !== free).forEach((x) => obs.push({ type: 'bar', lane: x, z: 1, vx: 0, ph: 0 }));
-        } else obs.push({ type, lane: L, z: 1, vx: OBS[type].fly ? (Math.random() < 0.5 ? -1 : 1) * (0.5 + Math.min(1.2, t * 0.02)) : 0, ph: Math.random() * 6 });
-        if (t > 50 && Math.random() < 0.35) { const L2 = [-1, 0, 1].filter((x) => x !== L)[Math.floor(Math.random() * 2)]; obs.push({ type: 'cone', lane: L2, z: 1.08, vx: 0, ph: 0 }); }
+        } else obs.push({ type, lane: L, z: 1, vx: OBS[type].fly ? (Math.random() < 0.5 ? -1 : 1) * Math.min(0.9, 0.45 + (t - FLY_AT) * 0.004) : 0, ph: Math.random() * 6 });
+        const two = Math.min(0.6, Math.max(0, (t - 15) / 150)); // 15초부터 두 차선 동시 장애물 확률 증가 (최대 60%)
+        if (type !== 'bar' && !OBS[type].fly && Math.random() < two) {
+          const L2 = [-1, 0, 1].filter((x) => x !== L)[Math.floor(Math.random() * 2)];
+          const t2 = ['cone', 'box', 'car'][Math.floor(Math.random() * (t > 10 ? 3 : 1))];
+          obs.push({ type: t2, lane: L2, z: 1, vx: 0, ph: 0 });
+        }
       }
       const proj = (z) => { const D = 14, d = 1 + z * D; return 1 / d; };   // 원근 배율 (가까울수록 1)
       function draw() {
@@ -270,7 +277,7 @@ const Mini = (() => {
       sh.el.querySelector('.mini-x').onclick = quit;
       reset(); draw();
       sh.msg(`<div class="mini-end"><h3>🏎️ 고속도로 질주</h3><p>지점 미팅에 늦었다! 날아오는 장애물을 피해 <b>최대한 오래</b> 달리세요.</p>
-        <p class="muted">왼쪽·오른쪽 버튼, 방향키, 화면 좌우 터치나 밀기로 차선을 바꿔요.<br>시간이 갈수록 빨라지고 장애물이 다양해져요!</p>
+        <p class="muted">왼쪽·오른쪽 버튼, 방향키, 화면 좌우 터치나 밀기로 차선을 바꿔요.<br>시간이 갈수록 빨라지고 장애물이 많아져요. 2분을 버티면 움직이는 장애물이 나타나요!</p>
         ${opts.best ? `<p>내 최고 기록 <b>${fmt(opts.best)}</b></p>` : ''}<button class="btn full" data-s>시작!</button></div>`);
       sh.el.querySelector('[data-s]').onclick = start;
     });
