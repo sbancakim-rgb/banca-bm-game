@@ -579,3 +579,7 @@ img.sprite.bust.illust { width: 135%; left: -17%; top: -3%; }
 #bg img.bgimg.opening, #opening img.opening { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; object-position: 50% 0; transform: none; filter: none; animation: none; }
 #bg img.bgimg.opening, #opening img.opening { inset: auto; top: 0; left: 50%; width: 100%; max-width: calc(100% * 0 + 75vh); height: auto; transform: translateX(-50%);
   -webkit-mask-image: linear-gradient(180deg, #000 82%, transparent); mask-image: linear-gradient(180deg, #000 82%, transparent); }
+/* 수정 오프닝(2:3): 화면이 넓어도 아래가 잘리지 않게 높이 기준 최대 폭 */
+#bg img.bgimg.opening, #opening img.opening { max-width: calc(100vh * 2 / 3); }
+#bg img.bgimg.opening, #opening img.opening { -webkit-mask-image: linear-gradient(180deg, #000 93%, transparent); mask-image: linear-gradient(180deg, #000 93%, transparent); }
+.op-fade { height: 34%; background: linear-gradient(180deg, rgba(20,30,70,0), rgba(20,30,70,.6) 40%, rgba(20,25,55,.88)); }
