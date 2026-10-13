@@ -370,17 +370,17 @@ const HONOR_TIERS = [
 /* 일간 보스 — 매일 1명 랜덤 (뒤로 갈수록 희귀하고 어려움) */
 const BOSS_TIERS = [
   // 같은 등급 안에서 그날 누가 올지는 사람마다 무작위 (npcs 중 하나, 확률은 등급 확률을 나눠 가짐)
-  { id: 'teamlead', npc: 'teamlead', npcs: ['teamlead', 'vicemgr', 'kimteam'], title: '은행 팀장·부지점장', rate: 50, stars: 1, count: 5, diffs: [1, 1, 2, 2, 2], mult: 1.8, cash: 300,
+  { id: 'teamlead', npc: 'teamlead', npcs: ['teamlead', 'vicemgr', 'kimteam'], title: '은행 팀장·부지점장', rate: 40, stars: 1, count: 5, diffs: [1, 1, 2, 2, 2], mult: 1.8, cash: 300,
     cats: ['banca_general', 'market', 'term'], desc: '지점 직원 교육을 맡길지 고민하는 최 팀장 · 이 부지점장 · 김 팀장 중 한 명. 기본기 위주 5문제.',
     ndesc: '직원 교육을 맡길 만한지 직접 확인하러 왔다. 기본기 위주 5문제.' },
-  { id: 'branchmgr', npc: 'branchmgr', title: '은행 지점장', rate: 30, stars: 2, count: 6, diffs: [1, 2, 2, 2, 3, 3], mult: 2.2, cash: 600,
-    cats: ['banca_general', 'market', 'econ', 'term'], desc: '지점 실적을 책임지는 지점장. 방카 규정과 시황 6문제.' },
-  { id: 'wmcenter', npc: 'wmcenter', title: 'WM센터장', rate: 14, stars: 3, count: 7, diffs: [2, 2, 2, 3, 3, 3, 3], mult: 2.8, cash: 1200,
-    cats: ['banca_general', 'market', 'econ'], desc: '자산가 고객을 상대하는 센터장. 세제·시장·경제 고난도 7문제.' },
-  { id: 'bankceo', npc: 'bankceo', title: '은행장', rate: 5, stars: 4, count: 8, diffs: [2, 3, 3, 3, 3, 3, 3, 3], mult: 4, cash: 3000,
-    cats: ['banca_general', 'market', 'econ', 'term'], desc: '아주 드물게 등장. 전 분야 최고 난이도 8문제, 15초 제한.' },
-  { id: 'bokgov', npc: 'bokgov', title: '한국은행 총재', rate: 1, stars: 5, count: 10, diffs: [3, 3, 3, 3, 3, 3, 3, 3, 3, 3], mult: 6, cash: 8000,
-    cats: ['market', 'econ', 'term'], desc: '전설의 보스. 금리·경제 극한 난이도 10문제, 12초 제한.' }
+  { id: 'branchmgr', npc: 'branchmgr', title: '은행 지점장', rate: 25, stars: 2, count: 5, diffs: [1, 2, 2, 3, 3], mult: 2.2, cash: 600,
+    cats: ['banca_general', 'market', 'econ', 'term'], desc: '지점 실적을 책임지는 지점장. 방카 규정과 시황 5문제.' },
+  { id: 'wmcenter', npc: 'wmcenter', title: 'WM센터장', rate: 20, stars: 3, count: 5, diffs: [2, 2, 3, 3, 3], mult: 2.8, cash: 1200,
+    cats: ['banca_general', 'market', 'econ'], desc: '자산가 고객을 상대하는 센터장. 세제·시장·경제 고난도 5문제.' },
+  { id: 'bankceo', npc: 'bankceo', title: '은행장', rate: 10, stars: 4, count: 6, diffs: [2, 3, 3, 3, 3, 3], mult: 4, cash: 3000,
+    cats: ['banca_general', 'market', 'econ', 'term'], desc: '아주 드물게 등장. 전 분야 최고 난이도 6문제, 15초 제한.' },
+  { id: 'bokgov', npc: 'bokgov', title: '한국은행 총재', rate: 5, stars: 5, count: 6, diffs: [3, 3, 3, 3, 3, 3], mult: 6, cash: 8000,
+    cats: ['market', 'econ', 'term'], desc: '전설의 보스. 금리·경제 극한 난이도 6문제, 12초 제한.' }
 ];
 
 /* 오늘의 이벤트 */
