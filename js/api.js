@@ -77,7 +77,7 @@ const Api = (() => {
       return absorbBoot(await call('boot', { ver: qc && qc.ver, faceVer: ls.get(FVK(user && user.email)) || '', openingVer: (ls.get(OPK) || {}).v || '' }));
     },
     faceVerKey: FVK,
-    opening: () => 'img/opening_2.webp', // 오프닝 그림 (공개 · 로그인 전에도 보임)
+    opening: () => 'img/opening_3.webp', // 오프닝 그림 (공개 · 로그인 전에도 보임)
     async me() { const r = await call('me'); user = r.user; ls.set(UK, user); return user; },
     logout() { token = null; user = null; ls.del(TK); ls.del(UK); ls.del(QC); },
     questions, cachedQuestions: () => qmem || [],
