@@ -1254,7 +1254,7 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
     const show = (i) => {
       cur = i; const c = CARS[i], own = owned(c), r = RANKS[c.rank];
       el.querySelectorAll('.gv-car').forEach((b) => { const k = +b.dataset.car; b.classList.toggle('on', k === i); b.classList.toggle('lock', !owned(CARS[k])); });
-      info.innerHTML = own ? `<b>${esc(c.name)}</b><small>${esc(c.desc)}${c.glb ? '' : ' · 🔧 3D 차량 준비 중'}</small>`
+      info.innerHTML = own ? `<b>${esc(c.name)}</b><small>${esc(c.desc)}${c.glb ? '' : ' · 🔧 3D 차량 준비 중'}${c.rank > my ? ` · 🛠️ 관리자 미리보기 (${esc(r.title)} 차)` : ''}</small>`
         : `<b>🔒 ???</b><small>${esc(r.title)}(Lv.${r.lv})으로 승진하면 지급돼요</small>`;
       if (!c.glb || !own) { load.classList.add('off'); view.innerHTML = `<div class="gv-none ${own ? '' : 'lock'}">${own ? c.icon : '?'}</div>`; return; }
       load.classList.remove('off');
