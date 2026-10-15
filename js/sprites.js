@@ -31,6 +31,7 @@ const Sprites = (() => {
           const key = 'illust:' + c.id;
           have[key] = new Set(c.exprs); base[key] = `img/player/${c.id}`; ext[key] = '.webp';
           presets[g].push(c.id);
+          Object.entries(c.stages || {}).forEach(([st, ex]) => { const k = `${key}@s${st}`; have[k] = new Set(ex); base[k] = `img/player/${c.id}_s${st}`; ext[k] = '.webp'; });
         }));
       }).catch(() => { }),
       // 배경 그림: img/bg/index.json 목록에 있는 것만 (예: 직급별 사무실 rank0~rank6)
@@ -54,8 +55,8 @@ const Sprites = (() => {
       if (!k) return null;
       if (data[k]) return data[k].thumb || null;
       if (illust[k]) return `img/chars/thumb/${k}.webp`;
-      const m = /^illust:(.+)$/.exec(k);
-      return m && have[k] ? `img/player/thumb/${m[1]}.webp` : null;
+      const m = /^illust:([^@]+)(?:@s(\d))?$/.exec(k);
+      return m && have[k] ? `img/player/thumb/${m[1]}${m[2] ? '_s' + m[2] : ''}.webp` : null;
     },
     presets: (g) => presets[g] || [],
     count: () => Object.keys(have).length + Object.keys(bgs).length

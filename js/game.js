@@ -38,6 +38,7 @@
   function save() {
     if (!S) return;
     S.oc = officeOC(); // 동료가 내 사무실을 구경할 때 쓰는 요약
+    S.cs = myStage();  // 지금 입은 의상 단계 (동료 화면에서도 같은 의상으로)
     S.updated = Date.now(); Store.save(S);
     clearTimeout(syncTimer); syncTimer = setTimeout(syncNow, 4000);
   }
@@ -114,6 +115,11 @@
   }
   const busy = (msg) => { els.screen.innerHTML = `<div class="loading"><div class="spin"></div>${esc(msg)}</div>`; };
   const opBg = (src) => `<img class="bgimg opblur" src="${src}" alt="" draggable="false"><img class="bgimg opening" src="${src}" alt="" draggable="false">`;
+  // 실물 캐릭터 그림 등록: { normal…, thumb, s1:{…}, s3:{…} } → face:me, face:me@s1 …
+  function regFace(key, map) {
+    const base = {}; Object.entries(map || {}).forEach(([k, v]) => { if (/^s\d$/.test(k)) Sprites.registerData(key + '@' + k, v); else base[k] = v; });
+    Sprites.registerData(key, base);
+  }
   const LOGO = `<div class="k">BANCASSURANCE QUIZ RPG</div><h1>방카BM <em>성장기</em></h1><p>인턴에서 사장까지, 지식으로 승진하라!</p>`;
   // 오프닝(직원 캐릭터 단체 그림): 로그인한 뒤 · 로딩하는 동안에만 보여 준다
   function openingOverlay(msg) {
@@ -160,8 +166,20 @@
   /* ---------------- 플레이어 / 성장 ---------------- */
   const rankOf = (lv) => RANKS.reduce((r, x) => (lv >= x.lv ? x : r), RANKS[0]);
   const faceOf = (P = S) => { const g = FACES[P.gender] || FACES.f; return g.find((x) => x.id === P.face) || g[0]; };
-  // P: 캐릭터 겉모습(내 기록 또는 동료의 look), faceKey: 실물 캐릭터 그림 키
-  function specOf(P, lv, faceKey) {
+  // 의상 단계 그림 고르기: 원하는 단계 → 아래 단계 → 기본(②, 지금 그림)
+  function stagedKey(baseKey, st) {
+    if (!baseKey) return baseKey;
+    for (let s = st || 2; s >= 1; s--) {
+      if (s === 2) { if (Sprites.has(baseKey)) return baseKey; continue; }
+      if (Sprites.has(baseKey + '@s' + s)) return baseKey + '@s' + s;
+    }
+    return baseKey;
+  }
+  const effStage = (want, has) => { for (let s = want || 2; s >= 1; s--) { if (s === 2) return 2; if ((has || []).includes(s)) return s; } return 2; };
+  // 내가 지금 입은 의상 단계 (옷장에서 고른 것 · 없으면 직급에 맞춤)
+  const myStage = () => { const auto = costumeStage(S.lv); return S.costume && S.costume <= auto ? S.costume : auto; };
+  // P: 캐릭터 겉모습(내 기록 또는 동료의 look), faceKey: 실물 캐릭터 그림 키, st: 의상 단계
+  function specOf(P, lv, faceKey, st) {
     const D = Store.fresh(''); P = Object.assign({}, D, P || {}); lv = lv || 1;
     const r = rankOf(lv), f = P.gender === 'f', fc = faceOf(P);
     const look = clone(r.look);
@@ -169,15 +187,16 @@
     if (f && look.type === 'shirt') look.shirt = '#fdf7fb';
     // 주인공 그림: 실물 캐릭터 → 고른 일러스트 → 성별 기본 일러스트 (코드로 그린 캐릭터는 쓰지 않음)
     const pre = Sprites.presets(P.gender)[0] || Sprites.presets(P.gender === 'f' ? 'm' : 'f')[0];
-    const illust = faceKey && Sprites.has(faceKey) ? faceKey
-      : P.illust && P.illust[0] === P.gender && Sprites.has('illust:' + P.illust) ? 'illust:' + P.illust
-      : pre ? 'illust:' + pre : null;
+    st = st || P.cs || costumeStage(lv);
+    const illust = faceKey && Sprites.has(faceKey) ? stagedKey(faceKey, st)
+      : P.illust && P.illust[0] === P.gender && Sprites.has('illust:' + P.illust) ? stagedKey('illust:' + P.illust, st)
+      : pre ? stagedKey('illust:' + pre, st) : null;
     return { key: illust || `player_${P.gender}_${RANKS.indexOf(r)}`, gender: P.gender, skin: P.skin,
       eye: fc.eye, eyeScale: fc.eyeScale, face: fc.face, eyeColor: fc.eyeColor, lashes: !!fc.lashes, blush: !!fc.blush, brow: fc.brow, thickBrows: fc.thickBrows,
       age: P.age, glasses: P.glasses || null, glassesColor: P.glassesColor,
       hair: { style: P.hairStyle, color: P.hairColor }, outfit: look, aura: !!r.aura, earrings: f && lv >= 20 ? '#f2c641' : null };
   }
-  const playerSpec = (lv = S.lv) => specOf(S, lv, hasFace ? 'face:me' : null);
+  const playerSpec = (lv = S.lv) => specOf(S, lv, hasFace ? 'face:me' : null, lv === S.lv ? myStage() : costumeStage(lv));
   // 가만히 서 있을 때 표정: 일러스트 캐릭터는 첫 표정(기본), 코드 그림은 미소
   const rest = () => (/^(illust|face):/.test(playerSpec().key) ? 'normal' : 'smile');
   const mastery = (g) => S.groupXp[g] / GROUPS[g].cats.length;
@@ -673,6 +692,13 @@
     await say(NARR, `🎉 승진을 축하합니다!\n${S.name} → 【${rank.title}】`);
     setChar(NPCS.partjang.spec, 'smile', 'enter');
     await say(whoOf('partjang'), PROMO_LINES[rank.lv] || '축하한다!');
+    const cos = COSTUMES.find((c) => c.lv === rank.lv && c.st > 1);
+    if (cos) { // 의상 단계가 바뀌는 직급: 새 의상 지급
+      S.costume = null; save(); // 옷장은 '직급에 맞춤'으로
+      const ready = !hasFace && !S.illust ? false : /@s\d$/.test(playerSpec().key) || cos.st === 2;
+      setChar(playerSpec(), 'smile', 'hop'); fx('<div class="flash"></div>', 700); Snd.lv(); confetti(50);
+      await say(NARR, `${cos.icon} 새 의상이 지급되었습니다!\n【${cos.name}】 ${cos.desc}${ready ? '' : '\n(새 의상 그림은 곧 도착해요. 그때까지는 지금 옷으로!)'}\n내 캐릭터 → 👔 옷장에서 언제든 갈아입을 수 있어요.`);
+    }
     els.vn.classList.remove('on');
   }
   async function classReveal() {
@@ -1007,7 +1033,7 @@
     els.screen.querySelectorAll('[data-av]').forEach((b) => b.onclick = () => charViewer(cur.list[+b.dataset.av]));
     // 실물 캐릭터 사진은 기본 표정만 먼저 받아서 바꿔 끼운다
     const fl = needFull(cur.list);
-    if (fl.length) loadPeerFaces(fl.map((x) => x.uid), ['normal']).then(() => {
+    if (fl.length) loadPeerFaces(fl.map(pfid), ['normal']).then(() => {
       els.screen.querySelectorAll('button.rkav').forEach((b) => { const x = cur.list[+b.dataset.av]; if (x && x.face && !x.me) b.innerHTML = avatar(x); });
     });
     els.screen.querySelectorAll('[data-cheer]').forEach((b) => b.onclick = () => doCheer(b.dataset.cheer, b.dataset.nm, b));
@@ -1020,12 +1046,13 @@
   // 이 기기에 받아 둔 동료 그림 중 버전이 같은 것은 바로 쓴다 (다시 받지 않음)
   function primePeerFaces(list) {
     list.filter((x) => x.face && !x.me).forEach((x) => {
-      peerVer[x.uid] = x.fv || '';
-      if (peerFace[x.uid] && peerFace[x.uid].__v === x.fv) return;
+      const id = pfid(x);
+      peerVer[id] = x.fv || '';
+      if (peerFace[id] && peerFace[id].__v === x.fv) return;
       try {
-        const c = JSON.parse(localStorage.getItem(PFK(x.uid)));
-        if (c && c.v === x.fv && c.m && c.m.normal) { peerFace[x.uid] = Object.assign({ __v: c.v }, c.m); Sprites.registerData('face:' + x.uid, c.m); }
-        else if (peerFace[x.uid] && peerFace[x.uid].__v !== x.fv) { delete peerFace[x.uid]; }
+        const c = JSON.parse(localStorage.getItem(PFK(id)));
+        if (c && c.v === x.fv && c.m && c.m.normal) { peerFace[id] = Object.assign({ __v: c.v }, c.m); Sprites.registerData('face:' + id, c.m); }
+        else if (peerFace[id] && peerFace[id].__v !== x.fv) { delete peerFace[id]; }
       } catch (e) { }
     });
   }
@@ -1045,10 +1072,11 @@
     } catch (e) { }
   }
   // p: { name, lv, look, uid, face, me }
-  const peerSpec = (p) => (p.me ? playerSpec(p.lv || S.lv) : specOf(p.look || {}, p.lv || 1, p.face ? 'face:' + p.uid : null));
+  const pfid = (p) => { const e = effStage((p.look || {}).cs || costumeStage(p.lv || 1), p.st); return e === 2 ? p.uid : p.uid + '@s' + e; };
+  const peerSpec = (p) => (p.me ? playerSpec(p.lv || S.lv) : specOf(p.look || {}, p.lv || 1, p.face ? 'face:' + pfid(p) : null));
   const restOf = (spec) => (/^(illust|face):/.test(spec.key) ? 'normal' : 'smile');
   // 실물 캐릭터 그림이 아직 없으면 빈 동그라미 (다른 그림을 먼저 보여주지 않음)
-  const faceReady = (p) => p.me || !p.face || Sprites.has('face:' + p.uid);
+  const faceReady = (p) => p.me || !p.face || Sprites.has('face:' + pfid(p));
   const avatar = (p) => {
     if (!p.me && p.thumb) return `<img class="avthumb" src="${p.thumb}" alt="" draggable="false">`; // 서버가 함께 보낸 작은 얼굴 사진
     if (!faceReady(p)) return '<i class="avwait"></i>';
@@ -1071,11 +1099,11 @@
     const ob = m.el.querySelector('#cvOffice');
     if (ob) ob.onclick = async () => {
       if (p.me) { m.close(); return openOffice(); }
-      if (p.face) await loadPeerFaces([p.uid]);
+      if (p.face) await loadPeerFaces([pfid(p)]);
       const sp = peerSpec(p); m.close();
       openOffice({ name: p.name, lv: p.lv, oc: (p.look || {}).oc, photo: p.thumb || Sprites.thumb(sp.key), person: Sprites.char(sp.key, 'normal') });
     };
-    if (p.face && !p.me) await loadPeerFaces([p.uid]);
+    if (p.face && !p.me) await loadPeerFaces([pfid(p)]);
     const box = m.el.querySelector('.cview'); if (!box || !box.isConnected) return;
     if (!faceReady(p)) { box.innerHTML = '<p class="muted" style="text-align:center;padding-top:40%">캐릭터 그림을 불러오지 못했어요.<br>잠시 후 다시 눌러 주세요.</p>'; return; }
     const spec = peerSpec(p), L = peerLines(p);
@@ -1248,7 +1276,7 @@
       box.innerHTML = list.length ? list.map((x, i) => `<div class="rankrow ${x.me ? 'me' : ''}"><span class="rk">${['🥇', '🥈', '🥉'][i] || i + 1}</span><span class="rkav" style="cursor:default">${avatar(x)}</span>
         <span class="nm">${esc(x.name)}${x.me ? ' (나)' : ''}<small>Lv.${x.lv} ${rankOf(x.lv).title}</small></span><b class="mini-rec">${Mini.fmt(x.ms)}</b></div>`).join('')
         : `<p class="muted" style="text-align:center;margin-top:24px">${tab === 'maze' ? '오늘 미로를 통과한 사람이 아직 없어요. 첫 기록의 주인공이 되어 보세요!' : '아직 기록이 없어요.'}</p>`;
-      const fl = needFull(list); if (fl.length) loadPeerFaces(fl.map((x) => x.uid), ['normal']).then(show);
+      const fl = needFull(list); if (fl.length) loadPeerFaces(fl.map(pfid), ['normal']).then(show);
     };
     els.screen.querySelectorAll('[data-mr]').forEach((b) => b.onclick = () => { tab = b.dataset.mr; els.screen.querySelectorAll('[data-mr]').forEach((x) => x.classList.toggle('on', x === b)); show(); });
     try { await syncNow(); data = await Api.miniRank(day); } catch (e) { const box = $('#miniRank'); if (box) box.innerHTML = `<p class="muted">${esc(e.message)}</p>`; return; }
@@ -1616,6 +1644,14 @@
           <div class="xpbar" style="margin-top:10px;height:9px"><i style="width:${S.lv >= MAX_LV ? 100 : Math.round((S.xp / xpNeed(S.lv)) * 100)}%"></i></div>
           <div class="muted" style="margin-top:4px">${S.lv >= MAX_LV ? 'MAX' : `다음 레벨까지 ${xpNeed(S.lv) - S.xp} XP`}</div>
         </div></div></div>
+      <div class="box"><h4>👔 옷장 <small class="muted">승진하면 새 의상이 지급돼요</small></h4><div class="wardrobe">
+        <button class="wcard ${!S.costume ? 'on' : ''}" data-cos="0"><span class="wi">✨</span><b>직급에 맞춤</b><small>지금: ${COSTUMES.find((c) => c.st === costumeStage(S.lv)).name}</small></button>
+        ${COSTUMES.map((c) => {
+          const lock = S.lv < c.lv, key = hasFace ? 'face:me' : S.illust ? 'illust:' + S.illust : null;
+          const ready = c.st === 2 || (key && Sprites.has(key + '@s' + c.st));
+          return `<button class="wcard ${S.costume === c.st ? 'on' : ''} ${lock ? 'lock' : ''}" data-cos="${c.st}" ${lock ? 'disabled' : ''}>
+            <span class="wi">${lock ? '🔒' : c.icon}</span><b>${c.name}</b><small>${lock ? `Lv.${c.lv}에 지급` : esc(c.desc)}</small>${!lock && !ready ? '<small class="muted">그림 준비 중</small>' : ''}</button>`;
+        }).join('')}</div></div>
       <div class="box stat"><div><b>${tot.n}</b><span>푼 문제</span></div><div><b>${tot.n ? Math.round((tot.c / tot.n) * 100) : 0}%</b><span>정답률</span></div><div><b>${S.bestCombo}</b><span>최고 콤보</span></div>
         <div><b>${S.streak.count}</b><span>연속 출근</span></div><div><b>${S.totalXp}</b><span>누적 XP</span></div><div><b>${Object.keys(S.ach).length}/${ACHIEVEMENTS.length}</b><span>업적</span></div></div>
       <div class="box"><h4>분야별 숙련도 (명예 직업 판정)</h4>${groups}
@@ -1633,6 +1669,10 @@
         }).join('')}</div></div>
     </div>`;
     els.screen.querySelectorAll('[data-ag]').forEach((b) => b.onclick = () => { achGroup = b.dataset.ag; pageChar(); });
+    els.screen.querySelectorAll('[data-cos]').forEach((b) => b.onclick = () => {
+      const st = +b.dataset.cos; S.costume = st || null; Snd.tap(); save(); renderHud();
+      toast(st ? `${COSTUMES.find((c) => c.st === st).icon} ${COSTUMES.find((c) => c.st === st).name} 의상으로 갈아입었어요` : '직급에 맞는 의상을 입어요'); pageChar();
+    });
   }
 
   /* ---- 설정 ---- */
@@ -1843,7 +1883,7 @@ Lv.${S.lv} ${rankOf(S.lv).title} ${S.name}의 모든 기록(경험치 ${S.totalX
         : '<p class="muted">아직 캐릭터가 있는 회원이 없어요.</p>';
       box.querySelectorAll('[data-ci]').forEach((b) => b.onclick = () => charViewer(items[+b.dataset.ci], { scene: true }));
       const fl = needFull(items);
-      if (fl.length) loadPeerFaces(fl.map((x) => x.uid), ['normal']).then(() => {
+      if (fl.length) loadPeerFaces(fl.map(pfid), ['normal']).then(() => {
         box.querySelectorAll('[data-ci]').forEach((b) => { const x = items[+b.dataset.ci]; if (x.face && !x.me && !x.thumb) b.querySelector('.rkav').innerHTML = avatar(x); });
       });
     };
@@ -1914,7 +1954,7 @@ Lv.${S.lv} ${rankOf(S.lv).title} ${S.name}의 모든 기록(경험치 ${S.totalX
     if (again) npcScene(k);
   }
   async function staffScene(p) {
-    if (p.face && !p.me) await loadPeerFaces([p.uid]);
+    if (p.face && !p.me) await loadPeerFaces([pfid(p)]);
     const spec = peerSpec(p), me = { name: p.name, role: rankOf(p.lv || 1).title };
     const again = await previewStage(async () => {
       setBg('office'); setChar(null);
@@ -2208,13 +2248,13 @@ Lv.${S.lv} ${rankOf(S.lv).title} ${S.name}의 모든 기록(경험치 ${S.totalX
     if (Api.opening() && !$('#opening')) openingOverlay('출근 준비 중…');
     // 실물 캐릭터(관리자가 비공개 폴더에 등록) — 이 기기에 받아 둔 그림을 먼저 쓰고, 바뀐 경우에만 다시 받는다
     const FK = 'bmq_face_' + u.email, FVK = Api.faceVerKey(u.email);
-    try { const c = JSON.parse(localStorage.getItem(FK)); if (c) { Sprites.registerData('face:me', c); hasFace = true; } else localStorage.removeItem(FVK); } catch (e) { }
+    try { const c = JSON.parse(localStorage.getItem(FK)); if (c) { regFace('face:me', c); hasFace = true; } else localStorage.removeItem(FVK); } catch (e) { }
     // 문제 · 진행 · 멘트 · 그림을 한 번의 요청으로
     let b = null, failed = false;
     try { b = await Api.boot(); } catch (e) { failed = true; }
     if (failed) { try { await Api.questions(); } catch (e) { toast(e.message, 3500); } } // 오프라인이면 저장해 둔 문제로
     loadTalk(b && b.talk);
-    if (b && b.face) { Sprites.registerData('face:me', b.face); hasFace = true; try { localStorage.setItem(FK, JSON.stringify(b.face)); localStorage.setItem(FVK, JSON.stringify(b.faceVer)); } catch (e) { } }
+    if (b && b.face) { regFace('face:me', b.face); hasFace = true; try { localStorage.setItem(FK, JSON.stringify(b.face)); localStorage.setItem(FVK, JSON.stringify(b.faceVer)); } catch (e) { } }
     else if (b && !b.faceVer && !Api.demo) { hasFace = false; try { localStorage.removeItem(FK); localStorage.removeItem(FVK); } catch (e) { } }
     const local = Store.load(u.email);
     let remote = null;

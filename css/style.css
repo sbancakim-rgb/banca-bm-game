@@ -583,3 +583,10 @@ img.sprite.bust.illust { width: 135%; left: -17%; top: -3%; }
 #bg img.bgimg.opening, #opening img.opening { max-width: calc(100vh * 2 / 3); }
 #bg img.bgimg.opening, #opening img.opening { -webkit-mask-image: linear-gradient(180deg, #000 93%, transparent); mask-image: linear-gradient(180deg, #000 93%, transparent); }
 .op-fade { height: 34%; background: linear-gradient(180deg, rgba(20,30,70,0), rgba(20,30,70,.6) 40%, rgba(20,25,55,.88)); }
+
+/* 옷장 */
+.wardrobe { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
+.wcard { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 10px 6px; border: 0; border-radius: 14px; background: #faf6f8; font: inherit; text-align: center; cursor: pointer; box-shadow: inset 0 0 0 2px #f0dbe5; }
+.wcard .wi { font-size: 26px; } .wcard b { font-size: 13px; } .wcard small { font-size: 11px; color: var(--ink2); line-height: 1.3; }
+.wcard.on { background: #fff3f7; box-shadow: inset 0 0 0 3px var(--pink); }
+.wcard.lock { opacity: .5; cursor: default; }

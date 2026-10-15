@@ -309,6 +309,15 @@ const CATS = {
   econ: { label: '경제학', group: 'econ', icon: '🎓', npcs: ['jogyo', 'kimgyosu', 'parkgyosu'], byDiff: true, color: '#6a4c93', desc: '연수원 강의' },
   term: { label: '경제 용어', group: 'term', icon: '📖', npcs: ['yunpro', 'choiseonim', 'ochajang'], byDiff: true, color: '#c9831f', desc: '사무실 동료' }
 };
+/* 의상 4단계 — 승진하면 새 의상 지급 (그림이 없으면 아래 단계 · 지금 그림(②)으로)
+   그림 파일: 실물 캐릭터 {이메일}_s{단계}_{표정}.webp · 일러스트 {m1}_s{단계}_{표정}.webp — ②단계는 지금 그림 그대로 */
+const COSTUMES = [
+  { st: 1, lv: 1, icon: '🪪', name: '새내기', ranks: '인턴 · 신입 BM', desc: '흰 셔츠 · 사원증 목걸이' },
+  { st: 2, lv: 10, icon: '👔', name: '영업 정장', ranks: '방카 BM · 지역단장', desc: '정장 · 포인트 넥타이' },
+  { st: 3, lv: 30, icon: '🎩', name: '임원', ranks: '사업부장 · 부사장', desc: '쓰리피스 수트 · 포켓스퀘어' },
+  { st: 4, lv: 50, icon: '👑', name: '사장', ranks: '사장', desc: '최고급 블랙 수트 · 금장 넥타이핀' }
+];
+const costumeStage = (lv) => COSTUMES.reduce((a, c) => (lv >= c.lv ? c.st : a), 1);
 /* 사무실 꾸밈 물품 (매점에서 구매 → 사무실에 비치 · 보관 선택) */
 const OFFICE_ITEMS = [
   { id: 'cactus', icon: '🌵', name: '미니 선인장', price: 500, desc: '책상 위의 작은 친구' },
