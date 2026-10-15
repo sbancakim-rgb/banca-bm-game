@@ -598,3 +598,24 @@ img.sprite.bust.illust { width: 135%; left: -17%; top: -3%; }
 .cvcos button.on { background: #fff3f7; box-shadow: inset 0 0 0 2px var(--pink); }
 .cvcos button:disabled { opacity: .45; cursor: default; }
 .cvcos p { width: 100%; margin: 2px 0 0; text-align: center; font-size: 11.5px; }
+
+/* 차고 */
+.garagebtn { top: calc(108px + var(--safe-t)); color: #10345b; background: linear-gradient(135deg, #e3f3ff, #8fd0ff); animation-delay: .4s; }
+.ov-bar .btn { padding-left: 4px; padding-right: 4px; white-space: nowrap; }
+#garageView { position: fixed; inset: 0; z-index: 56; display: flex; flex-direction: column; background: radial-gradient(ellipse at 50% 38%, #3b3f5c, #15131f 75%); padding: calc(8px + var(--safe-t)) 10px calc(10px + var(--safe-b)); }
+.gv-stage { position: relative; flex: 1; min-height: 0; border-radius: 18px; overflow: hidden; background: radial-gradient(ellipse at 50% 70%, #f4f6fb, #c9cfdd 70%, #9aa3b8); box-shadow: inset 0 -40px 60px rgba(0,0,0,.12); }
+.gv-view, .gv-view model-viewer { position: absolute; inset: 0; width: 100%; height: 100%; --poster-color: transparent; }
+.gv-none { position: absolute; inset: 0; display: grid; place-items: center; font-size: 30vmin; filter: drop-shadow(0 12px 18px rgba(0,0,0,.25)); }
+.gv-none.lock { font-family: 'Jua', sans-serif; color: #7d849a; font-size: 26vmin; filter: none; }
+.gv-load { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; color: #4a5068; font-weight: 700; font-size: 13px; pointer-events: none; transition: opacity .3s; }
+.gv-load.off { opacity: 0; }
+.gv-ar { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); border: 0; border-radius: 999px; padding: 8px 14px; font: inherit; font-size: 13px; font-weight: 800; color: #fff; background: rgba(30,24,48,.85); cursor: pointer; }
+.gv-info { color: #fff; text-align: center; padding: 10px 4px 8px; }
+.gv-info b { font-family: 'Jua', sans-serif; font-weight: 400; font-size: 20px; }
+.gv-info small { display: block; color: #c4bdd8; font-size: 12.5px; margin-top: 3px; line-height: 1.45; }
+.gv-list { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding: 2px 2px 4px; }
+.gv-list::-webkit-scrollbar { display: none; }
+.gv-car { flex: 0 0 auto; width: 74px; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 4px; border: 2px solid transparent; border-radius: 14px; background: rgba(255,255,255,.1); color: #fff; font: inherit; cursor: pointer; }
+.gv-car span { font-size: 26px; } .gv-car small { font-size: 11px; font-weight: 700; white-space: nowrap; }
+.gv-car.on { border-color: #ffd66b; background: rgba(255,214,107,.18); }
+.gv-car.lock span { filter: brightness(0) invert(.45); } .gv-car.lock small { color: #8f88a6; }

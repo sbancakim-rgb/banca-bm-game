@@ -699,6 +699,14 @@
       setChar(playerSpec(), 'smile', 'hop'); fx('<div class="flash"></div>', 700); Snd.lv(); confetti(50);
       await say(NARR, `${cos.icon} 새 의상이 지급되었습니다!\n【${cos.name}】 ${cos.desc}${ready ? '' : '\n(새 의상 그림은 곧 도착해요. 그때까지는 지금 옷으로!)'}\n내 캐릭터 → 👔 옷장에서 언제든 갈아입을 수 있어요.`);
     }
+    const car = CARS.find((c) => c.rank === RANKS.indexOf(rank));
+    if (car) { // 직급마다 새 차 지급
+      fx('<div class="flash"></div>', 700); Snd.coin();
+      await say(NARR, `🔑 새 차 열쇠를 받았습니다!
+${car.icon} 【${car.name}】
+${car.desc}
+${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있어요.' : '(3D 차량은 곧 도착해요. 홈 화면 → 🚗 내 차고)'}`);
+    }
     els.vn.classList.remove('on');
   }
   async function classReveal() {
@@ -753,7 +761,7 @@
     const evs = todayEvents(), open = CAT_ORDER.filter((c) => catCount(c) > 0);
     const doneN = open.filter((c) => S.daily.done[c]).length;
     const b = bossTier(), bd = S.dailyBoss.done, vig = (S.items.drink || 0) + (S.items.ginseng || 0);
-    els.screen.innerHTML = `<button class="officebtn" id="officeGo">🏢 사무실 가기</button><div class="sheet">
+    els.screen.innerHTML = `<button class="officebtn" id="officeGo">🏢 사무실 가기</button><button class="officebtn garagebtn" id="garageGo">🚗 내 차고</button><div class="sheet">
       ${S.events && S.events.pending ? '<button class="newsflash" id="evGo">📨 새 소식이 도착했어요! <b>확인하기 →</b></button>' : ''}
       <h3><span>${greeting()},<br>${esc(S.name)} ${r.title}님!</span><small>오늘 ${doneN}/${open.length} 완료<br>🔥 ${S.streak.count}일 연속 출근</small></h3>
       ${evs.length ? `<div class="events">${evs.map((e) => `<div class="event">${e.icon} ${e.title}<small>${e.desc}</small></div>`).join('')}</div>` : ''}
@@ -785,6 +793,7 @@
     });
     els.screen.querySelectorAll('[data-go2]').forEach((b) => b.onclick = () => go(b.dataset.go2));
     $('#officeGo').onclick = () => { Snd.tap(); openOffice(); };
+    $('#garageGo').onclick = () => { Snd.tap(); openGarage(); };
     $('#charTap').onclick = charTalk;
     const evGo = $('#evGo'); if (evGo) evGo.onclick = runEvent;
     checkInbox();
@@ -1198,7 +1207,7 @@
           ${photo ? `<button class="ov-hide" data-hide>${hide ? '🙋 캐릭터 보이기' : '🙈 캐릭터 치우기'}</button>` : ''}</div>
         <div class="ov-stage">${stage}<div class="ov-tip"></div>${photo ? '<div class="ov-hint">↔ 좌우로 밀어서 둘러보세요</div>' : ''}</div>
         <div class="ov-info">🏆 트로피 ${c.trophies.length} · 📜 상장 ${c.certs.length} · 📚 책 ${c.books}권 · 🪑 물품 ${c.items.length}개<small>${esc(c.title)} · ${esc(Office.PLACE[r])} · 물건을 눌러 보세요</small></div>
-        <div class="ov-bar">${me ? '<button class="btn" data-deco>🪑 꾸미기</button><button class="btn ghost" data-case>🏆 진열장</button><button class="btn ghost" data-shop>🛒 매점</button>'
+        <div class="ov-bar">${me ? '<button class="btn" data-deco>🪑 꾸미기</button><button class="btn ghost" data-case>🏆 진열장</button><button class="btn ghost" data-shop>🛒 매점</button><button class="btn ghost" data-car>🚗 차고</button>'
           : '<button class="btn ghost" data-case>🏆 진열장</button><button class="btn" data-x>닫기</button>'}</div>`;
       el.querySelectorAll('[data-x]').forEach((b) => b.onclick = close);
       const tip = el.querySelector('.ov-tip');
@@ -1219,9 +1228,50 @@
       const cs = el.querySelector('[data-case]'); if (cs) cs.onclick = () => showCase(c);
       const dc = el.querySelector('[data-deco]'); if (dc) dc.onclick = () => decoPanel(draw);
       const sp = el.querySelector('[data-shop]'); if (sp) sp.onclick = () => { close(); go('shop'); };
+      const cr = el.querySelector('[data-car]'); if (cr) cr.onclick = () => { Snd.tap(); openGarage(); };
     };
     const close = () => { el.remove(); if (me && $('#stage').className === 'home') setBg(RANKS[rankIdx(S.lv)].bg); };
     document.body.appendChild(el); draw();
+  }
+  /* ---------------- 차고 (직급별 차 · 3D로 돌려 보기) ---------------- */
+  let mvLoad = null; // 3D 뷰어는 차고를 처음 열 때만 불러옴
+  const loadMV = () => mvLoad || (mvLoad = new Promise((res, rej) => {
+    if (customElements.get('model-viewer')) return res();
+    const s = document.createElement('script'); s.type = 'module';
+    s.src = 'https://cdn.jsdelivr.net/npm/@google/model-viewer@3.5.0/dist/model-viewer.min.js';
+    s.onload = () => customElements.whenDefined('model-viewer').then(res); s.onerror = () => { mvLoad = null; rej(new Error('3D 뷰어를 불러오지 못했어요')); };
+    document.head.appendChild(s);
+  }));
+  function openGarage() {
+    const admin = !!(Api.user || {}).admin, my = rankIdx(S.lv);
+    const owned = (c) => c.rank <= my || admin; // 관리자는 전부 구경
+    let cur = Math.min(my, CARS.length - 1);
+    const el = document.createElement('div'); el.id = 'garageView';
+    el.innerHTML = `<div class="ov-top"><button class="mini-x" data-x aria-label="닫기">✕</button><b>🚗 ${esc(S.name)}의 차고</b></div>
+      <div class="gv-stage"><div class="gv-view"></div><div class="gv-load"><div class="spin"></div>차를 꺼내는 중…</div></div>
+      <div class="gv-info"></div><div class="gv-list">${CARS.map((c) => `<button class="gv-car" data-car="${c.rank}"><span>${c.icon}</span><small>${RANKS[c.rank].title}</small></button>`).join('')}</div>`;
+    const view = el.querySelector('.gv-view'), load = el.querySelector('.gv-load'), info = el.querySelector('.gv-info');
+    const show = (i) => {
+      cur = i; const c = CARS[i], own = owned(c), r = RANKS[c.rank];
+      el.querySelectorAll('.gv-car').forEach((b) => { const k = +b.dataset.car; b.classList.toggle('on', k === i); b.classList.toggle('lock', !owned(CARS[k])); });
+      info.innerHTML = own ? `<b>${esc(c.name)}</b><small>${esc(c.desc)}${c.glb ? '' : ' · 🔧 3D 차량 준비 중'}</small>`
+        : `<b>🔒 ???</b><small>${esc(r.title)}(Lv.${r.lv})으로 승진하면 지급돼요</small>`;
+      if (!c.glb || !own) { load.classList.add('off'); view.innerHTML = `<div class="gv-none ${own ? '' : 'lock'}">${own ? c.icon : '?'}</div>`; return; }
+      load.classList.remove('off');
+      loadMV().then(() => {
+        if (cur !== i) return;
+        view.innerHTML = `<model-viewer src="${c.glb}" alt="${esc(c.name)}" camera-controls auto-rotate ar rotation-per-second="18deg"
+          camera-orbit="-35deg 72deg auto" environment-image="neutral" shadow-intensity="1" exposure="1.05" interaction-prompt="none" touch-action="pan-y">
+          <button slot="ar-button" class="gv-ar">📱 내 방에 꺼내 보기 (AR)</button></model-viewer>`;
+        const mv = view.firstElementChild;
+        mv.addEventListener('load', () => load.classList.add('off'), { once: true });
+        mv.addEventListener('error', () => { load.classList.add('off'); view.innerHTML = `<div class="gv-none">${c.icon}</div>`; }, { once: true });
+      }).catch((e) => { load.classList.add('off'); view.innerHTML = `<div class="gv-none">${c.icon}</div>`; toast(e.message); });
+    };
+    el.querySelectorAll('.gv-car').forEach((b) => b.onclick = () => { Snd.tap(); show(+b.dataset.car); });
+    el.querySelector('[data-x]').onclick = () => el.remove();
+    document.body.appendChild(el); show(cur);
+    const on = el.querySelector('.gv-car.on'); if (on) on.scrollIntoView({ inline: 'center', block: 'nearest' });
   }
   function showCase(c) {
     modal(`<h2 style="font-size:22px">🏆 진열장</h2>
@@ -2424,7 +2474,7 @@ Lv.${S.lv} ${rankOf(S.lv).title} ${S.name}의 모든 기록(경험치 ${S.totalX
       if (no) no.click(); else if (modalClose) modalClose();
       return;
     }
-    for (const id of ['bgView', 'officeView', 'mini']) {
+    for (const id of ['bgView', 'garageView', 'officeView', 'mini']) {
       const ov = document.getElementById(id);
       if (ov) { const x = ov.querySelector('[data-x], .mini-x'); if (x) x.click(); else ov.remove(); return; }
     }

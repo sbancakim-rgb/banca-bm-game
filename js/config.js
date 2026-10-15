@@ -318,6 +318,16 @@ const COSTUMES = [
   { st: 4, lv: 50, icon: '👑', name: '사장', ranks: '사장', desc: '최고급 블랙 수트 · 금장 넥타이핀' }
 ];
 const costumeStage = (lv) => COSTUMES.reduce((a, c) => (lv >= c.lv ? c.st : a), 1);
+/* 차고: 직급마다 차 한 대 (승진하면 지급). glb = 3D 파일 (없으면 '준비 중') — 바꿀 때는 새 파일 이름으로 */
+const CARS = [
+  { rank: 0, name: '새내기 마이크로카', icon: '🚙', desc: '작고 귀여운 2인승 전기차. 첫 출근의 설렘을 싣고!', glb: 'img/cars/rank0_v2.glb' },
+  { rank: 1, name: '방카 컴팩트', icon: '🚗', desc: '은행 지점 사이를 가볍게 오가는 실속형 해치백' },
+  { rank: 2, name: '영업왕 세단', icon: '🚘', desc: '명함과 함께 받은 세련된 업무용 세단' },
+  { rank: 3, name: '지역단장 SUV', icon: '🚙', desc: 'BM들을 이끌고 어디든 가는 듬직한 SUV' },
+  { rank: 4, name: '사업부장 그랜드', icon: '🚘', desc: '품격이 느껴지는 대형 고급 세단' },
+  { rank: 5, name: '부사장 프레스티지', icon: '🚘', desc: '부사장 전용 최고급 플래그십' },
+  { rank: 6, name: 'CEO 리무진', icon: '🚘', desc: '사장님만 탈 수 있는 초호화 리무진' }
+];
 /* 사무실 꾸밈 물품 (매점에서 구매 → 사무실에 비치 · 보관 선택) */
 const OFFICE_ITEMS = [
   { id: 'cactus', icon: '🌵', name: '미니 선인장', price: 500, desc: '책상 위의 작은 친구' },
