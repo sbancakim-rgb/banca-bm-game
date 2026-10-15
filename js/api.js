@@ -268,12 +268,12 @@ function rankingFrom(rows, k, myEmail) {
   const pick = (curKey, xpField, prevKeyField, prevXpField, target) => rows.map((r) => ({
     name: r.name || '이름없음', lv: r.lv || 1, me: r.email === myEmail, email: r.email, look: r.look || null, face: false,
     xp: r[curKey] === target ? (r[xpField] || 0) : r[prevKeyField] === target ? (r[prevXpField] || 0) : 0
-  })).filter((x) => x.xp > 0).sort((a, b) => b.xp - a.xp);
+  })).filter((x) => x.name && x.name !== '이름없음').sort((a, b) => b.xp - a.xp || b.lv - a.lv);
   return {
-    week: { key: k.wk, list: pick('week', 'weekXp', 'prevWeek', 'prevWeekXp', k.wk).slice(0, 30) },
-    month: { key: k.mo, list: pick('month', 'monthXp', 'prevMonth', 'prevMonthXp', k.mo).slice(0, 30) },
-    lastWeek: { key: k.lastWk, winner: pick('week', 'weekXp', 'prevWeek', 'prevWeekXp', k.lastWk)[0] || null },
-    lastMonth: { key: k.lastMo, winner: pick('month', 'monthXp', 'prevMonth', 'prevMonthXp', k.lastMo)[0] || null }
+    week: { key: k.wk, list: pick('week', 'weekXp', 'prevWeek', 'prevWeekXp', k.wk).slice(0, 60) },
+    month: { key: k.mo, list: pick('month', 'monthXp', 'prevMonth', 'prevMonthXp', k.mo).slice(0, 60) },
+    lastWeek: { key: k.lastWk, winner: pick('week', 'weekXp', 'prevWeek', 'prevWeekXp', k.lastWk).filter((x) => x.xp > 0)[0] || null },
+    lastMonth: { key: k.lastMo, winner: pick('month', 'monthXp', 'prevMonth', 'prevMonthXp', k.lastMo).filter((x) => x.xp > 0)[0] || null }
   };
 }
 

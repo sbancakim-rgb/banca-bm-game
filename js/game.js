@@ -1026,7 +1026,7 @@
       <div class="box winner">${last.winner ? `👑 지난 ${rankTab === 'week' ? '주' : '달'} 최우수BM <b>${esc(last.winner.name)}</b> <span class="muted">Lv.${last.winner.lv} · ${last.winner.xp.toLocaleString()} XP</span>` : `<span class="muted">지난 ${rankTab === 'week' ? '주' : '달'} 기록이 아직 없어요.</span>`}</div>
       <p class="muted">이번 ${rankTab === 'week' ? '주' : '달'}에 얻은 경험치로 순위를 매겨요. 1위는 다음 ${rankTab === 'week' ? '주' : '달'}에 최우수BM으로 선정돼 명예 +${BEST_BM[rankTab].honor} · ${won(BEST_BM[rankTab].cash)}을 받아요.</p>
       <div class="box row" style="justify-content:space-between;padding:10px 14px"><span>📣 오늘 남은 응원 <b id="cheerLeft">${cheer.left}</b>/${SOCIAL.cheerPerDay}</span><span class="muted">응원받은 동료는 ${won(SOCIAL.cheerCash)} · 명예 +${SOCIAL.cheerHonor}</span></div>
-      ${cur.list.length ? cur.list.map((x, i) => `<div class="rankrow ${x.me ? 'me' : ''}"><span class="rk">${medal(i)}</span><button class="rkav" data-av="${i}" aria-label="${esc(x.name)} 캐릭터 보기">${avatar(x)}</button><span class="nm" data-av="${i}">${esc(x.name)}${x.me ? ' (나)' : ''}<small>Lv.${x.lv} ${rankOf(x.lv).title} · ${x.xp.toLocaleString()} XP</small></span>
+      ${cur.list.length ? cur.list.map((x, i) => `<div class="rankrow ${x.me ? 'me' : ''}"><span class="rk">${x.xp > 0 ? medal(i) : '·'}</span><button class="rkav" data-av="${i}" aria-label="${esc(x.name)} 캐릭터 보기">${avatar(x)}</button><span class="nm" data-av="${i}">${esc(x.name)}${x.me ? ' (나)' : ''}<small>Lv.${x.lv} ${rankOf(x.lv).title} · ${x.xp.toLocaleString()} XP</small></span>
         ${x.me ? '' : `<span class="acts"><button class="btn mini" data-cheer="${esc(x.uid)}" data-nm="${esc(x.name)}" ${cheer.left <= 0 || cheer.to.includes(x.uid) ? 'disabled' : ''}>${cheer.to.includes(x.uid) ? '응원 완료' : '📣 응원'}</button><button class="btn ghost mini" data-send="${esc(x.uid)}" data-nm="${esc(x.name)}">💸</button></span>`}</div>`).join('')
         : '<p class="muted" style="text-align:center;margin-top:30px">아직 이번 기간 기록이 없어요. 첫 1위를 노려 보세요!</p>'}`;
     els.screen.querySelectorAll('[data-rt]').forEach((b) => b.onclick = () => { rankTab = b.dataset.rt; pageRank(); });
@@ -1091,7 +1091,8 @@
   }
   async function charViewer(p, opt = {}) {
     const m = modal(`<div class="cview"><div class="loading" style="padding-top:40%"><div class="spin"></div>캐릭터를 불러오는 중…</div></div>
-      <h2 style="font-size:22px">${esc(p.name)}</h2><p class="muted" style="text-align:center;margin:0 0 12px">${p.lv ? `Lv.${p.lv} ${rankOf(p.lv).title}` : '아직 입사 전'} · 캐릭터를 눌러 보세요!</p>
+      <h2 style="font-size:22px">${esc(p.name)}</h2><p class="muted" style="text-align:center;margin:0 0 8px">${p.lv ? `Lv.${p.lv} ${rankOf(p.lv).title}` : '아직 입사 전'} · 캐릭터를 눌러 보세요!</p>
+      <div class="cvcos"></div>
       ${opt.scene ? '<button class="btn full" id="cvScene" style="margin-bottom:8px">🎬 게임 화면으로 보기</button>' : ''}
       ${p.lv ? '<button class="btn ghost full" id="cvOffice" style="margin-bottom:8px">🏢 사무실 구경하기</button>' : ''}
       <button class="btn ghost full" data-close>닫기</button>`);
@@ -1106,10 +1107,30 @@
     if (p.face && !p.me) await loadPeerFaces([pfid(p)]);
     const box = m.el.querySelector('.cview'); if (!box || !box.isConnected) return;
     if (!faceReady(p)) { box.innerHTML = '<p class="muted" style="text-align:center;padding-top:40%">캐릭터 그림을 불러오지 못했어요.<br>잠시 후 다시 눌러 주세요.</p>'; return; }
-    const spec = peerSpec(p), L = peerLines(p);
+    // 의상 갈아입혀 보기 (미리보기 · 저장 안 됨): 그 사람이 받은 의상만, 관리자는 전부
+    const admin = !!(Api.user || {}).admin, plv = p.lv || 1;
+    const curSt = p.me ? myStage() : ((p.look || {}).cs || costumeStage(plv));
+    const faceIdFor = (st) => { const e = effStage(st, p.st); return e === 2 ? p.uid : p.uid + '@s' + e; };
+    const specFor = (st) => (p.me ? specOf(S, S.lv, hasFace ? 'face:me' : null, st) : specOf(p.look || {}, plv, p.face ? 'face:' + faceIdFor(st) : null, st));
+    let vst = curSt, spec = specFor(vst);
+    const L = peerLines(p);
     let last = -1, taps = [], tm = null;
+    const cos = m.el.querySelector('.cvcos');
+    const drawCos = () => {
+      if (!cos || !p.lv) return;
+      cos.innerHTML = COSTUMES.map((c) => {
+        const open = admin || c.lv <= plv, exact = c.st === 2 || /@s\d$/.test(specFor(c.st).key) && specFor(c.st).key.endsWith('@s' + c.st);
+        return `<button data-vst="${c.st}" class="${vst === c.st ? 'on' : ''}" ${open ? '' : 'disabled'} title="${esc(c.desc)}">${open ? c.icon : '🔒'}<small>${c.name}${open && !exact ? '·준비 중' : ''}</small></button>`;
+      }).join('') + `<p class="muted">${vst === curSt ? '지금 입고 있는 의상' : '👀 미리보기 (실제 의상은 바뀌지 않아요)'}${admin ? ' · 관리자: 모든 의상' : ''}</p>`;
+      cos.querySelectorAll('[data-vst]').forEach((b) => b.onclick = async (e) => {
+        e.stopPropagation(); vst = +b.dataset.vst; Snd.tap();
+        if (p.face && !p.me) await loadPeerFaces([faceIdFor(vst)]);
+        spec = specFor(vst); fig.className = 'cvfig'; fig.innerHTML = charHTML(spec, restOf(spec)); void fig.offsetWidth; fig.className = 'cvfig hop'; drawCos();
+      });
+    };
     box.innerHTML = `<div class="cvfig">${charHTML(spec, restOf(spec))}</div>`;
     const fig = box.querySelector('.cvfig');
+    drawCos();
     box.onclick = () => {
       const now = Date.now(); taps = taps.filter((t) => now - t < 3000); taps.push(now);
       let line;
