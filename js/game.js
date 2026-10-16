@@ -1251,7 +1251,7 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
     const owned = (c) => c.rank <= my || admin; // 관리자는 전부 구경
     let cur = Math.min(my, CARS.length - 1);
     const el = document.createElement('div'); el.id = 'garageView';
-    el.innerHTML = `<div class="ov-top"><button class="mini-x" data-x aria-label="닫기">✕</button><b>🚗 ${esc(S.name)}의 차고</b><button class="ov-hide" data-deco>🎨 꾸미기</button><button class="ov-hide" data-park>🅿️ 주차장</button></div>
+    el.innerHTML = `<div class="ov-top"><button class="mini-x" data-x aria-label="닫기">✕</button><b>🚗 ${esc(S.name)}의 차고</b><button class="ov-hide" data-park>🅿️ 주차장</button></div>
       <div class="gv-stage"><div class="gv-view"></div><div class="gv-load"><div class="spin"></div>차를 꺼내는 중…</div></div>
       <div class="gv-info"></div><div class="gv-list">${CARS.map((c) => `<button class="gv-car" data-car="${c.rank}"><span>${c.icon}</span><small>${RANKS[c.rank].title}</small></button>`).join('')}</div>`;
     const view = el.querySelector('.gv-view'), load = el.querySelector('.gv-load'), info = el.querySelector('.gv-info');
@@ -1275,7 +1275,6 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
     el.querySelectorAll('.gv-car').forEach((b) => b.onclick = () => { Snd.tap(); show(+b.dataset.car); });
     el.querySelector('[data-x]').onclick = () => el.remove();
     el.querySelector('[data-park]').onclick = () => { Snd.tap(); el.remove(); openParking(); };
-    el.querySelector('[data-deco]').onclick = () => { Snd.tap(); carDecoPanel(); };
     document.body.appendChild(el); show(cur);
     const on = el.querySelector('.gv-car.on'); if (on) on.scrollIntoView({ inline: 'center', block: 'nearest' });
   }
@@ -1472,13 +1471,14 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
     checkAch(); save(); syncNow(); renderHud();
     return { msg: lines.join('<br>') };
   }
-  // 출근길 미로 이스터 에그: 막다른 길 하나에 숨은 비밀 금고 (하루 한 번 50,000원)
-  const EGG_CASH = 50000;
+  // 출근길 미로 이스터 에그: 막다른 길 하나에 숨은 비밀 금고 (하루 5번까지 50,000원 — 미로를 다시 할 때마다 다시 찾을 수 있음)
+  const EGG_CASH = 50000, EGG_MAX = 5;
   function mazeEgg() {
     const m = miniState();
-    if (m.egg === today()) return '<b>🔒 빈 금고</b><small>오늘의 비밀 금고는 이미 열었어요. 내일 또 찾아보세요!</small>';
-    m.egg = today(); m.eggs = (m.eggs || 0) + 1; S.money += EGG_CASH; inc('eggs'); Snd.coin(); save();
-    return `<b>💰 비밀 금고 발견!</b><small>막다른 길에 숨겨진 비상금 +${won(EGG_CASH)}</small>`;
+    if (m.egg !== today()) { m.egg = today(); m.eggN = 0; }
+    if ((m.eggN || 0) >= EGG_MAX) return `<b>🔒 빈 금고</b><small>오늘은 ${EGG_MAX}번 모두 열었어요. 내일 또 찾아보세요!</small>`;
+    m.eggN = (m.eggN || 0) + 1; m.eggs = (m.eggs || 0) + 1; S.money += EGG_CASH; inc('eggs'); Snd.coin(); save();
+    return `<b>💰 비밀 금고 발견!</b><small>비상금 +${won(EGG_CASH)} · 오늘 ${m.eggN}/${EGG_MAX}번째</small>`;
   }
   async function playMini(kind) {
     const m = miniState();
@@ -1837,7 +1837,7 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
         ${own ? '<button class="btn mini ghost" data-office>사무실</button>' : `<button class="btn mini ${S.money >= it.price ? '' : 'ghost'}" data-deco="${it.id}">${won(it.price)}</button>`}</div>`; }).join('')}</div>
       <h4 class="sec">🚗 내 차 꾸미기 <small class="muted">회사 주차장에서 보여요</small></h4>
       <div class="shop">${CAR_ITEMS.map((it) => { const own = ((S.car || {}).owned || {})[it.id]; return `<div class="sitem">
-        <div class="si">${it.icon}</div><div class="sn"><b>${it.name}</b><small>${esc(it.desc)}</small>${own ? '<span class="own">✅ 보유 중 · 차고에서 장착/설정</span>' : ''}</div>
+        <div class="si">${it.icon}</div><div class="sn"><b>${it.name}</b><small>${esc(it.desc)}</small>${own ? '<span class="own">✅ 보유 중 · 주차장에서 장착/설정</span>' : ''}</div>
         ${own ? '<button class="btn mini ghost" data-cardeco>설정</button>' : `<button class="btn mini ${S.money >= it.price ? '' : 'ghost'}" data-carbuy="${it.id}">${won(it.price)}</button>`}</div>`; }).join('')}</div>
     </div>`;
     els.screen.querySelectorAll('[data-cardeco]').forEach((b) => b.onclick = () => carDecoPanel());
