@@ -39,6 +39,7 @@
     if (!S) return;
     S.oc = officeOC(); // 동료가 내 사무실을 구경할 때 쓰는 요약
     S.cs = myStage();  // 지금 입은 의상 단계 (동료 화면에서도 같은 의상으로)
+    S.cr = carCR();    // 차 꾸밈 요약 (동료가 주차장에서 봄)
     S.updated = Date.now(); Store.save(S);
     clearTimeout(syncTimer); syncTimer = setTimeout(syncNow, 4000);
   }
@@ -1011,7 +1012,7 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
     // 저장과 동시에 불러왔으니 내 최신 실적은 이 기기 값으로 반영
     const pd = ensurePeriod();
     [[r.week, pd.week === r.week.key ? pd.weekXp : 0], [r.month, pd.month === r.month.key ? pd.monthXp : 0]].forEach(([box, xp]) => {
-      if (!(xp > 0)) return;
+      if (!(xp > 0) || (Api.user || {}).admin) return; // 관리자는 최우수BM에서 제외
       let mine = box.list.find((x) => x.me);
       if (!mine) { mine = { name: S.name, lv: S.lv, me: true, uid: '', xp: 0 }; box.list.push(mine); }
       mine.xp = Math.max(mine.xp, xp); mine.lv = S.lv; mine.name = S.name;
@@ -1248,7 +1249,7 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
     const owned = (c) => c.rank <= my || admin; // 관리자는 전부 구경
     let cur = Math.min(my, CARS.length - 1);
     const el = document.createElement('div'); el.id = 'garageView';
-    el.innerHTML = `<div class="ov-top"><button class="mini-x" data-x aria-label="닫기">✕</button><b>🚗 ${esc(S.name)}의 차고</b><button class="ov-hide" data-park>🅿️ 주차장</button></div>
+    el.innerHTML = `<div class="ov-top"><button class="mini-x" data-x aria-label="닫기">✕</button><b>🚗 ${esc(S.name)}의 차고</b><button class="ov-hide" data-deco>🎨 꾸미기</button><button class="ov-hide" data-park>🅿️ 주차장</button></div>
       <div class="gv-stage"><div class="gv-view"></div><div class="gv-load"><div class="spin"></div>차를 꺼내는 중…</div></div>
       <div class="gv-info"></div><div class="gv-list">${CARS.map((c) => `<button class="gv-car" data-car="${c.rank}"><span>${c.icon}</span><small>${RANKS[c.rank].title}</small></button>`).join('')}</div>`;
     const view = el.querySelector('.gv-view'), load = el.querySelector('.gv-load'), info = el.querySelector('.gv-info');
@@ -1272,15 +1273,19 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
     el.querySelectorAll('.gv-car').forEach((b) => b.onclick = () => { Snd.tap(); show(+b.dataset.car); });
     el.querySelector('[data-x]').onclick = () => el.remove();
     el.querySelector('[data-park]').onclick = () => { Snd.tap(); el.remove(); openParking(); };
+    el.querySelector('[data-deco]').onclick = () => { Snd.tap(); carDecoPanel(); };
     document.body.appendChild(el); show(cur);
     const on = el.querySelector('.gv-car.on'); if (on) on.scrollIntoView({ inline: 'center', block: 'nearest' });
   }
   /* ---------------- 회사 주차장 (모든 BM의 차를 3D로) ---------------- */
   const carOf = (lv) => CARS[Math.min(rankIdx(lv), CARS.length - 1)];
+  const TIME_ORDER = ['auto', 'morning', 'day', 'sunset', 'night'];
+  let parkTime = 'auto';
   async function openParking() {
     if (document.getElementById('parkView')) return;
+    const admin = !!(Api.user || {}).admin;
     const el = document.createElement('div'); el.id = 'parkView';
-    el.innerHTML = `<div class="ov-top"><button class="mini-x" data-x aria-label="닫기">✕</button><b>🅿️ 회사 주차장</b><button class="ov-hide" data-mine>📍 내 차</button></div>
+    el.innerHTML = `<div class="ov-top"><button class="mini-x" data-x aria-label="닫기">✕</button><b>🅿️ 회사 주차장</b><button class="ov-hide pk-time" data-time>⏱</button>${admin ? '' : '<button class="ov-hide" data-mine>📍 내 차</button>'}</div>
       <div class="pk-stage"><div class="gv-load"><div class="spin"></div><span>주차장 문 여는 중…</span></div><div class="pk-hint">↔ 옆으로 밀어서 둘러보세요 · 차를 누르면 3D로 구경</div></div>
       <div class="pk-info">레벨 높은 순서로 주차돼 있어요</div>`;
     document.body.appendChild(el);
@@ -1288,29 +1293,46 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
     const close = () => { closed = true; if (park) park.close(); el.remove(); };
     el.querySelector('[data-x]').onclick = close;
     const stage = el.querySelector('.pk-stage'), load = el.querySelector('.gv-load'), ltxt = load.querySelector('span');
-    let list;
+    let list, rk;
     try {
       await syncNow().catch(() => { });
-      list = (await Api.ranking(periodKeys())).week.list.slice();
+      rk = await Api.ranking(periodKeys());
+      list = rk.week.list.filter((x) => !(admin && x.me)); // 관리자는 주차장에서 제외
     } catch (e) { if (!closed) { toast(e.message); close(); } return; }
     if (closed) return;
     let me = list.find((x) => x.me);
-    if (!me) list.push(me = { name: S.name, me: true, uid: '' });
-    me.lv = S.lv; me.name = S.name;
+    if (!me && !admin) list.push(me = { name: S.name, me: true, uid: '' });
+    if (me) { me.lv = S.lv; me.name = S.name; me.cr = carCR(); }
     list = list.filter((x) => carOf(x.lv || 1).glb).sort((a, c) => (c.lv || 1) - (a.lv || 1) || String(a.name).localeCompare(c.name, 'ko'));
+    // 최우수BM(지난주) · 이번 주 1위 → 스포트라이트
+    const win = rk.lastWeek && rk.lastWeek.winner, lead = rk.week.list.find((x) => x.xp > 0 && !(admin && x.me));
+    const same = (a, b) => a && b && (a.me && b.me || (a.uid && a.uid === b.uid));
+    list.forEach((x) => { x.best = same(x, win) ? '👑 최우수BM' : same(x, lead) ? '🔥 이번 주 1위' : ''; });
     primePeerFaces(list);
-    const label = (x) => `<span class="pk-av">${avatar(x)}</span><b>${esc(x.name)}${x.me ? ' (나)' : ''}</b><small>Lv.${x.lv} ${rankOf(x.lv).title}</small>`;
-    el.querySelector('.pk-info').textContent = `BM ${list.length}명 · 레벨 높은 순서로 주차돼 있어요`;
+    // 아직 아무도 없는 구역은 샘플 자리 하나 (승진하면 여기 주차!)
+    const SAMPLE = { vip: { rank: 6, title: 'VIP 전용석', from: RANKS[5] }, exec: { rank: 4, title: '간부 전용석', from: RANKS[3] } };
+    const zoneOf = (lv) => (rankIdx(lv) >= 5 ? 'vip' : rankIdx(lv) >= 3 ? 'exec' : 'bm');
+    const has = (z) => list.some((x) => zoneOf(x.lv || 1) === z);
+    if (!has('exec')) list.splice(list.findIndex((x) => zoneOf(x.lv || 1) === 'bm') < 0 ? list.length : list.findIndex((x) => zoneOf(x.lv || 1) === 'bm'), 0, { sample: 'exec', lv: SAMPLE.exec.from.lv, name: SAMPLE.exec.title });
+    if (!has('vip')) list.unshift({ sample: 'vip', lv: SAMPLE.vip.from.lv, name: SAMPLE.vip.title });
+    const label = (x) => x.sample
+      ? `<span class="pk-av pk-lock">🔒</span><b>${esc(x.name)}</b><small>${esc(SAMPLE[x.sample].from.title)}부터 주차</small>`
+      : `${x.best ? `<em class="pk-best">${x.best}</em>` : ''}<span class="pk-av">${avatar(x)}</span><b>${esc(x.name)}${x.me ? ' (나)' : ''}</b><small>Lv.${x.lv} ${rankOf(x.lv).title}</small>`;
+    el.querySelector('.pk-info').textContent = `BM ${list.filter((x) => !x.sample).length}명 · 레벨 높은 순서로 주차돼 있어요`;
     try {
-      park = await Parking.open(stage, list.map((x) => ({ rank: rankIdx(x.lv), glb: carOf(x.lv).glb, html: label(x), me: x.me })), {
+      park = await Parking.open(stage, list.map((x) => ({ rank: x.sample ? SAMPLE[x.sample].rank : rankIdx(x.lv), glb: CARS[x.sample ? SAMPLE[x.sample].rank : rankIdx(x.lv)].glb,
+        html: label(x), name: x.name, me: x.me, sample: !!x.sample, best: !!x.best, cr: x.me ? carCR() : (x.look || {}).cr })), {
+        time: parkTime,
         onPick: (i) => { Snd.tap(); openCarView(list[i]); },
         onMove: () => { const h = el.querySelector('.pk-hint'); if (h) h.remove(); },
         onProgress: (k, n) => { ltxt.textContent = `차를 주차하는 중… ${k}/${n}`; if (k >= Math.min(n, 3)) load.classList.add('off'); }
       });
     } catch (e) { if (!closed) { toast('주차장을 불러오지 못했어요. 인터넷 연결을 확인해 주세요'); close(); } return; }
     if (closed) { park.close(); return; }
-    const mi = list.findIndex((x) => x.me);
-    el.querySelector('[data-mine]').onclick = () => { Snd.tap(); park.goTo(mi); };
+    const mi = list.findIndex((x) => x.me), mb = el.querySelector('[data-mine]');
+    if (mb) mb.onclick = () => { Snd.tap(); park.goTo(mi); };
+    const tb = el.querySelector('[data-time]'); tb.textContent = park.timeLabel;
+    tb.onclick = () => { Snd.tap(); parkTime = TIME_ORDER[(TIME_ORDER.indexOf(park.time()) + 1) % TIME_ORDER.length]; tb.textContent = park.setTime(parkTime); };
     // 썸네일 없는 동료는 얼굴 그림을 받아 와서 이름표에 끼운다
     const fl = needFull(list);
     if (fl.length) loadPeerFaces(fl.map(pfid), ['normal']).then(() => {
@@ -1319,11 +1341,15 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
   }
   // 주차장에서 고른 차를 3D로 구경
   function openCarView(x) {
-    const c = carOf(x.lv || 1), r = rankOf(x.lv || 1);
+    const c = x.sample ? CARS[x.sample === 'vip' ? 6 : 4] : carOf(x.lv || 1), r = rankOf(x.lv || 1);
     const el = document.createElement('div'); el.id = 'carView';
-    el.innerHTML = `<div class="ov-top"><button class="mini-x" data-x aria-label="닫기">✕</button><span class="pk-av sm">${avatar(x)}</span><b>${esc(x.name)}${x.me ? ' (나)' : ''}의 차</b></div>
+    el.innerHTML = x.sample
+      ? `<div class="ov-top"><button class="mini-x" data-x aria-label="닫기">✕</button><span class="pk-av sm pk-lock">🔒</span><b>${esc(x.name)} (샘플)</b></div>
       <div class="gv-stage"><div class="gv-view"></div><div class="gv-load"><div class="spin"></div>차 문 여는 중…</div></div>
-      <div class="gv-info"><b>${esc(c.name)}</b><small>Lv.${x.lv} ${esc(r.title)} · ${esc(c.desc)}</small></div>`;
+      <div class="gv-info"><b>${esc(c.name)}</b><small>아직 이 구역에 주차한 BM이 없어요. ${esc(r.title)}(Lv.${r.lv})으로 승진하면 이 자리에 내 차가 주차돼요!</small></div>`
+      : `<div class="ov-top"><button class="mini-x" data-x aria-label="닫기">✕</button><span class="pk-av sm">${avatar(x)}</span><b>${esc(x.name)}${x.me ? ' (나)' : ''}의 차</b></div>
+      <div class="gv-stage"><div class="gv-view"></div><div class="gv-load"><div class="spin"></div>차 문 여는 중…</div></div>
+      <div class="gv-info"><b>${esc(c.name)}</b><small>${x.best ? esc(x.best) + ' · ' : ''}Lv.${x.lv} ${esc(r.title)} · ${esc(c.desc)}${carDecoText(x.me ? carCR() : (x.look || {}).cr)}</small></div>`;
     el.querySelector('[data-x]').onclick = () => el.remove();
     document.body.appendChild(el);
     const view = el.querySelector('.gv-view'), load = el.querySelector('.gv-load');
@@ -1335,6 +1361,50 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
       mv.addEventListener('load', () => load.classList.add('off'), { once: true });
       mv.addEventListener('error', () => { load.classList.add('off'); view.innerHTML = `<div class="gv-none">${c.icon}</div>`; }, { once: true });
     }).catch((e) => { load.classList.add('off'); view.innerHTML = `<div class="gv-none">${c.icon}</div>`; toast(e.message); });
+  }
+  /* ---------------- 차 꾸미기 ---------------- */
+  const carState = () => S.car || (S.car = { owned: {}, shown: {}, plate: '', glow: GLOW_COLORS[0][0] });
+  function carCR() {
+    const c = S && S.car; if (!c) return null;
+    const i = CAR_ITEMS.filter((it) => c.owned[it.id] && c.shown[it.id] !== false).map((it) => it.id);
+    return i.length ? { i, p: c.plate || '', g: c.glow || GLOW_COLORS[0][0] } : null;
+  }
+  const carDecoText = (cr) => { const i = (cr && cr.i) || []; return i.length ? ' · 꾸밈 ' + i.map((id) => (CAR_ITEMS.find((t) => t.id === id) || {}).icon || '').join('') : ''; };
+  const cleanPlate = (t) => String(t || '').replace(/[^0-9A-Za-z가-힣 ]/g, '').replace(/\s+/g, ' ').trim().slice(0, 8);
+  async function buyCarItem(id) {
+    const it = CAR_ITEMS.find((x) => x.id === id), c = carState();
+    if (c.owned[id]) return true;
+    if (S.money < it.price) { toast(`활동비가 ${won(it.price - S.money)} 부족해요`); return false; }
+    if (!(await confirmBox(`${it.icon} ${it.name}을(를) ${won(it.price)}에 살까요?\n회사 주차장의 내 차에 바로 달려요.`, '구매'))) return false;
+    S.money -= it.price; c.owned[id] = Date.now(); c.shown[id] = true; inc('purchases');
+    if (id === 'plate' && !c.plate) c.plate = '방카 ' + String(1000 + Math.floor(Math.random() * 9000));
+    Snd.coin(); toast(`${it.icon} ${it.name} 구매! 주차장에서 확인해 보세요`); checkAch(); save(); renderHud();
+    return true;
+  }
+  function carDecoPanel() {
+    const c = carState();
+    const m = modal(`<h2 style="font-size:22px">🎨 내 차 꾸미기</h2><p class="muted" style="text-align:center">꾸민 모습은 🅿️ 회사 주차장에서 동료들도 볼 수 있어요.</p>
+      <div class="decolist">${CAR_ITEMS.map((it) => {
+        const own = c.owned[it.id], on = own && c.shown[it.id] !== false;
+        return `<div class="decorow ${own ? '' : 'locked'}"><span class="di">${it.icon}</span><span class="dn"><b>${it.name}</b><small>${esc(it.desc)}</small>
+          ${own && it.id === 'plate' ? `<span class="cdplate"><input id="cdPlate" maxlength="8" value="${esc(c.plate || '')}" placeholder="예: 방카왕 1004"><button class="btn mini" data-plate>저장</button></span>` : ''}
+          ${own && it.id === 'glow' ? `<span class="cdglow">${GLOW_COLORS.map(([v, n]) => `<button class="${c.glow === v ? 'on' : ''}" data-glow="${v}" style="--g:${v}" aria-label="${n}"></button>`).join('')}</span>` : ''}</span>
+          ${own ? `<button class="btn mini ${on ? '' : 'ghost'}" data-tg="${it.id}">${on ? '장착 중' : '빼 둠'}</button>` : `<button class="btn mini ${S.money >= it.price ? '' : 'ghost'}" data-cbuy="${it.id}">${won(it.price)}</button>`}</div>`;
+      }).join('')}</div><button class="btn full" data-close style="margin-top:10px">완료</button>`);
+    m.el.querySelectorAll('[data-tg]').forEach((b) => b.onclick = () => {
+      const id = b.dataset.tg, on = c.shown[id] !== false;
+      c.shown[id] = !on; b.textContent = on ? '빼 둠' : '장착 중'; b.classList.toggle('ghost', on); Snd.tap(); save();
+    });
+    m.el.querySelectorAll('[data-cbuy]').forEach((b) => b.onclick = async () => { m.close(); if (await buyCarItem(b.dataset.cbuy)) carDecoPanel(); else carDecoPanel(); });
+    const pb = m.el.querySelector('[data-plate]');
+    if (pb) pb.onclick = () => {
+      const t = cleanPlate(m.el.querySelector('#cdPlate').value);
+      if (!t) return toast('번호판 문구를 한 글자 이상 적어 주세요 (한글·영문·숫자)');
+      c.plate = t; m.el.querySelector('#cdPlate').value = t; Snd.coin(); save(); toast(`🔢 번호판을 "${t}"(으)로 바꿨어요`);
+    };
+    m.el.querySelectorAll('[data-glow]').forEach((b) => b.onclick = () => {
+      c.glow = b.dataset.glow; m.el.querySelectorAll('[data-glow]').forEach((x) => x.classList.toggle('on', x === b)); Snd.tap(); save();
+    });
   }
   function showCase(c) {
     modal(`<h2 style="font-size:22px">🏆 진열장</h2>
@@ -1736,7 +1806,13 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
       <div class="shop">${OFFICE_ITEMS.map((it) => { const own = ((S.office || {}).owned || {})[it.id]; return `<div class="sitem">
         <div class="si">${it.icon}</div><div class="sn"><b>${it.name}</b><small>${esc(it.desc)}</small>${own ? '<span class="own">✅ 보유 중 · 사무실에서 비치/보관</span>' : ''}</div>
         ${own ? '<button class="btn mini ghost" data-office>사무실</button>' : `<button class="btn mini ${S.money >= it.price ? '' : 'ghost'}" data-deco="${it.id}">${won(it.price)}</button>`}</div>`; }).join('')}</div>
+      <h4 class="sec">🚗 내 차 꾸미기 <small class="muted">회사 주차장에서 보여요</small></h4>
+      <div class="shop">${CAR_ITEMS.map((it) => { const own = ((S.car || {}).owned || {})[it.id]; return `<div class="sitem">
+        <div class="si">${it.icon}</div><div class="sn"><b>${it.name}</b><small>${esc(it.desc)}</small>${own ? '<span class="own">✅ 보유 중 · 차고에서 장착/설정</span>' : ''}</div>
+        ${own ? '<button class="btn mini ghost" data-cardeco>설정</button>' : `<button class="btn mini ${S.money >= it.price ? '' : 'ghost'}" data-carbuy="${it.id}">${won(it.price)}</button>`}</div>`; }).join('')}</div>
     </div>`;
+    els.screen.querySelectorAll('[data-cardeco]').forEach((b) => b.onclick = () => carDecoPanel());
+    els.screen.querySelectorAll('[data-carbuy]').forEach((b) => b.onclick = async () => { if (await buyCarItem(b.dataset.carbuy)) { pageShop(); if (b.dataset.carbuy === 'plate' || b.dataset.carbuy === 'glow') carDecoPanel(); } });
     $('#sendMoney').onclick = () => sendMoneyModal();
     els.screen.querySelectorAll('[data-office]').forEach((b) => b.onclick = () => openOffice());
     els.screen.querySelectorAll('[data-deco]').forEach((b) => b.onclick = async () => {

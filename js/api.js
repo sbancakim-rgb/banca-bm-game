@@ -210,7 +210,7 @@ const Demo = (() => {
         { title: '[데모] 서버를 연결하면 구글 뉴스의 최신 경제 기사가 여기에 나와요', link: 'https://news.google.com/search?q=%EA%B8%B0%EC%A4%80%EA%B8%88%EB%A6%AC&hl=ko', source: '데모', date: new Date().toString(), topic: '기준금리' },
         { title: '[데모] 보험·방카슈랑스 뉴스', link: 'https://news.google.com/search?q=%EB%B0%A9%EC%B9%B4%EC%8A%88%EB%9E%91%EC%8A%A4&hl=ko', source: '데모', date: new Date().toString(), topic: '보험' }] });
       case 'ranking': {
-        const rows = Object.entries(d.progress).map(([e, raw]) => { try { const p = JSON.parse(raw); return { email: e, name: p.name, lv: p.lv, look: demoLook(p), ...(p.period || {}) }; } catch (er) { return null; } }).filter(Boolean);
+        const rows = Object.entries(d.progress).map(([e, raw]) => { try { const p = JSON.parse(raw); return { email: e, name: p.name, lv: p.lv, look: demoLook(p), ...(p.period || {}) }; } catch (er) { return null; } }).filter((r) => r && !(d.users[r.email] || {}).admin); // 관리자 제외
         const r = rankingFrom(rows, b, email); ['week', 'month'].forEach((k) => r[k].list.forEach((x) => x.uid = 'u:' + x.email)); r.cheer = demoCheer(d, email); return ok(r);
       }
       case 'changePassword':
@@ -280,6 +280,6 @@ function rankingFrom(rows, k, myEmail) {
 /* 캐릭터 겉모습만 (데모 — 서버는 Code.gs lookOf_) */
 function demoLook(p) {
   if (!p || !p.name) return null;
-  const o = {}; ['gender', 'hairStyle', 'hairColor', 'skin', 'face', 'age', 'glasses', 'glassesColor', 'illust', 'oc', 'cs'].forEach((k) => { if (p[k] != null) o[k] = p[k]; });
+  const o = {}; ['gender', 'hairStyle', 'hairColor', 'skin', 'face', 'age', 'glasses', 'glassesColor', 'illust', 'oc', 'cs', 'cr'].forEach((k) => { if (p[k] != null) o[k] = p[k]; });
   return o;
 }

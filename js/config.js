@@ -328,6 +328,15 @@ const CARS = [
   { rank: 5, name: '부사장 프레스티지', icon: '🚘', desc: '부사장 전용 최고급 플래그십', glb: 'img/cars/rank5_v1.glb' },
   { rank: 6, name: 'CEO 리무진', icon: '🚘', desc: '사장님만 탈 수 있는 초호화 리무진', glb: 'img/cars/rank6_v1.glb' }
 ];
+/* 차 꾸미기 (매점에서 구매 → 회사 주차장의 내 차에 보임) */
+const CAR_ITEMS = [
+  { id: 'plate', icon: '🔢', name: '나만의 번호판', price: 3000, desc: '앞 번호판 문구를 직접 정해요 (8자까지)' },
+  { id: 'flag', icon: '🚩', name: '회사 깃발', price: 1500, desc: '안테나에 달린 BANCA 깃발' },
+  { id: 'ribbon', icon: '🎀', name: '축하 리본', price: 2000, desc: '지붕 위 커다란 빨간 리본' },
+  { id: 'roofbox', icon: '🧳', name: '루프박스', price: 2500, desc: '주말 캠핑 준비 완료!' },
+  { id: 'glow', icon: '✨', name: '네온 언더글로우', price: 5000, desc: '차 아래 네온 불빛 · 밤에 더 빛나요' }
+];
+const GLOW_COLORS = [['#ff4fa3', '핑크'], ['#3fa9ff', '블루'], ['#3ee08f', '그린'], ['#ffc93c', '골드'], ['#b26bff', '퍼플']];
 /* 사무실 꾸밈 물품 (매점에서 구매 → 사무실에 비치 · 보관 선택) */
 const OFFICE_ITEMS = [
   { id: 'cactus', icon: '🌵', name: '미니 선인장', price: 500, desc: '책상 위의 작은 친구' },
