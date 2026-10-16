@@ -1287,9 +1287,10 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
     if (document.getElementById('parkView')) return;
     const admin = !!(Api.user || {}).admin;
     const el = document.createElement('div'); el.id = 'parkView';
-    el.innerHTML = `<div class="ov-top"><button class="mini-x" data-x aria-label="닫기">✕</button><b>🅿️ 회사 주차장</b><button class="ov-hide pk-time" data-time>⏱</button>${admin ? '' : '<button class="ov-hide" data-mine>📍 내 차</button>'}</div>
+    el.innerHTML = `<div class="ov-top"><button class="mini-x" data-x aria-label="닫기">✕</button><b>🅿️ 회사 주차장</b></div>
       <div class="pk-stage"><div class="gv-load"><div class="spin"></div><span>주차장 문 여는 중…</span></div><div class="pk-hint">↔ 옆으로 밀어서 둘러보세요 · 차를 누르면 3D로 구경</div></div>
-      <div class="pk-info">레벨 높은 순서로 주차돼 있어요</div>`;
+      <div class="pk-info">레벨 높은 순서로 주차돼 있어요</div>
+      <div class="ov-bar pk-bar"><button class="btn ghost" data-time>⏱</button>${admin ? '' : '<button class="btn ghost" data-mine>📍 내 차</button><button class="btn" data-deco>🎨 꾸미기</button>'}</div>`;
     document.body.appendChild(el);
     let park = null, closed = false;
     const close = () => { closed = true; if (park) park.close(); el.remove(); };
@@ -1321,20 +1322,35 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
       ? `<span class="pk-av pk-lock">🔒</span><b>${esc(x.name)}</b><small>${esc(SAMPLE[x.sample].from.title)}부터 주차</small>`
       : `${x.best ? `<em class="pk-best">${x.best}</em>` : ''}<span class="pk-av">${avatar(x)}</span><b>${esc(x.name)}${x.me ? ' (나)' : ''}</b><small>Lv.${x.lv} ${rankOf(x.lv).title}</small>`;
     el.querySelector('.pk-info').textContent = `BM ${list.filter((x) => !x.sample).length}명 · 레벨 높은 순서로 주차돼 있어요`;
-    try {
-      park = await Parking.open(stage, list.map((x) => ({ rank: x.sample ? SAMPLE[x.sample].rank : rankIdx(x.lv), glb: x.sample ? null : CARS[rankIdx(x.lv)].glb,
-        html: label(x), name: x.name, me: x.me, sample: !!x.sample, best: !!x.best, cr: x.me ? carCR() : (x.look || {}).cr })), {
-        time: parkTime,
-        onPick: (i) => { Snd.tap(); openCarView(list[i]); },
-        onMove: () => { const h = el.querySelector('.pk-hint'); if (h) h.remove(); },
-        onProgress: (k, n) => { ltxt.textContent = `차를 주차하는 중… ${k}/${n}`; if (k >= Math.min(n, 3)) load.classList.add('off'); }
-      });
-    } catch (e) { if (!closed) { toast('주차장을 불러오지 못했어요. 인터넷 연결을 확인해 주세요'); close(); } return; }
-    if (closed) { park.close(); return; }
-    const mi = list.findIndex((x) => x.me), mb = el.querySelector('[data-mine]');
+    const mi = list.findIndex((x) => x.me), tb = el.querySelector('[data-time]');
+    // 주차장 짓기 (꾸미기를 바꾸면 내 차 앞에서 다시 지음 — 차 모델은 받아 둔 것을 씀)
+    const build = async (at) => {
+      if (park) { park.close(); park = null; }
+      load.classList.remove('off');
+      try {
+        park = await Parking.open(stage, list.map((x) => ({ rank: x.sample ? SAMPLE[x.sample].rank : rankIdx(x.lv), glb: x.sample ? null : CARS[rankIdx(x.lv)].glb,
+          html: label(x), name: x.name, me: x.me, sample: !!x.sample, best: !!x.best, cr: x.me ? carCR() : (x.look || {}).cr })), {
+          time: parkTime,
+          onPick: (i) => { Snd.tap(); openCarView(list[i]); },
+          onMove: () => { const h = el.querySelector('.pk-hint'); if (h) h.remove(); },
+          onProgress: (k, n) => { ltxt.textContent = `차를 주차하는 중… ${k}/${n}`; if (k >= Math.min(n, 3)) load.classList.add('off'); }
+        });
+      } catch (e) { if (!closed) { toast('주차장을 불러오지 못했어요. 인터넷 연결을 확인해 주세요'); close(); } return false; }
+      if (closed) { park.close(); return false; }
+      if (at != null && at >= 0) park.goTo(at);
+      tb.textContent = park.timeLabel;
+      return true;
+    };
+    if (!(await build())) return;
+    const mb = el.querySelector('[data-mine]');
     if (mb) mb.onclick = () => { Snd.tap(); park.goTo(mi); };
-    const tb = el.querySelector('[data-time]'); tb.textContent = park.timeLabel;
     tb.onclick = () => { Snd.tap(); parkTime = TIME_ORDER[(TIME_ORDER.indexOf(park.time()) + 1) % TIME_ORDER.length]; tb.textContent = park.setTime(parkTime); };
+    const db = el.querySelector('[data-deco]');
+    if (db) db.onclick = () => { // 꾸미고 닫으면 내 차 앞에서 바로 확인
+      Snd.tap(); park.goTo(mi);
+      const before = JSON.stringify(carCR());
+      carDecoPanel(() => { if (!closed && JSON.stringify(carCR()) !== before) build(mi); });
+    };
     // 썸네일 없는 동료는 얼굴 그림을 받아 와서 이름표에 끼운다
     const fl = needFull(list);
     if (fl.length) loadPeerFaces(fl.map(pfid), ['normal']).then(() => {
@@ -1385,7 +1401,7 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
     Snd.coin(); toast(`${it.icon} ${it.name} 구매! 주차장에서 확인해 보세요`); checkAch(); save(); renderHud();
     return true;
   }
-  function carDecoPanel() {
+  function carDecoPanel(onDone) {
     const c = carState();
     const m = modal(`<h2 style="font-size:22px">🎨 내 차 꾸미기</h2><p class="muted" style="text-align:center">꾸민 모습은 🅿️ 회사 주차장에서 동료들도 볼 수 있어요.</p>
       <div class="decolist">${CAR_ITEMS.map((it) => {
@@ -1394,12 +1410,13 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
           ${own && it.id === 'plate' ? `<span class="cdplate"><input id="cdPlate" maxlength="8" value="${esc(c.plate || '')}" placeholder="예: 방카왕 1004"><button class="btn mini" data-plate>저장</button></span>` : ''}
           ${own && it.id === 'glow' ? `<span class="cdglow">${GLOW_COLORS.map(([v, n]) => `<button class="${c.glow === v ? 'on' : ''}" data-glow="${v}" style="--g:${v}" aria-label="${n}"></button>`).join('')}</span>` : ''}</span>
           ${own ? `<button class="btn mini ${on ? '' : 'ghost'}" data-tg="${it.id}">${on ? '장착 중' : '빼 둠'}</button>` : `<button class="btn mini ${S.money >= it.price ? '' : 'ghost'}" data-cbuy="${it.id}">${won(it.price)}</button>`}</div>`;
-      }).join('')}</div><button class="btn full" data-close style="margin-top:10px">완료</button>`);
+      }).join('')}</div><button class="btn full" data-close style="margin-top:10px">완료</button>`, () => { if (!reopening && onDone) onDone(); });
+    let reopening = false;
     m.el.querySelectorAll('[data-tg]').forEach((b) => b.onclick = () => {
       const id = b.dataset.tg, on = c.shown[id] !== false;
       c.shown[id] = !on; b.textContent = on ? '빼 둠' : '장착 중'; b.classList.toggle('ghost', on); Snd.tap(); save();
     });
-    m.el.querySelectorAll('[data-cbuy]').forEach((b) => b.onclick = async () => { m.close(); if (await buyCarItem(b.dataset.cbuy)) carDecoPanel(); else carDecoPanel(); });
+    m.el.querySelectorAll('[data-cbuy]').forEach((b) => b.onclick = async () => { reopening = true; m.close(); await buyCarItem(b.dataset.cbuy); carDecoPanel(onDone); });
     const pb = m.el.querySelector('[data-plate]');
     if (pb) pb.onclick = () => {
       const t = cleanPlate(m.el.querySelector('#cdPlate').value);

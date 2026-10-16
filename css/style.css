@@ -658,3 +658,6 @@ img.sprite.bust.illust { width: 135%; left: -17%; top: -3%; }
   background: linear-gradient(135deg, #fff3c4, #ffd66b); color: #4a2a00; box-shadow: 0 10px 30px rgba(0,0,0,.4), 0 0 30px rgba(255,214,107,.8); pointer-events: none; white-space: nowrap; animation: eggpop 2.6s ease both; }
 .mini-egg b { font-family: 'Jua', sans-serif; font-weight: 400; font-size: 22px; } .mini-egg small { font-size: 12.5px; font-weight: 700; }
 @keyframes eggpop { 0% { opacity: 0; transform: translate(-50%, 20px) scale(.6); } 12% { opacity: 1; transform: translate(-50%, 0) scale(1.08); } 20%, 82% { transform: translate(-50%, 0) scale(1); opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -16px); } }
+
+.pk-bar { margin-top: 6px; } .pk-bar .btn { padding-left: 6px; padding-right: 6px; font-size: 14px; }
+#parkView .pk-bar .btn.ghost { background: rgba(255,255,255,.12); color: #fff; border-color: rgba(255,255,255,.25); }
