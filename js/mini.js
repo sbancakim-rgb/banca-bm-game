@@ -2,6 +2,7 @@
    미니게임 — BM 드라이빙
    · maze : 출근길 미로 (위에서 본 지도, 날마다 같은 미로 → 시간 대결)
    · run  : 고속도로 질주 (1인칭, 3차선 장애물 피하기 → 버틴 시간 대결)
+   · park : 주차왕 (위에서 본 주차장, 빠르게 + 사고 없이 → 날마다 같은 주차장 · 시간 대결)
    Mini.play(kind, { seed, best, onResult(res) → {msg} }) → 나가면 resolve
    ========================================================= */
 const Mini = (() => {
@@ -24,6 +25,7 @@ const Mini = (() => {
     el.innerHTML = `<div class="mini-top"><button class="mini-x" aria-label="나가기">✕</button><b>${title}</b><span class="mini-time">0.00초</span></div>
       <div class="mini-stage"><canvas></canvas><div class="mini-msg"></div></div>
       <div class="mini-pad ${pad}">${pad === 'four' ? '<button data-d="up">▲</button><button data-d="left">◀</button><button data-d="down">▼</button><button data-d="right">▶</button>'
+        : pad === 'park' ? '<button data-k="left">◀</button><button data-k="right">▶</button><i></i><button data-k="rev">후진</button><button data-k="gas">전진</button>'
         : '<button data-d="left">◀ 왼쪽</button><button data-d="right">오른쪽 ▶</button>'}</div>`;
     document.body.appendChild(el);
     const cv = el.querySelector('canvas'), ctx = cv.getContext('2d');
@@ -293,5 +295,138 @@ const Mini = (() => {
     });
   }
 
-  return { play: (kind, opts = {}) => (kind === 'maze' ? maze(opts) : run(opts)), fmt };
+
+  /* ---------- 3. 주차왕 (위에서 본 주차장 · 빠르게 + 사고 없이) ---------- */
+  function park(opts) {
+    return new Promise((done) => {
+      const WW = 12, WH = 17.4, LIMIT = 90000, MAXB = 3, PEN = 5000; // 세계 크기(m) · 제한 시간 · 사고 한도 · 사고 1번 = +5초
+      const CL = 4.3, CW = 1.8, WB = 2.6, MAXS = 0.62;                 // 차 길이 · 폭 · 축간거리 · 최대 조향
+      const rand = rng((opts.seed || Date.now()) + '|park');
+      // 주차칸: 위 줄(머리를 위로) · 아래 줄 — 칸 4개씩, 폭 2.8m
+      const SW = 2.8, X0 = (WW - SW * 4) / 2, TOP = [0.5, 5.6], BOT = [11.8, 16.9];
+      const spots = [];
+      for (const [y0, y1] of [TOP, BOT]) for (let i = 0; i < 4; i++) spots.push({ x0: X0 + i * SW, x1: X0 + (i + 1) * SW, y0, y1 });
+      const target = spots[1 + Math.floor(rand() * 7)]; // 첫 칸(입구 바로 앞)은 빼고
+      const COLORS = ['#4f7cff', '#2fb67c', '#ffd166', '#c77dff', '#f2f2f2', '#333a48', '#ff9f43', '#7fd1e8'];
+      const obst = []; // 축 정렬 사각형 {x0,y0,x1,y1,kind,color}
+      spots.forEach((s) => {
+        if (s === target) return;
+        if (rand() < 0.82) { const cx = (s.x0 + s.x1) / 2, cy = (s.y0 + s.y1) / 2, jx = (rand() - 0.5) * 0.35;
+          obst.push({ x0: cx - CW / 2 + jx, x1: cx + CW / 2 + jx, y0: cy - CL / 2, y1: cy + CL / 2, kind: 'car', color: COLORS[Math.floor(rand() * COLORS.length)], top: s.y0 < 8 }); }
+      });
+      [[X0 - 0.45, 5.15], [WW - X0 + 0.05, 5.15], [X0 - 0.45, 11.85], [WW - X0 + 0.05, 11.85]].forEach(([x, y]) => obst.push({ x0: x, x1: x + 0.4, y0: y, y1: y + 0.4, kind: 'pillar' }));
+      const walls = [{ x0: -1, x1: WW + 1, y0: -1, y1: 0.15 }, { x0: -1, x1: WW + 1, y0: WH - 0.15, y1: WH + 1 }, { x0: -1, x1: 0.15, y0: -1, y1: WH + 1 }, { x0: WW - 0.15, x1: WW + 1, y0: -1, y1: WH + 1 }];
+      const sh = shell('🅿️ 주차왕', 'park');
+      let size = sh.fit(WH / WW), k = size.w / WW;
+      const onResize = () => { size = sh.fit(WH / WW); k = size.w / WW; };
+      addEventListener('resize', onResize);
+      let car, keys, t0, raf, running = false, last = 0, bumps = 0, hitAt = 0, still = 0;
+      const reset = () => { car = { x: 2.7, y: 8.7, th: 0, v: 0, st: 0 }; keys = {}; bumps = 0; hitAt = 0; still = 0; };
+      // 누르고 있는 동안 (버튼 · 방향키)
+      const KM = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'gas', ArrowDown: 'rev', a: 'left', d: 'right', w: 'gas', s: 'rev' };
+      const kd = (e) => { const m = KM[e.key]; if (m) { e.preventDefault(); keys[m] = 1; } }, ku = (e) => { const m = KM[e.key]; if (m) keys[m] = 0; };
+      addEventListener('keydown', kd); addEventListener('keyup', ku);
+      sh.el.querySelectorAll('.mini-pad [data-k]').forEach((b) => {
+        const on = (e) => { e.preventDefault(); keys[b.dataset.k] = 1; b.classList.add('on'); }, off = () => { keys[b.dataset.k] = 0; b.classList.remove('on'); };
+        b.addEventListener('pointerdown', on); b.addEventListener('pointerup', off); b.addEventListener('pointercancel', off); b.addEventListener('pointerleave', off);
+      });
+      const corners = (c) => { const ca = Math.cos(c.th), sa = Math.sin(c.th), hl = CL / 2, hw = CW / 2;
+        return [[hl, hw], [hl, -hw], [-hl, -hw], [-hl, hw]].map(([a, b]) => [c.x + a * ca - b * sa, c.y + a * sa + b * ca]); };
+      // 기울어진 차(사각형)와 축 정렬 사각형이 겹치는지 (분리축 검사)
+      function hits(c, r) {
+        const P = corners(c), Q = [[r.x0, r.y0], [r.x1, r.y0], [r.x1, r.y1], [r.x0, r.y1]];
+        const axes = [[1, 0], [0, 1], [Math.cos(c.th), Math.sin(c.th)], [-Math.sin(c.th), Math.cos(c.th)]];
+        return axes.every(([ax, ay]) => {
+          const pp = P.map(([x, y]) => x * ax + y * ay), qq = Q.map(([x, y]) => x * ax + y * ay);
+          return Math.max(...pp) > Math.min(...qq) && Math.max(...qq) > Math.min(...pp);
+        });
+      }
+      function step(dt, now) {
+        const want = (keys.left ? -1 : 0) + (keys.right ? 1 : 0);
+        car.st += Math.max(-dt * 2.6, Math.min(dt * 2.6, want * MAXS - car.st));
+        if (keys.gas && !keys.rev) car.v = car.v < 0 ? Math.min(0, car.v + 7 * dt) : Math.min(4.2, car.v + 2.6 * dt);
+        else if (keys.rev && !keys.gas) car.v = car.v > 0 ? Math.max(0, car.v - 7 * dt) : Math.max(-2.4, car.v - 2.2 * dt);
+        else car.v = Math.sign(car.v) * Math.max(0, Math.abs(car.v) - 3.5 * dt);
+        const prev = { ...car };
+        car.th += car.v / WB * Math.tan(car.st) * dt;
+        car.x += car.v * Math.cos(car.th) * dt; car.y += car.v * Math.sin(car.th) * dt;
+        if ([...obst, ...walls].some((r) => hits(car, r))) { // 쿵! — 제자리로 되돌리고 멈춤
+          Object.assign(car, prev); car.v = 0;
+          if (now - hitAt > 700) { hitAt = now; bumps++; sh.el.querySelector('.mini-stage').classList.remove('bump'); void sh.el.offsetWidth; sh.el.querySelector('.mini-stage').classList.add('bump'); opts.onBump && opts.onBump(); }
+        }
+        // 칸 안에 반듯하게 · 멈춰서 0.6초 → 주차 성공
+        const inside = corners(car).every(([x, y]) => x > target.x0 - 0.12 && x < target.x1 + 0.12 && y > target.y0 - 0.12 && y < target.y1 + 0.12);
+        const straight = Math.abs(Math.cos(car.th)) < Math.sin(12 * Math.PI / 180);
+        still = inside && straight && Math.abs(car.v) < 0.15 ? still + dt : 0;
+        return still > 0.6;
+      }
+      function rr(c, x, y, w, h, r) { c.beginPath(); c.roundRect(x, y, w, h, r); c.fill(); }
+      function drawCar(c, x, y, th, w, l, col, me) {
+        c.save(); c.translate(x * k, y * k); c.rotate(th + Math.PI / 2);
+        const bw = w * k, bh = l * k;
+        c.fillStyle = 'rgba(0,0,0,.25)'; rr(c, -bw / 2 + 2, -bh / 2 + 3, bw, bh, bw * 0.28);
+        c.fillStyle = col; rr(c, -bw / 2, -bh / 2, bw, bh, bw * 0.28);
+        c.fillStyle = me ? '#cfe8ff' : 'rgba(200,225,255,.85)'; c.fillRect(-bw * 0.36, -bh * 0.27, bw * 0.72, bh * 0.17); c.fillRect(-bw * 0.36, bh * 0.2, bw * 0.72, bh * 0.12);
+        if (me) { c.fillStyle = '#fff59a'; c.fillRect(-bw * 0.42, -bh / 2, bw * 0.2, bh * 0.05); c.fillRect(bw * 0.22, -bh / 2, bw * 0.2, bh * 0.05);
+          c.fillStyle = '#ff3b3b'; c.fillRect(-bw * 0.42, bh / 2 - bh * 0.04, bw * 0.2, bh * 0.04); c.fillRect(bw * 0.22, bh / 2 - bh * 0.04, bw * 0.2, bh * 0.04); }
+        c.restore();
+      }
+      function draw(now = performance.now()) {
+        const c = sh.ctx, w = size.w, h = size.h;
+        c.fillStyle = '#4e5462'; c.fillRect(0, 0, w, h);
+        c.fillStyle = '#9aa0ad'; c.fillRect(0, 0, w, 0.15 * k); c.fillRect(0, h - 0.15 * k, w, 0.15 * k); c.fillRect(0, 0, 0.15 * k, h); c.fillRect(w - 0.15 * k, 0, 0.15 * k, h);
+        // 목표 칸
+        const pulse = 0.35 + 0.25 * Math.sin(now / 220);
+        c.fillStyle = `rgba(255,214,107,${pulse})`; c.fillRect(target.x0 * k, target.y0 * k, SW * k, (target.y1 - target.y0) * k);
+        c.strokeStyle = '#ffd66b'; c.lineWidth = 3; c.strokeRect(target.x0 * k + 1.5, target.y0 * k + 1.5, SW * k - 3, (target.y1 - target.y0) * k - 3);
+        c.fillStyle = 'rgba(255,255,255,.9)'; c.font = `bold ${k * 1.3}px sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle';
+        c.fillText('P', (target.x0 + SW / 2) * k, (target.y0 + target.y1) / 2 * k);
+        // 주차선
+        c.strokeStyle = 'rgba(255,255,255,.85)'; c.lineWidth = Math.max(1.5, k * 0.08);
+        for (const [y0, y1] of [TOP, BOT]) { c.beginPath(); for (let i = 0; i <= 4; i++) { c.moveTo((X0 + i * SW) * k, y0 * k); c.lineTo((X0 + i * SW) * k, y1 * k); } c.moveTo(X0 * k, (y0 < 8 ? y0 : y1) * k); c.lineTo((X0 + 4 * SW) * k, (y0 < 8 ? y0 : y1) * k); c.stroke(); }
+        // 통로 화살표
+        c.fillStyle = 'rgba(255,255,255,.25)'; c.font = `bold ${k * 0.9}px sans-serif`; c.fillText('→   →   →', WW / 2 * k, 8.7 * k);
+        obst.forEach((o) => {
+          if (o.kind === 'pillar') { c.fillStyle = '#b8bcc6'; c.fillRect(o.x0 * k, o.y0 * k, (o.x1 - o.x0) * k, (o.y1 - o.y0) * k); c.fillStyle = '#ffd23f'; c.fillRect(o.x0 * k, o.y0 * k, (o.x1 - o.x0) * k, (o.y1 - o.y0) * k * 0.3); }
+          else drawCar(c, (o.x0 + o.x1) / 2, (o.y0 + o.y1) / 2, o.top ? -Math.PI / 2 : Math.PI / 2, CW, CL, o.color, false);
+        });
+        drawCar(c, car.x, car.y, car.th, CW, CL, '#ff6f91', true);
+        if (still > 0) { c.fillStyle = '#fff'; c.font = `bold ${k * 0.8}px sans-serif`; c.fillText('주차 중…', car.x * k, (car.y - 2.8) * k); }
+      }
+      function loop(ts) {
+        const dt = Math.min(0.05, (ts - last) / 1000 || 0); last = ts;
+        const now = performance.now(), el = now - t0, left = LIMIT - el;
+        sh.time(`⏱ ${(el / 1000).toFixed(1)}초 · 💥 ${bumps}/${MAXB}`);
+        const ok = step(dt, now);
+        draw(now);
+        if (ok) return finish({ ok: true, ms: Math.round(el) + bumps * PEN, raw: Math.round(el), bumps });
+        if (bumps >= MAXB) return finish({ ok: false, why: 'crash', ms: 0, bumps });
+        if (left <= 0) return finish({ ok: false, why: 'time', ms: 0, bumps });
+        raf = requestAnimationFrame(loop);
+      }
+      function finish(res) {
+        running = false; cancelAnimationFrame(raf); keys = {};
+        const out = (opts.onResult && opts.onResult(res)) || {};
+        sh.msg(`<div class="mini-end"><h3>${res.ok ? (res.bumps ? '🅿️ 주차 완료!' : '🏆 무사고 완벽 주차!') : res.why === 'crash' ? '🚨 사고 3번…' : '⏰ 시간 초과'}</h3>
+          <p>${res.ok ? `기록 <b>${fmt(res.ms)}</b>${res.bumps ? ` <span class="muted">(주행 ${fmt(res.raw)} + 사고 ${res.bumps}번 × 5초)</span>` : ''}` : res.why === 'crash' ? '보험 처리 들어갑니다… 다시 천천히 해 봐요!' : '고객님 상담 시간에 늦었어요…'}</p>
+          ${out.msg ? `<p class="muted">${out.msg}</p>` : ''}
+          <div class="row"><button class="btn ghost full" data-q>나가기</button><button class="btn full" data-r>다시 하기</button></div></div>`);
+        sh.el.querySelector('[data-r]').onclick = start;
+        sh.el.querySelector('[data-q]').onclick = quit;
+      }
+      async function start() {
+        reset(); draw(); await countdown(sh);
+        t0 = performance.now(); last = 0; running = true; raf = requestAnimationFrame(loop);
+      }
+      function quit() { running = false; cancelAnimationFrame(raf); removeEventListener('keydown', kd); removeEventListener('keyup', ku); removeEventListener('resize', onResize); sh.el.remove(); done(); }
+      sh.el.querySelector('.mini-x').onclick = quit;
+      reset(); draw();
+      sh.msg(`<div class="mini-end"><h3>🅿️ 주차왕</h3><p>반짝이는 <b>P 칸</b>에 <b>빠르고 · 사고 없이</b> 주차하세요!</p>
+        <p class="muted">◀ ▶ 핸들 · 전진 / 후진 버튼을 누르고 있는 동안 움직여요 (방향키도 돼요).<br>칸 안에 반듯하게 들어가 멈추면 성공! 부딪히면 +5초, 3번 부딪히면 실패예요.<br>오늘의 주차장은 모두 같아요 — 시간 대결!</p>
+        ${opts.best ? `<p>내 오늘 최고 <b>${fmt(opts.best)}</b></p>` : ''}<button class="btn full" data-s>시작!</button></div>`);
+      sh.el.querySelector('[data-s]').onclick = start;
+    });
+  }
+
+  return { play: (kind, opts = {}) => (kind === 'maze' ? maze(opts) : kind === 'park' ? park(opts) : run(opts)), fmt };
 })();

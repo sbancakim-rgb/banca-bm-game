@@ -362,7 +362,7 @@ const OFFICE_ITEMS = [
   { id: 'crystal', icon: '💎', name: '크리스탈 장식', price: 30000, desc: '사장실에 어울리는 최고급 장식' }
 ];
 /* 미니게임 보상 (하루 한 번씩) — 미로: 제한 시간 안에 도착 / 질주: 30초 이상 버티기 */
-const MINI_REWARD = { maze: { cash: 100, xp: 5 }, run: { cash: 100, xp: 5, need: 30000 } };
+const MINI_REWARD = { maze: { cash: 100, xp: 5 }, run: { cash: 100, xp: 5, need: 30000 }, park: { cash: 100, xp: 5 } };
 /* 방카 상품 출제 비중: 주력 플래티넘행복연금 2 · 즉시연금 1 · 그 밖의 상품 0.5 (태그·질문으로 구분) */
 const PRODUCT_FOCUS = [{ re: /플래티넘/, w: 2 }, { re: /즉시연금|즉시형/, w: 1 }];
 const PRODUCT_OTHER_W = 0.5;

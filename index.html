@@ -6,9 +6,11 @@
 <title>방카BM 성장기</title>
 <meta name="description" content="방카슈랑스·경제 지식 퀴즈로 인턴에서 사장까지 성장하는 방카BM 육성 게임">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&display=swap">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
-<link rel="stylesheet" href="css/style.css?v=62">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&display=swap" media="print" onload="this.media='all'">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" media="print" onload="this.media='all'">
+<link rel="preload" as="image" href="img/opening_3.webp">
+<link rel="stylesheet" href="css/style.css?v=63">
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#ff6f91" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#1d1724" media="(prefers-color-scheme: dark)">
@@ -27,6 +29,10 @@
 </script>
 </head>
 <body>
+<!-- 시작 화면: 스크립트를 받기 전에 바로 보이도록 HTML에 직접 (게임이 준비되면 사라짐) -->
+<div id="opening" class="boot"><img class="opblur" src="img/opening_3.webp" alt=""><img class="opening" src="img/opening_3.webp" alt=""><div class="op-fade"></div>
+  <div class="op-bottom"><div class="logo2"><div class="k">BANCASSURANCE QUIZ RPG</div><h1>방카BM <em>성장기</em></h1><p>인턴에서 사장까지, 지식으로 승진하라!</p></div>
+  <div class="op-load"><div class="spin"></div>출근 준비 중…</div></div></div>
 <div id="app">
   <div id="stage"><div id="bg"></div><div id="chara"></div></div>
   <header id="hud" class="hidden"></header>
@@ -55,16 +61,16 @@
   <div id="toast"></div>
 </div>
 
-<script src="js/env.js?v=62"></script>
-<script src="js/art.js?v=62"></script>
-<script src="js/config.js?v=62"></script>
-<script src="js/data/library.js?v=62"></script>
-<script src="js/sprites.js?v=62"></script>
-<script src="js/store.js?v=62"></script>
-<script src="js/api.js?v=62"></script>
-<script src="js/office.js?v=62"></script>
-<script src="js/parking.js?v=62"></script>
-<script src="js/mini.js?v=62"></script>
-<script src="js/game.js?v=62"></script>
+<script defer src="js/env.js?v=63"></script>
+<script defer src="js/art.js?v=63"></script>
+<script defer src="js/config.js?v=63"></script>
+<script defer src="js/data/library.js?v=63"></script>
+<script defer src="js/sprites.js?v=63"></script>
+<script defer src="js/store.js?v=63"></script>
+<script defer src="js/api.js?v=63"></script>
+<script defer src="js/office.js?v=63"></script>
+<script defer src="js/parking.js?v=63"></script>
+<script defer src="js/mini.js?v=63"></script>
+<script defer src="js/game.js?v=63"></script>
 </body>
 </html>

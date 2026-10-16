@@ -135,6 +135,7 @@
   }
   async function closeOpening(minMs = 1600) {
     const el = $('#opening'); if (!el) return;
+    if (el.classList.contains('boot')) { el.classList.add('out'); setTimeout(() => el.remove(), 450); return; } // HTML 시작 화면은 준비되는 대로 바로 걷기
     if (!el.dataset.at && Api.opening()) { openingOverlay('출근 준비 완료!'); }
     const at = Number($('#opening').dataset.at || 0);
     if (at) await sleep(Math.max(0, minMs - (Date.now() - at))); // 그림이 뜬 뒤 잠깐은 보여 주기
@@ -260,7 +261,18 @@
     S.xp += x;
     while (S.lv < MAX_LV && S.xp >= xpNeed(S.lv)) { S.xp -= xpNeed(S.lv); S.lv++; ups.push(S.lv); }
     if (S.lv >= MAX_LV) S.xp = 0;
+    if (ups.length) setTimeout(() => levelUpFx(S.lv), 60);
     return ups;
+  }
+  // 레벨 업 이펙트: 빛줄기 + LEVEL UP! + 별 + 꽃가루 (어느 화면 위에서든)
+  function levelUpFx(lv) {
+    const old = $('#lvup'); if (old) old.remove();
+    const el = document.createElement('div'); el.id = 'lvup';
+    const stars = Array.from({ length: 12 }, (_, i) => { const a = i / 12 * Math.PI * 2, r = 120 + Math.random() * 80;
+      return `<i class="lv-star" style="--dx:${Math.round(Math.cos(a) * r)}px;--dy:${Math.round(Math.sin(a) * r)}px;animation-delay:${(0.15 + Math.random() * 0.25).toFixed(2)}s">${pick(['⭐', '✨', '🌟'])}</i>`; }).join('');
+    el.innerHTML = `<div class="lv-rays"></div><div class="lv-box"><b>LEVEL UP!</b><span>Lv.${lv} ${esc(rankOf(lv).title)}</span>${stars}</div>`;
+    document.body.appendChild(el); setTimeout(() => el.remove(), 2500);
+    Snd.lv(); confetti(60);
   }
 
   /* ---- 하루 단위 상태 · 일간 보스 추첨 ---- */
@@ -925,7 +937,60 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
       els.choices.innerHTML = '';
     }
   }
+  /* ---- 동료(실제 회원)가 내 게임에 찾아와 퀴즈를 내고 격려 — 나 자신은 절대 나오지 않음 ---- */
+  let peerCache = null; // 최우수BM · 주차장에서 받아 둔 회원 목록 재사용
+  async function pickPeer() {
+    let list = peerCache;
+    if (!list) { try { list = peerCache = (await Api.ranking(periodKeys())).week.list; } catch (e) { return null; } }
+    const others = (list || []).filter((x) => !x.me && x.name && x.name !== S.name); // 본인 제외 (관리자는 서버에서 이미 빠짐)
+    return others.length ? pick(others) : null;
+  }
+  const PEER_HI = [
+    '{나}님! 지나가다 들렀어요 😄 요즘 공부 열심히 하신다면서요?',
+    '어, {나}님! 마침 잘 만났다. 나 방금 재밌는 문제 하나 봤거든요.',
+    '{나}님~ 커피 한잔 하실래요? ☕ 대신 문제 하나 맞히면 제가 살게요!',
+    '{나}님, 이번 주 최우수BM 노리신다던데… 실력 좀 볼까요? 😏'
+  ];
+  const PEER_CHEER = [
+    '역시 {나}님! 우리 같이 사장까지 가 봐요 💪',
+    '오늘도 화이팅! 지점에서 {나}님 칭찬 자자하던데요?',
+    '{나}님 덕분에 저도 자극받고 가요. 다음엔 제가 이길 거예요!',
+    '이번 주 최우수BM, {나}님이 될 것 같은데요? 👑'
+  ];
+  const PEER_COMFORT = [
+    '괜찮아요! 저도 처음엔 이거 틀렸어요. 같이 힘내요 🙌',
+    '아깝다! 해설 한번 읽어 보면 다음엔 무조건 맞힐 거예요.',
+    '틀려도 괜찮아요. 오늘 배운 건 고객 상담 때 꼭 써먹게 될 거예요!'
+  ];
+  async function peerVisit() {
+    const p = await pickPeer();
+    if (!p) { await say(NARR, '복도에서 동료들의 웃음소리가 들린다. 오늘도 다들 열심이다!'); return grant({ honor: 5 }); }
+    if (p.face) { primePeerFaces([p]); await loadPeerFaces([pfid(p)]).catch(() => { }); }
+    const spec = peerSpec(p), who = { name: p.name, role: rankOf(p.lv || 1).title }, nm = (t) => t.replace(/\{나\}/g, S.name);
+    setChar(spec, 'smile', 'enter');
+    await say(NARR, `👋 ${rankOf(p.lv || 1).title} ${p.name}님이 찾아왔다!`);
+    await say(who, nm(pick(PEER_HI)));
+    const q = rankForPick(pool())[0];
+    if (!q) { await say(who, nm(pick(PEER_CHEER))); return grant({ honor: 10 }); }
+    const r = await ask(q, who, { spec }, 20, { sess: {}, noItems: true });
+    els.dlg.classList.remove('asking'); els.meta.innerHTML = ''; S.seen[q.id] = dayNum();
+    if (r.correct) {
+      Snd.ok(); setChar(spec, 'happy', 'hop'); fx('<div class="stamp ok">정답!</div>', 1100);
+      inc('correct'); inc('c_' + q.cat);
+      await say(who, nm(pick(PEER_CHEER)), { extra: `<span class="exp">📘 ${esc(q.exp || '')}</span>` });
+      els.choices.innerHTML = '';
+      inc('peerVisits'); await grant({ xp: 30, cash: 300, honor: 10 });
+    } else {
+      Snd.ng(); revealAnswer(q); setChar(spec, 'worried', 'shake');
+      S.wrong[q.id] = { n: ((S.wrong[q.id] || {}).n || 0) + 1, t: Date.now() };
+      await say(who, nm(pick(PEER_COMFORT)), { extra: `<span class="exp">정답: <span class="ans">${esc(answerText(q))}</span>\n📘 ${esc(q.exp || '')}</span>` });
+      els.choices.innerHTML = '';
+      setChar(spec, 'smile', 'hop'); await say(who, nm('그래도 {나}님 응원해요! 다음에 또 올게요 👋'));
+      inc('peerVisits'); await grant({ honor: 5 });
+    }
+  }
   const RANDOM_EVENTS = [
+    { id: 'peer', w: 24, bg: 'office', npc: null, run: peerVisit }, // 실제 동료 방문 (가장 자주)
     { id: 'coffee', w: 10, bg: 'bank', npc: 'worker', run: async (w) => {
       await say(w, 'BM님! 지난번에 알려주신 대로 설명했더니 고객님이 바로 이해하셨어요.');
       await say(w, '감사의 의미로… 커피 쿠폰이에요! ☕');
@@ -1011,6 +1076,7 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
     bindBack();
     let r;
     try { [, r] = await Promise.all([syncNow(), Api.ranking(periodKeys())]); } catch (e) { toast(e.message); return; }
+    peerCache = r.week.list;
     // 저장과 동시에 불러왔으니 내 최신 실적은 이 기기 값으로 반영
     const pd = ensurePeriod();
     [[r.week, pd.week === r.week.key ? pd.weekXp : 0], [r.month, pd.month === r.month.key ? pd.monthXp : 0]].forEach(([box, xp]) => {
@@ -1238,6 +1304,15 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
     document.body.appendChild(el); draw();
   }
   /* ---------------- 차고 (직급별 차 · 3D로 돌려 보기) ---------------- */
+  // 차 한 대를 회전판 위에 (주차장과 같은 3D 엔진 → 꾸밈이 그대로 보임)
+  function closeShowroom(view) { if (view && view._sr) { view._sr.close(); view._sr = null; } }
+  function showroom(view, c, cr, still, load) {
+    closeShowroom(view); view.innerHTML = '';
+    const tok = view._tok = (view._tok || 0) + 1;
+    Parking.open(view, [{ rank: c.rank, glb: c.glb, html: '', cr }], { showroom: true, onProgress: (k) => { if (k) load.classList.add('off'); } })
+      .then((sr) => { if (!still() || view._tok !== tok || !view.isConnected) return sr.close(); view._sr = sr; })
+      .catch(() => { load.classList.add('off'); view.innerHTML = `<div class="gv-none">${c.icon}</div>`; toast('3D 차를 불러오지 못했어요. 인터넷 연결을 확인해 주세요'); });
+  }
   let mvLoad = null; // 3D 뷰어는 차고를 처음 열 때만 불러옴
   const loadMV = () => mvLoad || (mvLoad = new Promise((res, rej) => {
     if (customElements.get('model-viewer')) return res();
@@ -1260,21 +1335,14 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
       el.querySelectorAll('.gv-car').forEach((b) => { const k = +b.dataset.car; b.classList.toggle('on', k === i); b.classList.toggle('lock', !owned(CARS[k])); });
       info.innerHTML = own ? `<b>${esc(c.name)}</b><small>${esc(c.desc)}${c.glb ? '' : ' · 🔧 3D 차량 준비 중'}${c.rank > my ? ` · 🛠️ 관리자 미리보기 (${esc(r.title)} 차)` : ''}</small>`
         : `<b>🔒 ???</b><small>${esc(r.title)}(Lv.${r.lv})으로 승진하면 지급돼요</small>`;
-      if (!c.glb || !own) { load.classList.add('off'); view.innerHTML = `<div class="gv-none ${own ? '' : 'lock'}">${own ? c.icon : '?'}</div>`; return; }
+      if (!c.glb || !own) { closeShowroom(view); load.classList.add('off'); view.innerHTML = `<div class="gv-none ${own ? '' : 'lock'}">${own ? c.icon : '?'}</div>`; return; }
       load.classList.remove('off');
-      loadMV().then(() => {
-        if (cur !== i) return;
-        view.innerHTML = `<model-viewer src="${c.glb}" alt="${esc(c.name)}" camera-controls auto-rotate ar rotation-per-second="18deg"
-          camera-orbit="-35deg 72deg auto" environment-image="neutral" shadow-intensity="1" exposure="1.05" interaction-prompt="none" touch-action="pan-y">
-          <button slot="ar-button" class="gv-ar">📱 내 방에 꺼내 보기 (AR)</button></model-viewer>`;
-        const mv = view.firstElementChild;
-        mv.addEventListener('load', () => load.classList.add('off'), { once: true });
-        mv.addEventListener('error', () => { load.classList.add('off'); view.innerHTML = `<div class="gv-none">${c.icon}</div>`; }, { once: true });
-      }).catch((e) => { load.classList.add('off'); view.innerHTML = `<div class="gv-none">${c.icon}</div>`; toast(e.message); });
+      showroom(view, c, carCR(), () => cur === i, load); // 꾸민 모습 그대로
     };
     el.querySelectorAll('.gv-car').forEach((b) => b.onclick = () => { Snd.tap(); show(+b.dataset.car); });
-    el.querySelector('[data-x]').onclick = () => el.remove();
-    el.querySelector('[data-park]').onclick = () => { Snd.tap(); el.remove(); openParking(); };
+    const shut = () => { closeShowroom(view); el.remove(); };
+    el.querySelector('[data-x]').onclick = shut;
+    el.querySelector('[data-park]').onclick = () => { Snd.tap(); shut(); openParking(); };
     document.body.appendChild(el); show(cur);
     const on = el.querySelector('.gv-car.on'); if (on) on.scrollIntoView({ inline: 'center', block: 'nearest' });
   }
@@ -1317,7 +1385,7 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
     let list, rk;
     try {
       await syncNow().catch(() => { });
-      rk = await Api.ranking(periodKeys());
+      rk = await Api.ranking(periodKeys()); peerCache = rk.week.list;
       list = rk.week.list.filter((x) => !(admin && x.me)); // 관리자는 주차장에서 제외
     } catch (e) { if (!closed) { toast(e.message); close(); } return; }
     if (closed) return;
@@ -1388,17 +1456,10 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
     el.innerHTML = `<div class="ov-top"><button class="mini-x" data-x aria-label="닫기">✕</button><span class="pk-av sm">${avatar(x)}</span><b>${esc(x.name)}${x.me ? ' (나)' : ''}의 차</b></div>
       <div class="gv-stage"><div class="gv-view"></div><div class="gv-load"><div class="spin"></div>차 문 여는 중…</div></div>
       <div class="gv-info"><b>${esc(c.name)}</b><small>${x.best ? esc(x.best) + ' · ' : ''}Lv.${x.lv} ${esc(r.title)} · ${esc(c.desc)}${carDecoText(x.me ? carCR() : (x.look || {}).cr)}</small></div>`;
-    el.querySelector('[data-x]').onclick = () => el.remove();
     document.body.appendChild(el);
     const view = el.querySelector('.gv-view'), load = el.querySelector('.gv-load');
-    loadMV().then(() => {
-      view.innerHTML = `<model-viewer src="${c.glb}" alt="${esc(c.name)}" camera-controls auto-rotate ar rotation-per-second="18deg"
-        camera-orbit="-35deg 72deg auto" environment-image="neutral" shadow-intensity="1" exposure="1.05" interaction-prompt="none" touch-action="pan-y">
-        <button slot="ar-button" class="gv-ar">📱 내 방에 꺼내 보기 (AR)</button></model-viewer>`;
-      const mv = view.firstElementChild;
-      mv.addEventListener('load', () => load.classList.add('off'), { once: true });
-      mv.addEventListener('error', () => { load.classList.add('off'); view.innerHTML = `<div class="gv-none">${c.icon}</div>`; }, { once: true });
-    }).catch((e) => { load.classList.add('off'); view.innerHTML = `<div class="gv-none">${c.icon}</div>`; toast(e.message); });
+    el.querySelector('[data-x]').onclick = () => { closeShowroom(view); el.remove(); };
+    showroom(view, c, x.me ? carCR() : (x.look || {}).cr, () => true, load);
   }
   /* ---------------- 차 꾸미기 ---------------- */
   const carState = () => S.car || (S.car = { owned: {}, shown: {}, plate: '', glow: GLOW_COLORS[0][0] });
@@ -1469,8 +1530,9 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
   /* ---------------- 미니게임: BM 드라이빙 ---------------- */
   const miniState = () => {
     const m = S.mini || (S.mini = { maze: { date: '', best: 0 }, run: { best: 0 }, reward: { date: '', maze: false, run: false } });
-    if (m.reward.date !== today()) m.reward = { date: today(), maze: false, run: false };
+    if (m.reward.date !== today()) m.reward = { date: today(), maze: false, run: false, park: false };
     if (m.maze.date !== today()) m.maze = { date: today(), best: 0 };
+    if (!m.park || m.park.date !== today()) m.park = { date: today(), best: 0 }; // 주차왕도 날마다 같은 주차장
     return m;
   };
   function miniResult(kind, res) {
@@ -1478,11 +1540,15 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
     if (kind === 'maze') {
       if (!res.ok) return { msg: '다시 도전해 보세요! 길을 기억하면 훨씬 빨라져요.' };
       if (!m.maze.best || res.ms < m.maze.best) { lines.push(m.maze.best ? `🎉 오늘 최고 기록 경신! (이전 ${Mini.fmt(m.maze.best)})` : '🎉 오늘 첫 도착!'); m.maze.best = res.ms; }
+    } else if (kind === 'park') {
+      if (!res.ok) return { msg: res.why === 'crash' ? '천천히 · 조금씩 핸들을 돌려 보세요. 후진도 적극 활용!' : '칸 안에 반듯하게 들어가서 멈춰야 성공이에요!' };
+      if (!m.park.best || res.ms < m.park.best) { lines.push(m.park.best ? `🎉 오늘 최고 기록 경신! (이전 ${Mini.fmt(m.park.best)})` : '🎉 오늘 첫 주차 성공!'); m.park.best = res.ms; }
+      if (!res.bumps) { inc('parkClean'); lines.push('🏆 무사고 주차!'); }
     } else {
       if (!m.run.best || res.ms > m.run.best) { lines.push(m.run.best ? `🎉 최고 기록 경신! (이전 ${Mini.fmt(m.run.best)})` : '🎉 첫 기록!'); m.run.best = res.ms; }
     }
     const rw = MINI_REWARD[kind];
-    if (!m.reward[kind] && (kind === 'maze' || res.ms >= rw.need)) {
+    if (!m.reward[kind] && (kind !== 'run' || res.ms >= rw.need)) {
       m.reward[kind] = true; earn(rw.cash); const ups = addXp(rw.xp); inc('miniPlays');
       lines.push(`오늘의 드라이빙 보상 +${won(rw.cash)} · +${rw.xp}XP`);
       if (ups.length) lines.push(`⬆️ Lv.${S.lv} 달성!`);
@@ -1502,7 +1568,7 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
   async function playMini(kind) {
     const m = miniState();
     inSession = true; els.nav.classList.add('hidden');
-    try { await Mini.play(kind, { seed: 'maze|' + today(), best: kind === 'maze' ? m.maze.best : m.run.best, onResult: (r) => miniResult(kind, r), onEgg: mazeEgg }); }
+    try { await Mini.play(kind, { seed: 'maze|' + today(), best: (m[kind] || {}).best, onResult: (r) => miniResult(kind, r), onEgg: mazeEgg }); }
     finally { inSession = false; els.nav.classList.remove('hidden'); go('drive'); }
   }
   async function pageDrive() {
@@ -1515,8 +1581,9 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
       <div class="drivecards">
         ${card('maze', '🗺️', '출근길 미로', '본사에서 지점까지 60초 안에! 오늘의 미로는 모두 같아요', m.maze.best, `도착하면 +${won(MINI_REWARD.maze.cash)}`)}
         ${card('run', '🏎️', '고속도로 질주', '1인칭 운전 · 날아오는 장애물 피하기 · 점점 빨라져요', m.run.best, `${MINI_REWARD.run.need / 1000}초 버티면 +${won(MINI_REWARD.run.cash)}`)}
+        ${card('park', '🅿️', '주차왕', '빠르게 · 사고 없이 P 칸에 주차! 오늘의 주차장은 모두 같아요', m.park.best, `주차 성공하면 +${won(MINI_REWARD.park.cash)}`)}
       </div>
-      <div class="seg" style="margin-top:14px"><button data-mr="maze" class="on">🗺️ 오늘의 미로 순위</button><button data-mr="run">🏎️ 질주 명예의 전당</button></div>
+      <div class="seg" style="margin-top:14px"><button data-mr="maze" class="on">🗺️ 오늘의 미로</button><button data-mr="park">🅿️ 오늘의 주차왕</button><button data-mr="run">🏎️ 질주 명예의 전당</button></div>
       <div id="miniRank"><div class="loading"><div class="spin"></div>순위를 불러오는 중…</div></div></div>`;
     bindBack();
     els.screen.querySelectorAll('[data-mini]').forEach((b) => b.onclick = () => playMini(b.dataset.mini));
@@ -1527,14 +1594,14 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
       primePeerFaces(list);
       box.innerHTML = list.length ? list.map((x, i) => `<div class="rankrow ${x.me ? 'me' : ''}"><span class="rk">${['🥇', '🥈', '🥉'][i] || i + 1}</span><span class="rkav" style="cursor:default">${avatar(x)}</span>
         <span class="nm">${esc(x.name)}${x.me ? ' (나)' : ''}<small>Lv.${x.lv} ${rankOf(x.lv).title}</small></span><b class="mini-rec">${Mini.fmt(x.ms)}</b></div>`).join('')
-        : `<p class="muted" style="text-align:center;margin-top:24px">${tab === 'maze' ? '오늘 미로를 통과한 사람이 아직 없어요. 첫 기록의 주인공이 되어 보세요!' : '아직 기록이 없어요.'}</p>`;
+        : `<p class="muted" style="text-align:center;margin-top:24px">${tab === 'maze' ? '오늘 미로를 통과한 사람이 아직 없어요. 첫 기록의 주인공이 되어 보세요!' : tab === 'park' ? '오늘 주차에 성공한 사람이 아직 없어요. 첫 주차왕이 되어 보세요!' : '아직 기록이 없어요.'}</p>`;
       const fl = needFull(list); if (fl.length) loadPeerFaces(fl.map(pfid), ['normal']).then(show);
     };
     els.screen.querySelectorAll('[data-mr]').forEach((b) => b.onclick = () => { tab = b.dataset.mr; els.screen.querySelectorAll('[data-mr]').forEach((x) => x.classList.toggle('on', x === b)); show(); });
     try { await syncNow(); data = await Api.miniRank(day); } catch (e) { const box = $('#miniRank'); if (box) box.innerHTML = `<p class="muted">${esc(e.message)}</p>`; return; }
     // 방금 낸 내 기록은 이 기기 값으로 바로 반영
     const mine = (list, ms, asc) => { if (!ms) return list; let me = list.find((x) => x.me); if (!me) { me = { name: S.name, lv: S.lv, me: true, uid: '', ms }; list.push(me); } me.ms = asc ? Math.min(me.ms, ms) : Math.max(me.ms, ms); return list.sort((a, b) => (asc ? a.ms - b.ms : b.ms - a.ms)).slice(0, 10); };
-    data.maze = mine(data.maze || [], m.maze.best, true); data.run = mine(data.run || [], m.run.best, false);
+    data.maze = mine(data.maze || [], m.maze.best, true); data.run = mine(data.run || [], m.run.best, false); data.park = mine(data.park || [], m.park.best, true);
     show();
   }
 
@@ -2475,6 +2542,7 @@ Lv.${S.lv} ${rankOf(S.lv).title} ${S.name}의 모든 기록(경험치 ${S.totalX
   /* ---------------- 로그인 / 타이틀 / 캐릭터 생성 / 프롤로그 ---------------- */
   function loginScreen(msg) {
     curPage = 'login';
+    const bs = $('#opening.boot'); if (bs) { bs.classList.add('out'); setTimeout(() => bs.remove(), 450); } // HTML 시작 화면 걷기
     els.hud.classList.add('hidden'); els.nav.classList.add('hidden'); stageMode('');
     els.bg.innerHTML = opBg(Api.opening()); els.place.innerHTML = ''; setChar(null);
     els.screen.innerHTML = `<div class="op-fade"></div><div class="login2" id="l2"><div class="logo2">${LOGO}</div>
@@ -2499,6 +2567,7 @@ Lv.${S.lv} ${rankOf(S.lv).title} ${S.name}의 모든 기록(경험치 ${S.totalX
       } catch (er) { closeOpening(0); toast(er.message, 3200); const b = $('#lgo'); if (b) { b.disabled = false; b.textContent = '로그인'; } }
     };
   }
+  let spritesReady = Promise.resolve();
   async function enterGame() {
     const u = Api.user;
     els.hud.classList.add('hidden'); els.nav.classList.add('hidden');
@@ -2511,6 +2580,7 @@ Lv.${S.lv} ${rankOf(S.lv).title} ${S.name}의 모든 기록(경험치 ${S.totalX
     let b = null, failed = false;
     try { b = await Api.boot(); } catch (e) { failed = true; }
     if (failed) { try { await Api.questions(); } catch (e) { toast(e.message, 3500); } } // 오프라인이면 저장해 둔 문제로
+    await spritesReady;
     loadTalk(b && b.talk);
     if (b && b.face) { regFace('face:me', b.face); hasFace = true; try { localStorage.setItem(FK, JSON.stringify(b.face)); localStorage.setItem(FVK, JSON.stringify(b.faceVer)); } catch (e) { } }
     else if (b && !b.faceVer && !Api.demo) { hasFace = false; try { localStorage.removeItem(FK); localStorage.removeItem(FVK); } catch (e) { } }
@@ -2699,7 +2769,7 @@ Lv.${S.lv} ${rankOf(S.lv).title} ${S.name}의 모든 기록(경험치 ${S.totalX
     setupBack();
     const allKeys = []; // 등장인물 그림은 img/chars/index.json 목록으로 불러옴
     const allBgs = [...new Set([...Object.values(NPCS).map((n) => n.bg).filter(Boolean), ...RANKS.map((r) => r.bg), 'title'])];
-    await Sprites.init(allKeys, allBgs).catch(() => { });
+    spritesReady = Sprites.init(allKeys, allBgs).catch(() => { }); // 그림 목록은 뒤에서 받고, 게임에 들어갈 때만 기다림
     if (!Api.loggedIn()) return loginScreen();
     try { await Api.me(); }
     catch (e) {

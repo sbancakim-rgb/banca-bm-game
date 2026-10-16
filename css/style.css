@@ -671,3 +671,29 @@ img.sprite.bust.illust { width: 135%; left: -17%; top: -3%; }
 .pk-zoom { position: absolute; right: 10px; top: 10px; z-index: 3; display: flex; flex-direction: column; gap: 6px; }
 .pk-zoom button { width: 38px; height: 38px; border: 0; border-radius: 12px; background: rgba(20,15,30,.72); color: #fff; font-size: 22px; font-weight: 800; line-height: 1; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,.25); }
 .pk-zoom button:active { transform: scale(.94); }
+
+/* 시작 화면(HTML) — 바로 보이게 애니메이션 없이 */
+#opening.boot { animation: none; }
+/* 레벨 업 이펙트 */
+#lvup { position: fixed; inset: 0; z-index: 64; display: grid; place-items: center; pointer-events: none; }
+#lvup .lv-rays { position: absolute; width: 140vmax; height: 140vmax; background: repeating-conic-gradient(from 0deg, rgba(255,226,120,.38) 0 7deg, rgba(255,226,120,0) 7deg 18deg); -webkit-mask-image: radial-gradient(circle, #000 0, transparent 45%); mask-image: radial-gradient(circle, #000 0, transparent 45%); animation: lvspin 2.4s linear, lvfade 2.4s ease both; }
+#lvup .lv-box { position: relative; text-align: center; animation: lvpop 2.4s cubic-bezier(.2,1.4,.4,1) both; }
+#lvup .lv-box b { display: block; font-family: 'Jua', sans-serif; font-weight: 400; font-size: 54px; line-height: 1; color: #fff7c2; letter-spacing: 2px;
+  text-shadow: 0 3px 0 #e8467c, 0 6px 0 #a1265a, 0 10px 24px rgba(0,0,0,.45); -webkit-text-stroke: 1px #c46a00; }
+#lvup .lv-box span { display: inline-block; margin-top: 10px; padding: 6px 16px; border-radius: 999px; background: linear-gradient(135deg, #ffe08a, #f2b632); color: #4a2a00; font-weight: 900; font-size: 18px; box-shadow: 0 4px 14px rgba(0,0,0,.3); }
+#lvup .lv-star { position: absolute; font-size: 26px; animation: lvstar 1.6s ease-out both; }
+@keyframes lvspin { to { transform: rotate(60deg); } }
+@keyframes lvfade { 0% { opacity: 0; } 15%, 70% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes lvpop { 0% { opacity: 0; transform: scale(.3); } 14% { opacity: 1; transform: scale(1.15); } 22% { transform: scale(1); } 80% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(1.1) translateY(-20px); } }
+@keyframes lvstar { 0% { opacity: 0; transform: translate(0, 0) scale(.4); } 20% { opacity: 1; } 100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(1.2) rotate(160deg); } }
+/* 주차왕 조작 버튼: ◀ ▶ (핸들) · 후진 전진 */
+.mini-pad.park { grid-template-columns: 1fr 1fr .3fr 1fr 1.3fr; } .mini-pad.park button { min-height: 66px; font-size: 18px; } .mini-pad.park button.on { background: rgba(255,111,145,.6); }
+.mini-pad.park [data-k="gas"] { background: rgba(47,182,124,.45); } .mini-pad.park [data-k="rev"] { background: rgba(79,124,255,.4); }
+.mini-stage.bump { animation: bump .35s; }
+@keyframes bump { 20% { transform: translate(-6px, 2px); filter: brightness(1.6) saturate(.4); } 45% { transform: translate(5px, -2px); } 70% { transform: translate(-3px, 1px); } }
+.drivecards .drivecard:nth-child(3) { grid-column: 1 / -1; }
+
+/* 차고 · 3D 구경 쇼룸 (주차장과 같은 3D 엔진) */
+.gv-view canvas { position: absolute; inset: 0; width: 100% !important; height: 100% !important; display: block; touch-action: none; cursor: grab; }
+.gv-stage { background: #15161f; }
+#lvup::before { content: ""; position: absolute; inset: 0; background: radial-gradient(circle, rgba(20,10,40,.45) 0, rgba(20,10,40,0) 55%); animation: lvfade 2.4s ease both; }

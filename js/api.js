@@ -202,7 +202,8 @@ const Demo = (() => {
         const item = (r, ms) => ({ name: r.p.name, lv: r.p.lv || 1, me: r.e === email, uid: 'u:' + r.e, look: demoLook(r.p), face: false, ms });
         return ok({
           maze: rows.filter((r) => r.p.mini.maze && r.p.mini.maze.date === b.day && r.p.mini.maze.best).map((r) => item(r, r.p.mini.maze.best)).sort((a, c) => a.ms - c.ms).slice(0, 10),
-          run: rows.filter((r) => r.p.mini.run && r.p.mini.run.best).map((r) => item(r, r.p.mini.run.best)).sort((a, c) => c.ms - a.ms).slice(0, 10)
+          run: rows.filter((r) => r.p.mini.run && r.p.mini.run.best).map((r) => item(r, r.p.mini.run.best)).sort((a, c) => c.ms - a.ms).slice(0, 10),
+          park: rows.filter((r) => r.p.mini.park && r.p.mini.park.date === b.day && r.p.mini.park.best).map((r) => item(r, r.p.mini.park.best)).sort((a, c) => a.ms - c.ms).slice(0, 10)
         });
       }
       case 'report': { const no = 'R' + Date.now().toString().slice(-8); d.reports.unshift({ no, at: new Date().toISOString(), email, qid: b.qid, cat: b.cat, snapshot: b.snapshot, kind: b.kind, reason: b.reason, status: '접수' }); store(d); return ok({ no }); }

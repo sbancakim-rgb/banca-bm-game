@@ -3,6 +3,7 @@
    Parking.open(host, people, { onPick, onMove, onProgress, time })
      people: [{ rank(0~6), glb, html(차 위 이름표), name, me, sample, best, cr(차 꾸밈) }]
      — 넘겨준 순서대로 왼쪽부터 주차. 직급에 따라 VIP · 간부 · BM 구역으로 나뉜다
+   opts.showroom: 차 한 대만 회전판 위에 (내 차고 · 3D 구경) — 끌면 차가 돌아가고 꾸밈도 그대로 보임
    3D 엔진(three.js)은 주차장을 처음 열 때만 불러온다.
    ========================================================= */
 const Parking = (() => {
@@ -37,6 +38,7 @@ const Parking = (() => {
 
   async function open(host, people, opts = {}) {
     const { T, GLTFLoader, RoomEnvironment } = await lib();
+    const SR = !!opts.showroom;
     const canvasTex = (w, h, draw, repeat) => {
       const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h);
       const t = new T.CanvasTexture(c); t.colorSpace = T.SRGBColorSpace; t.anisotropy = 4;
@@ -86,10 +88,12 @@ const Parking = (() => {
       g.fillStyle = '#5b606b'; g.fillRect(0, 0, w, h);
       for (let i = 0; i < 2600; i++) { const v = 70 + Math.random() * 50; g.fillStyle = `rgba(${v},${v + 3},${v + 10},.5)`; g.fillRect(Math.random() * w, Math.random() * h, 2, 2); }
     }, [W / 4, 30 / 4]);
-    scene.add(flat(W, 30, std({ map: asphalt, roughness: 0.95 }), cx, 0, 3));
-    const curb = new T.Mesh(new T.BoxGeometry(W, 0.25, 0.6), std({ color: '#c9c9c2', roughness: 0.9 })); curb.position.set(cx, 0.125, -4.6); scene.add(curb);
     const wallMat = std({ roughness: 0.8 });
-    const wall = new T.Mesh(new T.PlaneGeometry(W, 7), wallMat); wall.position.set(cx, 3.5, -5.2); scene.add(wall);
+    if (!SR) {
+      scene.add(flat(W, 30, std({ map: asphalt, roughness: 0.95 }), cx, 0, 3));
+      const curb = new T.Mesh(new T.BoxGeometry(W, 0.25, 0.6), std({ color: '#c9c9c2', roughness: 0.9 })); curb.position.set(cx, 0.125, -4.6); scene.add(curb);
+      const wall = new T.Mesh(new T.PlaneGeometry(W, 7), wallMat); wall.position.set(cx, 3.5, -5.2); scene.add(wall);
+    }
     const drawWall = (P) => { // 벽 색은 시간대마다, 불 켜진 창문은 스스로 빛남(emissive)
       if (wallMat.map) wallMat.map.dispose(); if (wallMat.emissiveMap) wallMat.emissiveMap.dispose();
       const isOn = (r, c) => P.lit && ((r * 7 + c * 3) % 5 < 3 * P.lit);
@@ -145,7 +149,7 @@ const Parking = (() => {
 
     // ---- 구역 꾸밈: 벽 간판 · VIP 지붕 · 구역 사이 화단 ----
     const lineMats = {}; Object.keys(ZONES).forEach((k) => lineMats[k] = basic({ color: ZONES[k].line }));
-    zones.forEach((zn, zi) => {
+    if (!SR) zones.forEach((zn, zi) => {
       const Z = ZONES[zn.z], a = zn.from - SLOT[zn.z] / 2, b = zn.to + SLOT[zn.z] / 2, mid = (a + b) / 2, zw = b - a;
       const sign = canvasTex(1024, 220, (g, w, h) => {
         g.fillStyle = Z.bg; g.fillRect(0, 0, w, h); g.strokeStyle = Z.fg; g.lineWidth = 8; g.strokeRect(10, 10, w - 20, h - 20);
@@ -181,7 +185,7 @@ const Parking = (() => {
       parent.add(new T.Mesh(new T.TubeGeometry(new T.QuadraticBezierCurve3(pts[0], m, pts[1]), 16, 0.025, 6), velvet));
     }
     const signPole = new T.CylinderGeometry(0.04, 0.04, 1.3, 8), signPoleMat = std({ color: '#777', metalness: 0.7, roughness: 0.4 });
-    slots.forEach((s, i) => {
+    if (!SR) slots.forEach((s, i) => {
       const lm = lineMats[s.zone], prev = slots[i - 1], next = slots[i + 1];
       if (!prev || prev.zone !== s.zone) scene.add(flat(0.14, 7.2, lm, s.x - s.w / 2, 0.012, -0.2));
       scene.add(flat(0.14, 7.2, lm, s.x + s.w / 2, 0.012, -0.2));
@@ -221,7 +225,7 @@ const Parking = (() => {
     const lampNight = [];
     const poleGeo = new T.CylinderGeometry(0.06, 0.08, 4.2, 10), poleMat = std({ color: '#3c4048', metalness: 0.6, roughness: 0.5 });
     const headGeo = new T.BoxGeometry(0.5, 0.12, 0.9), bulbGeo = new T.BoxGeometry(0.36, 0.04, 0.7), poolMat = glowMat(poolTex);
-    for (let lx = x0 + GAP; lx <= x1 - GAP; lx += GAP * 2.2) {
+    for (let lx = x0 + GAP; !SR && lx <= x1 - GAP; lx += GAP * 2.2) {
       const pole = new T.Mesh(poleGeo, poleMat); pole.position.set(lx, 2.1, -4.3); scene.add(pole);
       const head = new T.Mesh(headGeo, poleMat); head.position.set(lx, 4.2, -3.95); scene.add(head);
       const bulb = new T.Mesh(bulbGeo, bulbMat); bulb.position.set(lx, 4.13, -3.95); scene.add(bulb);
@@ -340,17 +344,18 @@ const Parking = (() => {
 
     // ---- 카메라 ----
     const cam = new T.PerspectiveCamera(32, 1, 0.5, 140);
-    let camX = 0, vel = 0, dirty = true, alive = true, viewW = VIEW_W, time = 'auto', zoom = 1;
+    let camX = 0, vel = 0, dirty = true, alive = true, viewW = VIEW_W, time = 'auto', zoom = 1, spin = 0.004;
     const ZMIN = 0.5, ZMAX = 1.6; // 확대 2배 · 축소 1.6배
     const fit = () => {
       const w = host.clientWidth || 1, h = host.clientHeight || 1;
       renderer.setSize(w, h, false); cam.aspect = w / h;
-      viewW = Math.max(VIEW_W, Math.min(span + GAP * 2, w / h * 9)) * zoom; // zoom < 1 이면 확대
+      viewW = (SR ? Math.max(5.6, Math.min(10, w / h * 6)) : Math.max(VIEW_W, Math.min(span + GAP * 2, w / h * 9))) * zoom; // zoom < 1 이면 확대
       const hf = 2 * Math.atan(Math.tan(T.MathUtils.degToRad(cam.fov / 2)) * cam.aspect);
       cam.userData.d = Math.max(zoom >= 1 ? 7 : 4.6, (viewW / 2) / Math.tan(hf / 2)); cam.updateProjectionMatrix(); dirty = true; // 너무 가까이 가면 긴 차 안으로 들어가므로 4.6m까지
     };
     const place = () => { // 확대할수록 시선을 낮춰 차가 화면 가운데에 오게
       const d = cam.userData.d || 12, ly = 1.75 - Math.max(0, 1 - zoom) * 1.3;
+      if (SR) { cam.position.set(0, 1.3 + d * 0.26, d); cam.lookAt(0, 0.8 - Math.max(0, 1 - zoom) * 0.3, 0); return; }
       cam.position.set(camX, 1.6 + d * 0.2, d + 0.5); cam.lookAt(camX, ly, -0.8);
     };
 
@@ -388,7 +393,17 @@ const Parking = (() => {
       el.onclick = (e) => { e.stopPropagation(); opts.onPick && opts.onPick(s.i); };
       labels.appendChild(el); s.el = el;
     });
-    const timeLabel = setTime(opts.time);
+    const timeLabel = setTime(SR ? 'day' : opts.time);
+    if (SR) { // 차고: 어두운 쇼룸 + 빛나는 회전판
+      labels.style.display = 'none';
+      const g = skyCanvas.getContext('2d'), l = g.createLinearGradient(0, 0, 0, 256);
+      l.addColorStop(0, '#2c3150'); l.addColorStop(0.6, '#1a1c2c'); l.addColorStop(1, '#0d0e16'); g.fillStyle = l; g.fillRect(0, 0, 4, 256); skyTex.needsUpdate = true;
+      scene.fog = new T.Fog('#10111a', 9, 26); hemi.intensity = 0.75;
+      scene.add(flat(60, 60, std({ color: '#0e0f16', roughness: 0.55, metalness: 0.2 }), 0, -0.01, 0));
+      const disc = new T.Mesh(new T.CylinderGeometry(4.1, 4.2, 0.12, 64), std({ color: '#2a2d3d', roughness: 0.25, metalness: 0.6 })); disc.position.y = -0.06; scene.add(disc);
+      const ring = new T.Mesh(new T.TorusGeometry(4.15, 0.035, 8, 96), basic({ color: '#ffd66b' })); ring.rotation.x = Math.PI / 2; ring.position.y = 0.005; scene.add(ring);
+      scene.add(flat(11, 11, glowMat(radial([[0, 'rgba(160,190,255,.35)'], [0.5, 'rgba(160,190,255,.12)'], [1, 'rgba(160,190,255,0)']])), 0, 0.006, 0));
+    }
     const order = slots.slice().sort((a, b) => Math.abs(a.x - camX) - Math.abs(b.x - camX)); // 보이는 차부터
     let done = 0;
     const status = opts.onProgress || (() => { });
@@ -439,6 +454,7 @@ const Parking = (() => {
       if (pinch && pts.size === 2) { setZoom(pinch.z * pinch.d / pdist()); opts.onMove && opts.onMove(); return; }
       if (down == null) return;
       const dx = e.clientX - lastX, now = performance.now();
+      if (SR) { const w0 = slots[0] && slots[0].wrap; if (w0) w0.rotation.y += dx * 0.012; spin = dx * 0.012; lastX = e.clientX; lastT = now; moved += Math.abs(dx); dirty = true; return; }
       camX -= dx * perPx(); moved += Math.abs(dx); clamp();
       vel = -dx * perPx() / Math.max(8, now - lastT) * 16; lastX = e.clientX; lastT = now; dirty = true;
       opts.onMove && opts.onMove();
@@ -485,6 +501,7 @@ const Parking = (() => {
     const loop = () => {
       if (!alive) return;
       if (down == null && Math.abs(vel) > 0.002) { camX += vel; vel *= 0.92; clamp(); dirty = true; }
+      if (SR && down == null && !pinch && slots[0] && slots[0].wrap) { slots[0].wrap.rotation.y += spin; spin += (0.004 - spin) * 0.04; dirty = true; } // 손 떼면 관성 → 천천히 자동 회전
       if (anims.length) { const t = performance.now() / 1000; anims.forEach((f) => f(t)); dirty = true; } // 풍선 흔들림 · 광택 반짝임
       if (dirty) { place(); renderer.render(scene, cam); placeLabels(); dirty = false; }
       requestAnimationFrame(loop);
