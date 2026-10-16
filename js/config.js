@@ -341,7 +341,7 @@ const CAR_ITEMS = [
   { id: 'envoy', icon: '🎌', name: '의전 깃발', price: 7000, desc: '앞 펜더 양쪽에 꽂는 의전용 깃발' },
   { id: 'carpet', icon: '🟥', name: '레드카펫 마중', price: 8000, desc: '운전석 문 앞 레드카펫과 금색 차단봉' },
   { id: 'driver', icon: '🧑‍✈️', name: '전속 기사님 고용', price: 50000, desc: '운전석 옆에서 기사님이 대기하고 있어요' },
-  { id: 'guards', icon: '🕴️', name: '경호원 2인', price: 120000, desc: '검은 정장 · 선글라스 경호원이 차를 지켜요' }
+  { id: 'guards', icon: '🕴️', name: '경호원 고용', price: 120000, desc: '검은 정장 · 선글라스 경호원이 차 옆을 지켜요' }
 ];
 const GLOW_COLORS = [['#ff4fa3', '핑크'], ['#3fa9ff', '블루'], ['#3ee08f', '그린'], ['#ffc93c', '골드'], ['#b26bff', '퍼플']];
 /* 사무실 꾸밈 물품 (매점에서 구매 → 사무실에 비치 · 보관 선택) */

@@ -257,29 +257,17 @@ const Parking = (() => {
     const starTex = canvasTex(64, 64, (g, w, h) => { const r = g.createRadialGradient(32, 32, 0, 32, 32, 32); r.addColorStop(0, 'rgba(255,255,255,1)'); r.addColorStop(0.15, 'rgba(255,255,240,.9)'); r.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = r; g.fillRect(0, 0, w, h); g.fillStyle = '#fff'; g.fillRect(30, 2, 4, 60); g.fillRect(2, 30, 60, 4); });
     const lineM = new T.LineBasicMaterial({ color: '#eeeeee' }), surfRay = new T.Raycaster(), DOWN = new T.Vector3(0, -1, 0);
     const anims = [];
-    // 사람 (기사님 · 경호원) — 단순한 3D 도형으로
-    const skinM = std({ color: '#f1c7a5', roughness: 0.7 }), suitM = std({ color: '#15161c', roughness: 0.55 }), shirtM = std({ color: '#f4f4f4', roughness: 0.6 });
-    const gloveM = std({ color: '#ffffff', roughness: 0.5 }), hairM = std({ color: '#1a1410', roughness: 0.8 }), tieM = std({ color: '#7a1020', roughness: 0.5 }), blackM = std({ color: '#050505', metalness: 0.5, roughness: 0.15 });
-    function person(kind) {
-      const g = new T.Group(), add = (geo, m, x, y, z) => { const o = new T.Mesh(geo, m); o.position.set(x, y, z); g.add(o); return o; };
-      [-1, 1].forEach((d) => {
-        add(new T.CylinderGeometry(0.085, 0.075, 0.82, 10), suitM, d * 0.1, 0.43, 0);
-        add(new T.BoxGeometry(0.12, 0.07, 0.26), blackM, d * 0.1, 0.035, 0.05);
-        add(new T.CapsuleGeometry(0.06, 0.46, 4, 8), suitM, d * 0.27, 1.13, 0.02).rotation.z = d * 0.08;
-        add(new T.SphereGeometry(0.065, 10, 8), kind === 'driver' ? gloveM : skinM, d * 0.29, 0.82, 0.04);
-      });
-      add(new T.CapsuleGeometry(0.2, 0.42, 4, 12), suitM, 0, 1.17, 0).scale.z = 0.68;
-      add(new T.BoxGeometry(0.12, 0.3, 0.02), shirtM, 0, 1.3, 0.135);
-      add(new T.BoxGeometry(0.045, 0.24, 0.02), kind === 'guard' ? blackM : tieM, 0, 1.28, 0.148);
-      add(new T.CylinderGeometry(0.055, 0.06, 0.08, 8), skinM, 0, 1.5, 0);
-      add(new T.SphereGeometry(0.125, 16, 12), skinM, 0, 1.64, 0).scale.y = 1.1;
-      add(new T.SphereGeometry(0.132, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.5), hairM, 0, 1.66, -0.005);
-      if (kind === 'driver') { // 기사 모자 (금색 띠) · 눈
-        add(new T.CylinderGeometry(0.15, 0.135, 0.09, 18), suitM, 0, 1.8, 0);
-        add(new T.CylinderGeometry(0.137, 0.137, 0.028, 18), goldM, 0, 1.765, 0);
-        add(new T.BoxGeometry(0.2, 0.015, 0.1), blackM, 0, 1.745, 0.14);
-        [-1, 1].forEach((d) => add(new T.SphereGeometry(0.016, 6, 6), blackM, d * 0.045, 1.655, 0.118));
-      } else add(new T.BoxGeometry(0.22, 0.045, 0.03), blackM, 0, 1.665, 0.118); // 경호원 선글라스
+    // 사람 (기사님 · 경호원) — 2D 그림을 세워 둠 (Sprite라 항상 화면을 바라봄)
+    const pplSprites = []; let pplTint = '#ffffff'; // 그림은 조명을 받지 않으니 시간대에 맞춰 직접 어둡게
+    const PEOPLE = { driver: 'img/items/driver_v1.webp', guard: 'img/items/guard_v1.webp' }, ppl = {};
+    const texLoader = new T.TextureLoader();
+    const pplTex = (k) => ppl[k] || (ppl[k] = texLoader.load(PEOPLE[k], (t) => { t.colorSpace = T.SRGBColorSpace; dirty = true; }));
+    const feetM = basic({ map: radial([[0, 'rgba(0,0,0,.5)'], [1, 'rgba(0,0,0,0)']]), transparent: true, depthWrite: false });
+    function person(kind, x, z) {
+      const g = new T.Group(); g.position.set(x, 0, z);
+      const sp = new T.Sprite(new T.SpriteMaterial({ map: pplTex(kind), alphaTest: 0.35, color: pplTint })); pplSprites.push(sp);
+      sp.center.set(0.5, 0); sp.scale.set(1.78 * 215 / 720, 1.78, 1); g.add(sp);
+      g.add(flat(0.7, 0.45, feetM, 0, 0.025, 0));
       return g;
     }
     function dress(s, wrap, Wd, L, H) {
@@ -322,11 +310,8 @@ const Parking = (() => {
         wrap.add(flat(1.5, 1.0, basic({ map: carpetTex }), side + 0.95, 0.03, L * 0.1).rotateZ(Math.PI / 2));
         [-1, 1].forEach((d) => stanchions(L * 0.1 + d * 0.62, side + 0.35, side + 1.55, 'x', wrap));
       }
-      if (has.has('driver')) { const p = person('driver'); p.position.set(side + 0.48, 0, L * 0.12); p.rotation.y = 0.42 + 0.5; wrap.add(p); }
-      if (has.has('guards')) {
-        const g1 = person('guard'); g1.position.set(side + 0.55, 0, -L * 0.3); g1.rotation.y = 0.42 + 0.3; wrap.add(g1);
-        const g2 = person('guard'); g2.position.set(side + 0.2, 0, L / 2 + 0.55); g2.rotation.y = 0.42; wrap.add(g2);
-      }
+      if (has.has('driver')) wrap.add(person('driver', side + 0.5, L * 0.12));
+      if (has.has('guards')) wrap.add(person('guard', side + 0.55, -L * 0.3));
       if (has.has('flowers')) {
         const hz = L * 0.3, hy = surf(0, hz), g = new T.Group(); g.position.set(0, hy, hz);
         const cols = ['#ff7aa8', '#ffffff', '#ff4d6d', '#ffd1e0', '#ffffff', '#ff7aa8', '#ffe066'];
@@ -391,6 +376,7 @@ const Parking = (() => {
       drawWall(P);
       bulbMat.color.set(P.lit > 0.5 ? '#fff3c4' : '#d9d9d9');
       lampNight.forEach((o) => { o.visible = P.lit > 0.5; });
+      pplTint = P.lit > 0.5 ? '#9aa0b8' : P.lit ? '#f0d8c8' : '#ffffff'; pplSprites.forEach((sp) => sp.material.color.set(pplTint));
       vipNight.forEach((o) => { o.material.opacity = P.lit > 0.5 ? 1 : P.lit ? 0.6 : 0.25; });
       slots.forEach((s) => nightOf(s, P));
       beams.forEach((b) => { b.material.opacity = P.lit > 0.5 ? 0.32 : 0.18; });
