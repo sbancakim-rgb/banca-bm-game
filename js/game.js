@@ -761,7 +761,7 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
     const evs = todayEvents(), open = CAT_ORDER.filter((c) => catCount(c) > 0);
     const doneN = open.filter((c) => S.daily.done[c]).length;
     const b = bossTier(), bd = S.dailyBoss.done, vig = (S.items.drink || 0) + (S.items.ginseng || 0);
-    els.screen.innerHTML = `<button class="officebtn" id="officeGo">🏢 사무실 가기</button><button class="officebtn garagebtn" id="garageGo">🚗 내 차고</button><div class="sheet">
+    els.screen.innerHTML = `<button class="officebtn" id="officeGo">🏢 사무실 가기</button><button class="officebtn garagebtn" id="garageGo">🚗 내 차고</button><button class="officebtn parkbtn" id="parkGo">🅿️ 주차장</button><div class="sheet">
       ${S.events && S.events.pending ? '<button class="newsflash" id="evGo">📨 새 소식이 도착했어요! <b>확인하기 →</b></button>' : ''}
       <h3><span>${greeting()},<br>${esc(S.name)} ${r.title}님!</span><small>오늘 ${doneN}/${open.length} 완료<br>🔥 ${S.streak.count}일 연속 출근</small></h3>
       ${evs.length ? `<div class="events">${evs.map((e) => `<div class="event">${e.icon} ${e.title}<small>${e.desc}</small></div>`).join('')}</div>` : ''}
@@ -794,6 +794,7 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
     els.screen.querySelectorAll('[data-go2]').forEach((b) => b.onclick = () => go(b.dataset.go2));
     $('#officeGo').onclick = () => { Snd.tap(); openOffice(); };
     $('#garageGo').onclick = () => { Snd.tap(); openGarage(); };
+    $('#parkGo').onclick = () => { Snd.tap(); openParking(); };
     $('#charTap').onclick = charTalk;
     const evGo = $('#evGo'); if (evGo) evGo.onclick = runEvent;
     checkInbox();
@@ -1247,7 +1248,7 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
     const owned = (c) => c.rank <= my || admin; // 관리자는 전부 구경
     let cur = Math.min(my, CARS.length - 1);
     const el = document.createElement('div'); el.id = 'garageView';
-    el.innerHTML = `<div class="ov-top"><button class="mini-x" data-x aria-label="닫기">✕</button><b>🚗 ${esc(S.name)}의 차고</b></div>
+    el.innerHTML = `<div class="ov-top"><button class="mini-x" data-x aria-label="닫기">✕</button><b>🚗 ${esc(S.name)}의 차고</b><button class="ov-hide" data-park>🅿️ 주차장</button></div>
       <div class="gv-stage"><div class="gv-view"></div><div class="gv-load"><div class="spin"></div>차를 꺼내는 중…</div></div>
       <div class="gv-info"></div><div class="gv-list">${CARS.map((c) => `<button class="gv-car" data-car="${c.rank}"><span>${c.icon}</span><small>${RANKS[c.rank].title}</small></button>`).join('')}</div>`;
     const view = el.querySelector('.gv-view'), load = el.querySelector('.gv-load'), info = el.querySelector('.gv-info');
@@ -1270,8 +1271,70 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
     };
     el.querySelectorAll('.gv-car').forEach((b) => b.onclick = () => { Snd.tap(); show(+b.dataset.car); });
     el.querySelector('[data-x]').onclick = () => el.remove();
+    el.querySelector('[data-park]').onclick = () => { Snd.tap(); el.remove(); openParking(); };
     document.body.appendChild(el); show(cur);
     const on = el.querySelector('.gv-car.on'); if (on) on.scrollIntoView({ inline: 'center', block: 'nearest' });
+  }
+  /* ---------------- 회사 주차장 (모든 BM의 차를 3D로) ---------------- */
+  const carOf = (lv) => CARS[Math.min(rankIdx(lv), CARS.length - 1)];
+  async function openParking() {
+    if (document.getElementById('parkView')) return;
+    const el = document.createElement('div'); el.id = 'parkView';
+    el.innerHTML = `<div class="ov-top"><button class="mini-x" data-x aria-label="닫기">✕</button><b>🅿️ 회사 주차장</b><button class="ov-hide" data-mine>📍 내 차</button></div>
+      <div class="pk-stage"><div class="gv-load"><div class="spin"></div><span>주차장 문 여는 중…</span></div><div class="pk-hint">↔ 옆으로 밀어서 둘러보세요 · 차를 누르면 3D로 구경</div></div>
+      <div class="pk-info">레벨 높은 순서로 주차돼 있어요</div>`;
+    document.body.appendChild(el);
+    let park = null, closed = false;
+    const close = () => { closed = true; if (park) park.close(); el.remove(); };
+    el.querySelector('[data-x]').onclick = close;
+    const stage = el.querySelector('.pk-stage'), load = el.querySelector('.gv-load'), ltxt = load.querySelector('span');
+    let list;
+    try {
+      await syncNow().catch(() => { });
+      list = (await Api.ranking(periodKeys())).week.list.slice();
+    } catch (e) { if (!closed) { toast(e.message); close(); } return; }
+    if (closed) return;
+    let me = list.find((x) => x.me);
+    if (!me) list.push(me = { name: S.name, me: true, uid: '' });
+    me.lv = S.lv; me.name = S.name;
+    list = list.filter((x) => carOf(x.lv || 1).glb).sort((a, c) => (c.lv || 1) - (a.lv || 1) || String(a.name).localeCompare(c.name, 'ko'));
+    primePeerFaces(list);
+    const label = (x) => `<span class="pk-av">${avatar(x)}</span><b>${esc(x.name)}${x.me ? ' (나)' : ''}</b><small>Lv.${x.lv} ${rankOf(x.lv).title}</small>`;
+    el.querySelector('.pk-info').textContent = `BM ${list.length}명 · 레벨 높은 순서로 주차돼 있어요`;
+    try {
+      park = await Parking.open(stage, list.map((x) => ({ rank: rankIdx(x.lv), glb: carOf(x.lv).glb, html: label(x), me: x.me })), {
+        onPick: (i) => { Snd.tap(); openCarView(list[i]); },
+        onMove: () => { const h = el.querySelector('.pk-hint'); if (h) h.remove(); },
+        onProgress: (k, n) => { ltxt.textContent = `차를 주차하는 중… ${k}/${n}`; if (k >= Math.min(n, 3)) load.classList.add('off'); }
+      });
+    } catch (e) { if (!closed) { toast('주차장을 불러오지 못했어요. 인터넷 연결을 확인해 주세요'); close(); } return; }
+    if (closed) { park.close(); return; }
+    const mi = list.findIndex((x) => x.me);
+    el.querySelector('[data-mine]').onclick = () => { Snd.tap(); park.goTo(mi); };
+    // 썸네일 없는 동료는 얼굴 그림을 받아 와서 이름표에 끼운다
+    const fl = needFull(list);
+    if (fl.length) loadPeerFaces(fl.map(pfid), ['normal']).then(() => {
+      el.querySelectorAll('.pk-label').forEach((b) => { const x = list[+b.dataset.i]; if (x && x.face && !x.me) b.querySelector('.pk-av').innerHTML = avatar(x); });
+    });
+  }
+  // 주차장에서 고른 차를 3D로 구경
+  function openCarView(x) {
+    const c = carOf(x.lv || 1), r = rankOf(x.lv || 1);
+    const el = document.createElement('div'); el.id = 'carView';
+    el.innerHTML = `<div class="ov-top"><button class="mini-x" data-x aria-label="닫기">✕</button><span class="pk-av sm">${avatar(x)}</span><b>${esc(x.name)}${x.me ? ' (나)' : ''}의 차</b></div>
+      <div class="gv-stage"><div class="gv-view"></div><div class="gv-load"><div class="spin"></div>차 문 여는 중…</div></div>
+      <div class="gv-info"><b>${esc(c.name)}</b><small>Lv.${x.lv} ${esc(r.title)} · ${esc(c.desc)}</small></div>`;
+    el.querySelector('[data-x]').onclick = () => el.remove();
+    document.body.appendChild(el);
+    const view = el.querySelector('.gv-view'), load = el.querySelector('.gv-load');
+    loadMV().then(() => {
+      view.innerHTML = `<model-viewer src="${c.glb}" alt="${esc(c.name)}" camera-controls auto-rotate ar rotation-per-second="18deg"
+        camera-orbit="-35deg 72deg auto" environment-image="neutral" shadow-intensity="1" exposure="1.05" interaction-prompt="none" touch-action="pan-y">
+        <button slot="ar-button" class="gv-ar">📱 내 방에 꺼내 보기 (AR)</button></model-viewer>`;
+      const mv = view.firstElementChild;
+      mv.addEventListener('load', () => load.classList.add('off'), { once: true });
+      mv.addEventListener('error', () => { load.classList.add('off'); view.innerHTML = `<div class="gv-none">${c.icon}</div>`; }, { once: true });
+    }).catch((e) => { load.classList.add('off'); view.innerHTML = `<div class="gv-none">${c.icon}</div>`; toast(e.message); });
   }
   function showCase(c) {
     modal(`<h2 style="font-size:22px">🏆 진열장</h2>
@@ -2474,7 +2537,7 @@ Lv.${S.lv} ${rankOf(S.lv).title} ${S.name}의 모든 기록(경험치 ${S.totalX
       if (no) no.click(); else if (modalClose) modalClose();
       return;
     }
-    for (const id of ['bgView', 'garageView', 'officeView', 'mini']) {
+    for (const id of ['bgView', 'carView', 'parkView', 'garageView', 'officeView', 'mini']) {
       const ov = document.getElementById(id);
       if (ov) { const x = ov.querySelector('[data-x], .mini-x'); if (x) x.click(); else ov.remove(); return; }
     }

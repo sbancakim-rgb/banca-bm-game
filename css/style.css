@@ -619,3 +619,24 @@ img.sprite.bust.illust { width: 135%; left: -17%; top: -3%; }
 .gv-car span { font-size: 26px; } .gv-car small { font-size: 11px; font-weight: 700; white-space: nowrap; }
 .gv-car.on { border-color: #ffd66b; background: rgba(255,214,107,.18); }
 .gv-car.lock span { filter: brightness(0) invert(.45); } .gv-car.lock small { color: #8f88a6; }
+
+/* 회사 주차장 */
+.parkbtn { top: calc(148px + var(--safe-t)); color: #1d3a1f; background: linear-gradient(135deg, #eaffea, #9be29f); animation-delay: .8s; }
+#parkView, #carView { position: fixed; inset: 0; z-index: 57; display: flex; flex-direction: column; background: #15131f; padding: calc(8px + var(--safe-t)) 10px calc(10px + var(--safe-b)); }
+#carView { z-index: 58; background: radial-gradient(ellipse at 50% 38%, #3b3f5c, #15131f 75%); }
+.pk-stage { position: relative; flex: 1; min-height: 0; border-radius: 18px; overflow: hidden; background: #bcd6ee; touch-action: none; }
+.pk-stage canvas { position: absolute; inset: 0; width: 100% !important; height: 100% !important; display: block; cursor: grab; }
+.pk-stage canvas:active { cursor: grabbing; }
+.pk-labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.pk-label { position: absolute; left: 0; top: 0; display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 0; border: 0; background: none; font: inherit; color: #fff; pointer-events: auto; cursor: pointer; will-change: transform; }
+.pk-label b { margin-top: 3px; padding: 2px 9px; border-radius: 999px; background: rgba(25,20,40,.82); font-size: 12.5px; font-weight: 800; white-space: nowrap; }
+.pk-label small { padding: 1px 7px; border-radius: 999px; background: rgba(255,255,255,.88); color: #3a3350; font-size: 10.5px; font-weight: 700; white-space: nowrap; }
+.pk-label.me b { background: #e8467c; }
+.pk-label::after { content: ''; width: 2px; height: 10px; background: rgba(25,20,40,.6); }
+.pk-av { display: block; width: 46px; height: 46px; border-radius: 50%; overflow: hidden; background: linear-gradient(135deg, var(--pink-l), var(--blue-l)); box-shadow: 0 0 0 3px #fff, 0 4px 10px rgba(0,0,0,.3); }
+.pk-label.me .pk-av { box-shadow: 0 0 0 3px #e8467c, 0 4px 10px rgba(0,0,0,.3); }
+.pk-av svg, .pk-av img { width: 100%; height: 100%; display: block; object-fit: cover; }
+.pk-av.sm { flex: none; width: 34px; height: 34px; box-shadow: 0 0 0 2px #fff; }
+.pk-hint { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); background: rgba(20,15,30,.75); color: #fff; font-size: 12px; font-weight: 700; padding: 6px 12px; border-radius: 999px; pointer-events: none; white-space: nowrap; }
+.pk-info { color: #c4bdd8; text-align: center; font-size: 12.5px; font-weight: 700; padding: 8px 0 2px; }
+#parkView .gv-load { z-index: 2; background: rgba(188,214,238,.85); }
