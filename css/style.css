@@ -191,7 +191,7 @@ textarea { min-height: 120px; }
 .item .src { font-size: 11.5px; color: var(--ink2); margin-top: 6px; }
 
 /* 모달 */
-#modal { position: absolute; inset: 0; z-index: 40; display: none; align-items: center; justify-content: center; background: rgba(30,15,35,.55); padding: 20px; }
+#modal { position: fixed; inset: 0; z-index: 65; display: none; align-items: center; justify-content: center; background: rgba(30,15,35,.55); padding: 20px; }
 #modal.on { display: flex; }
 .mcard { background: #fff; border-radius: 24px; width: 100%; max-width: 420px; padding: 22px 18px 18px; box-shadow: 0 20px 60px rgba(0,0,0,.4); animation: pop .35s cubic-bezier(.2,1.4,.4,1); max-height: 88vh; overflow-y: auto; }
 .mcard h2 { font-family: 'Jua', sans-serif; font-weight: 400; margin: 0 0 4px; text-align: center; font-size: 26px; }
@@ -214,7 +214,7 @@ textarea { min-height: 120px; }
 .swatches button { width: 38px; height: 38px; border-radius: 50%; box-shadow: inset 0 0 0 3px #fff, 0 0 0 2px #ddd; }
 .swatches button.on { box-shadow: inset 0 0 0 3px #fff, 0 0 0 3px var(--pink); }
 
-#toast { position: absolute; top: calc(70px + var(--safe-t)); left: 50%; transform: translateX(-50%); z-index: 50; display: flex; flex-direction: column; gap: 6px; align-items: center; pointer-events: none; width: 90%; }
+#toast { position: fixed; top: calc(70px + var(--safe-t)); left: 50%; transform: translateX(-50%); z-index: 66; max-width: 520px; display: flex; flex-direction: column; gap: 6px; align-items: center; pointer-events: none; width: 90%; }
 .toast { background: rgba(43,34,48,.92); color: #fff; padding: 10px 16px; border-radius: 14px; font-size: 14px; font-weight: 700; animation: pop .3s both; text-align: center; }
 .hidden { display: none !important; }
 

@@ -79,6 +79,8 @@
   const els = { bg: $('#bg'), chara: $('#chara'), hud: $('#hud'), sess: $('#sesshud'), screen: $('#screen'), vn: $('#vn'),
     choices: $('#choices'), dlg: $('#dialog'), name: $('#dialog .nametag'), meta: $('#dialog .meta'), text: $('#dialog .text'),
     timer: $('#dialog .timer'), place: $('#place'), timerBar: $('#dialog .timer i'), nav: $('#nav'), fx: $('#fx'), modal: $('#modal'), toast: $('#toast') };
+  // 팝업·알림은 게임 화면 밖 맨 위층으로 — 사무실·차고·주차장 같은 전체 화면 위에도 뜨게
+  document.body.appendChild(els.modal); document.body.appendChild(els.toast);
 
   function toast(msg, ms = 2400) {
     const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg;
