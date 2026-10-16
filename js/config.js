@@ -334,7 +334,14 @@ const CAR_ITEMS = [
   { id: 'flag', icon: '🚩', name: '회사 깃발', price: 1500, desc: '안테나에 달린 BANCA 깃발' },
   { id: 'ribbon', icon: '🎀', name: '축하 리본', price: 2000, desc: '지붕 위 커다란 빨간 리본' },
   { id: 'roofbox', icon: '🧳', name: '루프박스', price: 2500, desc: '주말 캠핑 준비 완료!' },
-  { id: 'glow', icon: '✨', name: '네온 언더글로우', price: 5000, desc: '차 아래 네온 불빛 · 밤에 더 빛나요' }
+  { id: 'glow', icon: '✨', name: '네온 언더글로우', price: 5000, desc: '차 아래 네온 불빛 · 밤에 더 빛나요' },
+  { id: 'balloons', icon: '🎈', name: '풍선 다발', price: 2500, desc: '차 옆에서 둥실둥실 흔들려요' },
+  { id: 'shine', icon: '💎', name: '광택 코팅', price: 3000, desc: '차체가 반짝반짝 빛나요' },
+  { id: 'flowers', icon: '💐', name: '웨딩 꽃장식', price: 4000, desc: '보닛 위 화사한 꽃다발' },
+  { id: 'envoy', icon: '🎌', name: '의전 깃발', price: 7000, desc: '앞 펜더 양쪽에 꽂는 의전용 깃발' },
+  { id: 'carpet', icon: '🟥', name: '레드카펫 마중', price: 8000, desc: '운전석 문 앞 레드카펫과 금색 차단봉' },
+  { id: 'driver', icon: '🧑‍✈️', name: '전속 기사님 고용', price: 50000, desc: '운전석 옆에서 기사님이 대기하고 있어요' },
+  { id: 'guards', icon: '🕴️', name: '경호원 2인', price: 120000, desc: '검은 정장 · 선글라스 경호원이 차를 지켜요' }
 ];
 const GLOW_COLORS = [['#ff4fa3', '핑크'], ['#3fa9ff', '블루'], ['#3ee08f', '그린'], ['#ffc93c', '골드'], ['#b26bff', '퍼플']];
 /* 사무실 꾸밈 물품 (매점에서 구매 → 사무실에 비치 · 보관 선택) */

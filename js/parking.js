@@ -107,6 +107,41 @@ const Parking = (() => {
       wallMat.needsUpdate = true;
     };
 
+    // ---- VIP 캐노피: 유리 지붕 + 금색 프레임 + 조명 간판 + 다운라이트 + 금장 기둥 + 토피어리 화분 ----
+    const goldM = std({ color: '#d9a93a', metalness: 0.95, roughness: 0.22 }), darkM = std({ color: '#17120d', metalness: 0.6, roughness: 0.35 });
+    const vipNight = [];
+    function vipCanopy(a, b) {
+      const zw = b - a, mid = (a + b) / 2, rw = zw + 0.8, z0 = -4.5, z1 = -0.6, zc = (z0 + z1) / 2, dz = z1 - z0, y = 3.05;
+      const glass = new T.Mesh(new T.BoxGeometry(rw, 0.04, dz), std({ color: '#2b3a4a', metalness: 0.4, roughness: 0.05, transparent: true, opacity: 0.55 }));
+      glass.position.set(mid, y, zc); scene.add(glass);
+      const bar = (w, h, d, x, yy, z, m = goldM) => { const o = new T.Mesh(new T.BoxGeometry(w, h, d), m); o.position.set(x, yy, z); scene.add(o); return o; };
+      bar(rw + 0.1, 0.08, 0.08, mid, y + 0.02, z0); bar(0.08, 0.08, dz, mid - rw / 2, y + 0.02, zc); bar(0.08, 0.08, dz, mid + rw / 2, y + 0.02, zc);
+      for (let k = 1; k < Math.round(rw / 1.2); k++) bar(0.04, 0.05, dz, mid - rw / 2 + k * rw / Math.round(rw / 1.2), y + 0.02, zc); // 유리 칸살
+      // 앞쪽 조명 간판 (VIP LOUNGE)
+      bar(rw + 0.14, 0.42, 0.16, mid, y - 0.06, z1, darkM);
+      bar(rw + 0.16, 0.05, 0.18, mid, y + 0.16, z1); bar(rw + 0.16, 0.05, 0.18, mid, y - 0.28, z1);
+      const fas = canvasTex(1024, 128, (g, w, h) => { g.fillStyle = '#17120d'; g.fillRect(0, 0, w, h); g.fillStyle = '#ffd66b'; g.font = 'bold 74px serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('♛  V I P   L O U N G E  ♛', w / 2, h / 2 + 4); });
+      const fw = Math.min(rw - 0.2, 4.2), face = new T.Mesh(new T.PlaneGeometry(fw, fw / 8), basic({ map: fas })); face.position.set(mid, y - 0.06, z1 + 0.085); scene.add(face);
+      // 다운라이트 (밤에 바닥으로 빛이 떨어짐)
+      const dl = basic({ color: '#fff1c8' }), pool = glowMat(radial([[0, 'rgba(255,226,160,.6)'], [1, 'rgba(255,226,160,0)']]));
+      for (let px = a + GAP / 2; px < b; px += GAP) [-3.4, -1.6].forEach((pz) => {
+        const d = new T.Mesh(new T.CylinderGeometry(0.11, 0.11, 0.03, 16), dl); d.position.set(px, y - 0.03, pz); scene.add(d);
+        const p = noPick(flat(2.6, 2.6, pool, px, 0.03, pz + 0.4)); scene.add(p); vipNight.push(p);
+      });
+      // 금장 기둥 (뒤쪽) + 토피어리 화분 (앞쪽 양 끝)
+      const nPost = Math.max(2, Math.round(zw / (GAP * 2)) + 1);
+      for (let k = 0; k < nPost; k++) {
+        const px = mid - rw / 2 + 0.1 + (rw - 0.2) * k / (nPost - 1);
+        const post = new T.Mesh(new T.CylinderGeometry(0.09, 0.09, y, 16), darkM); post.position.set(px, y / 2, z0 + 0.05); scene.add(post);
+        [0.08, y - 0.12, y * 0.5].forEach((ry) => { const ring = new T.Mesh(new T.TorusGeometry(0.1, 0.025, 8, 20), goldM); ring.rotation.x = Math.PI / 2; ring.position.set(px, ry, z0 + 0.05); scene.add(ring); });
+      }
+      [a - 0.15, b + 0.15].forEach((px) => {
+        const pot = new T.Mesh(new T.CylinderGeometry(0.32, 0.24, 0.55, 18), goldM); pot.position.set(px, 0.275, 2.6); scene.add(pot);
+        const ball = new T.Mesh(new T.SphereGeometry(0.42, 18, 14), std({ color: '#2f7a3b', roughness: 0.85 })); ball.position.set(px, 0.95, 2.6); scene.add(ball);
+        const ball2 = new T.Mesh(new T.SphereGeometry(0.28, 16, 12), std({ color: '#358a43', roughness: 0.85 })); ball2.position.set(px, 1.55, 2.6); scene.add(ball2);
+      });
+    }
+
     // ---- 구역 꾸밈: 벽 간판 · VIP 지붕 · 구역 사이 화단 ----
     const lineMats = {}; Object.keys(ZONES).forEach((k) => lineMats[k] = basic({ color: ZONES[k].line }));
     zones.forEach((zn, zi) => {
@@ -118,17 +153,7 @@ const Parking = (() => {
       });
       const sw = Math.min(6.4, Math.max(3.2, zw - 0.4));
       const sg = new T.Mesh(new T.PlaneGeometry(sw, sw * 220 / 1024), basic({ map: sign })); sg.position.set(mid, 5.45, -5.15); scene.add(sg);
-      if (zn.z === 'vip') { // 지붕(캐노피)
-        const roof = new T.Mesh(new T.BoxGeometry(zw + 0.6, 0.12, 3.4), std({ color: '#3a2a1c', roughness: 0.4, metalness: 0.5 }));
-        roof.position.set(mid, 2.95, -2.9); roof.rotation.x = 0.1; scene.add(roof);
-        const trim = new T.Mesh(new T.BoxGeometry(zw + 0.62, 0.08, 0.1), std({ color: '#d9a93a', metalness: 0.9, roughness: 0.25 }));
-        trim.position.set(mid, 2.85, -1.2); scene.add(trim);
-        const nPost = Math.max(2, Math.round(zw / (GAP * 2)) + 1);
-        for (let k = 0; k < nPost; k++) {
-          const post = new T.Mesh(new T.CylinderGeometry(0.07, 0.07, 3.1, 10), std({ color: '#2a2018', metalness: 0.6, roughness: 0.4 }));
-          post.position.set(a + zw * k / (nPost - 1), 1.55, -4.4); scene.add(post);
-        }
-      }
+      if (zn.z === 'vip') vipCanopy(a, b);
       if (zi > 0) { // 구역 사이 화단
         const px = zn.from - GAP / 2 - ZGAP / 2;
         const bed = new T.Mesh(new T.BoxGeometry(ZGAP - 0.9, 0.35, 6.4), std({ color: '#b9b4a8', roughness: 0.9 })); bed.position.set(px, 0.175, -0.4); scene.add(bed);
@@ -140,13 +165,27 @@ const Parking = (() => {
     // 주차선 · 칸 바닥 (VIP 레드카펫, 구역 글씨, 이름 팻말)
     const carpetTex = canvasTex(128, 256, (g, w, h) => { g.fillStyle = '#8f1d2c'; g.fillRect(0, 0, w, h); g.strokeStyle = '#e2b84a'; g.lineWidth = 8; g.strokeRect(6, 6, w - 12, h - 12); });
     const paintTex = {};
+    // 금색 차단봉 + 붉은 벨벳 줄 (axis 'z': 앞뒤로 / 'x': 옆으로 늘어섬)
+    const velvet = std({ color: '#9b1023', roughness: 0.6 });
+    function stanchions(px, from, to, axis, parent = scene, py = 0) {
+      const n = 2, pts = [];
+      for (let k = 0; k < n; k++) {
+        const t = from + (to - from) * k / (n - 1), x = axis === 'z' ? px : t, z = axis === 'z' ? t : px;
+        const base = new T.Mesh(new T.CylinderGeometry(0.14, 0.16, 0.04, 16), goldM); base.position.set(x, py + 0.02, z); parent.add(base);
+        const pole = new T.Mesh(new T.CylinderGeometry(0.03, 0.03, 0.9, 10), goldM); pole.position.set(x, py + 0.47, z); parent.add(pole);
+        const knob = new T.Mesh(new T.SphereGeometry(0.06, 12, 10), goldM); knob.position.set(x, py + 0.95, z); parent.add(knob);
+        pts.push(new T.Vector3(x, py + 0.86, z));
+      }
+      const m = pts[0].clone().lerp(pts[1], 0.5); m.y -= 0.22;
+      parent.add(new T.Mesh(new T.TubeGeometry(new T.QuadraticBezierCurve3(pts[0], m, pts[1]), 16, 0.025, 6), velvet));
+    }
     const signPole = new T.CylinderGeometry(0.04, 0.04, 1.3, 8), signPoleMat = std({ color: '#777', metalness: 0.7, roughness: 0.4 });
     slots.forEach((s, i) => {
       const lm = lineMats[s.zone], prev = slots[i - 1], next = slots[i + 1];
       if (!prev || prev.zone !== s.zone) scene.add(flat(0.14, 7.2, lm, s.x - GAP / 2, 0.012, -0.2));
       scene.add(flat(0.14, 7.2, lm, s.x + GAP / 2, 0.012, -0.2));
       if (!next || next.zone !== s.zone) { const zn = zones.find((q) => q.z === s.zone && q.to === s.x); scene.add(flat(zn.to - zn.from + GAP, 0.14, lm, (zn.from + zn.to) / 2, 0.012, -3.8)); }
-      if (s.zone === 'vip') scene.add(flat(GAP - 0.5, 6.6, basic({ map: carpetTex }), s.x, 0.008, -0.3));
+      if (s.zone === 'vip') { scene.add(flat(GAP - 0.5, 6.6, basic({ map: carpetTex }), s.x, 0.008, -0.3)); [-1, 1].forEach((d) => stanchions(s.x + d * (GAP / 2 - 0.12), 1.4, 3.2, 'z')); }
       const Z = ZONES[s.zone];
       if (Z.paint) {
         paintTex[s.zone] = paintTex[s.zone] || canvasTex(256, 96, (g, w, h) => { g.fillStyle = Z.line; g.font = 'bold 72px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(Z.paint, w / 2, h / 2 + 4); });
@@ -201,6 +240,35 @@ const Parking = (() => {
     });
     const flagTex = canvasTex(256, 160, (g, w, h) => { g.fillStyle = '#1f2a44'; g.fillRect(0, 0, w, h); g.fillStyle = '#ffd66b'; g.font = 'bold 54px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('BANCA', w / 2, h / 2 + 3); });
     const ribbonMat = std({ color: '#e8243c', roughness: 0.35, metalness: 0.1 });
+    const vipFlagTex = canvasTex(256, 160, (g, w, h) => { g.fillStyle = '#8f1d2c'; g.fillRect(0, 0, w, h); g.fillStyle = '#ffd66b'; g.font = 'bold 64px serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('VIP', w / 2, h / 2 + 4); });
+    const starTex = canvasTex(64, 64, (g, w, h) => { const r = g.createRadialGradient(32, 32, 0, 32, 32, 32); r.addColorStop(0, 'rgba(255,255,255,1)'); r.addColorStop(0.15, 'rgba(255,255,240,.9)'); r.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = r; g.fillRect(0, 0, w, h); g.fillStyle = '#fff'; g.fillRect(30, 2, 4, 60); g.fillRect(2, 30, 60, 4); });
+    const lineM = new T.LineBasicMaterial({ color: '#eeeeee' }), surfRay = new T.Raycaster(), DOWN = new T.Vector3(0, -1, 0);
+    const anims = [];
+    // 사람 (기사님 · 경호원) — 단순한 3D 도형으로
+    const skinM = std({ color: '#f1c7a5', roughness: 0.7 }), suitM = std({ color: '#15161c', roughness: 0.55 }), shirtM = std({ color: '#f4f4f4', roughness: 0.6 });
+    const gloveM = std({ color: '#ffffff', roughness: 0.5 }), hairM = std({ color: '#1a1410', roughness: 0.8 }), tieM = std({ color: '#7a1020', roughness: 0.5 }), blackM = std({ color: '#050505', metalness: 0.5, roughness: 0.15 });
+    function person(kind) {
+      const g = new T.Group(), add = (geo, m, x, y, z) => { const o = new T.Mesh(geo, m); o.position.set(x, y, z); g.add(o); return o; };
+      [-1, 1].forEach((d) => {
+        add(new T.CylinderGeometry(0.085, 0.075, 0.82, 10), suitM, d * 0.1, 0.43, 0);
+        add(new T.BoxGeometry(0.12, 0.07, 0.26), blackM, d * 0.1, 0.035, 0.05);
+        add(new T.CapsuleGeometry(0.06, 0.46, 4, 8), suitM, d * 0.27, 1.13, 0.02).rotation.z = d * 0.08;
+        add(new T.SphereGeometry(0.065, 10, 8), kind === 'driver' ? gloveM : skinM, d * 0.29, 0.82, 0.04);
+      });
+      add(new T.CapsuleGeometry(0.2, 0.42, 4, 12), suitM, 0, 1.17, 0).scale.z = 0.68;
+      add(new T.BoxGeometry(0.12, 0.3, 0.02), shirtM, 0, 1.3, 0.135);
+      add(new T.BoxGeometry(0.045, 0.24, 0.02), kind === 'guard' ? blackM : tieM, 0, 1.28, 0.148);
+      add(new T.CylinderGeometry(0.055, 0.06, 0.08, 8), skinM, 0, 1.5, 0);
+      add(new T.SphereGeometry(0.125, 16, 12), skinM, 0, 1.64, 0).scale.y = 1.1;
+      add(new T.SphereGeometry(0.132, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.5), hairM, 0, 1.66, -0.005);
+      if (kind === 'driver') { // 기사 모자 (금색 띠) · 눈
+        add(new T.CylinderGeometry(0.15, 0.135, 0.09, 18), suitM, 0, 1.8, 0);
+        add(new T.CylinderGeometry(0.137, 0.137, 0.028, 18), goldM, 0, 1.765, 0);
+        add(new T.BoxGeometry(0.2, 0.015, 0.1), blackM, 0, 1.745, 0.14);
+        [-1, 1].forEach((d) => add(new T.SphereGeometry(0.016, 6, 6), blackM, d * 0.045, 1.655, 0.118));
+      } else add(new T.BoxGeometry(0.22, 0.045, 0.03), blackM, 0, 1.665, 0.118); // 경호원 선글라스
+      return g;
+    }
     function dress(s, wrap, Wd, L, H) {
       const cr = s.p.cr || {}, has = new Set(cr.i || []);
       let extra = 0;
@@ -229,7 +297,52 @@ const Parking = (() => {
         const fx = -Wd * 0.34, fz = -L * 0.3, fy = H * 0.86;
         const pole = new T.Mesh(new T.CylinderGeometry(0.012, 0.012, 0.9, 6), std({ color: '#222' })); pole.position.set(fx, fy + 0.45, fz); wrap.add(pole);
         const fl = new T.Mesh(new T.PlaneGeometry(0.5, 0.31), basic({ map: flagTex, side: T.DoubleSide })); fl.position.set(fx - 0.26, fy + 0.74, fz); fl.rotation.y = 0.35; wrap.add(fl);
-        extra = Math.max(extra, 0.25);
+        extra = Math.max(extra, 1.0);
+      }
+      const side = Wd / 2; // +X 쪽(운전석)이 카메라에 보이는 옆면
+      const surf = (px, pz) => { // 차 표면 높이 (보닛·펜더 위에 장식 올릴 때)
+        surfRay.set(new T.Vector3(px, H + 2, pz), DOWN); const h = surfRay.intersectObject(wrap.children[0], true)[0];
+        return h ? h.point.y : H * 0.6;
+      };
+      wrap.updateMatrixWorld(true);
+      if (has.has('carpet')) {
+        wrap.add(flat(1.5, 1.0, basic({ map: carpetTex }), side + 0.95, 0.03, L * 0.1).rotateZ(Math.PI / 2));
+        [-1, 1].forEach((d) => stanchions(L * 0.1 + d * 0.62, side + 0.35, side + 1.55, 'x', wrap));
+      }
+      if (has.has('driver')) { const p = person('driver'); p.position.set(side + 0.48, 0, L * 0.12); p.rotation.y = 0.42 + 0.5; wrap.add(p); }
+      if (has.has('guards')) {
+        const g1 = person('guard'); g1.position.set(side + 0.55, 0, -L * 0.3); g1.rotation.y = 0.42 + 0.3; wrap.add(g1);
+        const g2 = person('guard'); g2.position.set(side + 0.2, 0, L / 2 + 0.55); g2.rotation.y = 0.42; wrap.add(g2);
+      }
+      if (has.has('flowers')) {
+        const hz = L * 0.3, hy = surf(0, hz), g = new T.Group(); g.position.set(0, hy, hz);
+        const cols = ['#ff7aa8', '#ffffff', '#ff4d6d', '#ffd1e0', '#ffffff', '#ff7aa8', '#ffe066'];
+        cols.forEach((c, k) => { const a = k / cols.length * Math.PI * 2, r = k ? 0.13 : 0; const f = new T.Mesh(new T.SphereGeometry(0.075, 10, 8), std({ color: c, roughness: 0.6 })); f.position.set(Math.cos(a) * r, 0.07 + (k ? 0 : 0.04), Math.sin(a) * r * 0.8); g.add(f); });
+        [-1, 1].forEach((d) => { const lf = new T.Mesh(new T.SphereGeometry(0.09, 8, 6), std({ color: '#4f9a4a' })); lf.scale.set(1.4, 0.3, 0.7); lf.position.set(d * 0.2, 0.03, 0.02); g.add(lf); });
+        const bow = new T.Mesh(new T.TorusGeometry(0.06, 0.02, 6, 12), ribbonMat); bow.position.set(0, 0.04, 0.18); g.add(bow);
+        wrap.add(g);
+      }
+      if (has.has('envoy')) [-1, 1].forEach((d) => {
+        const fx = d * Wd * 0.36, fz = L * 0.36, fy = surf(fx, fz);
+        const pole = new T.Mesh(new T.CylinderGeometry(0.012, 0.012, 0.42, 6), goldM); pole.position.set(fx, fy + 0.21, fz); wrap.add(pole);
+        const fl = new T.Mesh(new T.PlaneGeometry(0.28, 0.18), basic({ map: d > 0 ? flagTex : vipFlagTex, side: T.DoubleSide })); fl.position.set(fx + d * 0.15, fy + 0.33, fz); wrap.add(fl);
+      });
+      if (has.has('balloons')) {
+        const g = new T.Group(); g.position.set(side + 0.25, 0.95, L * 0.32); wrap.add(g);
+        ['#ff5a7a', '#ffd23f', '#4fc3f7', '#7ee081', '#c084fc'].forEach((c, k) => {
+          const bp = new T.Vector3(Math.cos(k * 1.3) * 0.32, 1.25 + (k % 3) * 0.22, Math.sin(k * 1.3) * 0.25);
+          const b = new T.Mesh(new T.SphereGeometry(0.2, 14, 12), std({ color: c, roughness: 0.25, metalness: 0.05 })); b.scale.y = 1.18; b.position.copy(bp); g.add(b);
+          g.add(new T.Line(new T.BufferGeometry().setFromPoints([new T.Vector3(0, 0, 0), bp.clone().setY(bp.y - 0.23)]), lineM));
+        });
+        const ph = Math.random() * 6; anims.push((t) => { g.rotation.z = Math.sin(t * 1.3 + ph) * 0.05; g.rotation.x = Math.sin(t * 0.9 + ph) * 0.04; });
+      }
+      if (has.has('shine')) {
+        const sp = [];
+        for (let k = 0; k < 9; k++) {
+          const st = noPick(new T.Sprite(new T.SpriteMaterial({ map: starTex, transparent: true, depthWrite: false, blending: T.AdditiveBlending })));
+          st.position.set((Math.random() - 0.3) * Wd, H * (0.45 + Math.random() * 0.55), (Math.random() - 0.5) * L * 0.9); st.userData.ph = Math.random() * 6; wrap.add(st); sp.push(st);
+        }
+        anims.push((t) => sp.forEach((st) => { const v = Math.max(0, Math.sin(t * 2.6 + st.userData.ph)); st.scale.setScalar(0.05 + v * 0.38); }));
       }
       // 밤: 헤드라이트 · 바닥 불빛
       [-1, 1].forEach((d) => { const hl = noPick(new T.Sprite(new T.SpriteMaterial({ map: headTex, transparent: true, depthWrite: false, blending: T.AdditiveBlending }))); hl.scale.set(0.9, 0.9, 1); hl.position.set(d * Wd * 0.33, H * 0.36, L / 2 + 0.06); wrap.add(hl); s.night.push(hl); });
@@ -265,6 +378,7 @@ const Parking = (() => {
       drawWall(P);
       bulbMat.color.set(P.lit > 0.5 ? '#fff3c4' : '#d9d9d9');
       lampNight.forEach((o) => { o.visible = P.lit > 0.5; });
+      vipNight.forEach((o) => { o.material.opacity = P.lit > 0.5 ? 1 : P.lit ? 0.6 : 0.25; });
       slots.forEach((s) => nightOf(s, P));
       beams.forEach((b) => { b.material.opacity = P.lit > 0.5 ? 0.32 : 0.18; });
       dirty = true;
@@ -343,7 +457,7 @@ const Parking = (() => {
     const placeLabels = () => {
       const w = host.clientWidth, h = host.clientHeight;
       slots.forEach((s) => {
-        v3.set(s.x, s.top + 0.35, 0).project(cam);
+        v3.set(s.x, s.top + 0.6, 0).project(cam);
         const lx = (v3.x + 1) / 2 * w, ly = (1 - v3.y) / 2 * h;
         const on = v3.z < 1 && lx > -80 && lx < w + 80;
         s.el.style.display = on ? '' : 'none';
@@ -354,6 +468,7 @@ const Parking = (() => {
     const loop = () => {
       if (!alive) return;
       if (down == null && Math.abs(vel) > 0.002) { camX += vel; vel *= 0.92; clamp(); dirty = true; }
+      if (anims.length) { const t = performance.now() / 1000; anims.forEach((f) => f(t)); dirty = true; } // 풍선 흔들림 · 광택 반짝임
       if (dirty) { place(); renderer.render(scene, cam); placeLabels(); dirty = false; }
       requestAnimationFrame(loop);
     };
