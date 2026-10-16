@@ -661,3 +661,9 @@ img.sprite.bust.illust { width: 135%; left: -17%; top: -3%; }
 
 .pk-bar { margin-top: 6px; } .pk-bar .btn { padding-left: 6px; padding-right: 6px; font-size: 14px; }
 #parkView .pk-bar .btn.ghost { background: rgba(255,255,255,.12); color: #fff; border-color: rgba(255,255,255,.25); }
+
+/* 최우수BM: 사진 아래 금빛 월계수 */
+.pk-avw { position: relative; display: block; width: 46px; height: 46px; }
+.pk-laurel { position: absolute; left: 50%; top: 50%; width: 82px; height: 82px; transform: translate(-50%, -48%); z-index: 2; pointer-events: none; filter: drop-shadow(0 2px 3px rgba(0,0,0,.35)); }
+.pk-label.best .pk-av { box-shadow: 0 0 0 3px #f2c447, 0 4px 10px rgba(0,0,0,.3); }
+.pk-label.best b { margin-top: 17px; }

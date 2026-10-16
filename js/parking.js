@@ -230,17 +230,7 @@ const Parking = (() => {
       lampNight.push(glow, pool);
     }
 
-    // ---- 최우수BM 스포트라이트 ----
-    const beamTex = canvasTex(4, 128, (g, w, h) => { const l = g.createLinearGradient(0, 0, 0, h); l.addColorStop(0, 'rgba(255,240,190,0)'); l.addColorStop(1, 'rgba(255,240,190,.9)'); g.fillStyle = l; g.fillRect(0, 0, w, h); });
-    const ringTex = radial([[0, 'rgba(255,224,130,.75)'], [0.7, 'rgba(255,224,130,.25)'], [1, 'rgba(255,224,130,0)']]);
-    const beams = [];
-    slots.filter((s) => s.p.best).forEach((s) => {
-      const sp = new T.SpotLight('#fff1c2', 45, 0, 0.42, 0.6, 2); sp.position.set(s.x, 8, 2.5); sp.target.position.set(s.x, 0, 0); scene.add(sp, sp.target);
-      const cone = noPick(new T.Mesh(new T.ConeGeometry(2.3, 7.6, 32, 1, true), basic({ map: beamTex, transparent: true, opacity: 0.2, depthWrite: false, blending: T.AdditiveBlending, side: T.DoubleSide })));
-      cone.position.set(s.x, 4.0, 1.0); cone.rotation.x = 0.27; scene.add(cone);
-      scene.add(flat(6, 6, glowMat(ringTex), s.x, 0.025, 0.2));
-      beams.push(cone);
-    });
+    const beams = []; // (최우수BM 표시는 이름표의 금빛 월계수로 — 조명은 차를 가려서 뺌)
 
     // ---- 차 꾸밈 ----
     const blobM = basic({ map: radial([[0, 'rgba(0,0,0,.55)'], [1, 'rgba(0,0,0,0)']]), transparent: true, depthWrite: false });

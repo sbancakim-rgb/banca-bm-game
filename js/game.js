@@ -1280,6 +1280,25 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
   }
   /* ---------------- 회사 주차장 (모든 BM의 차를 3D로) ---------------- */
   const carOf = (lv) => CARS[Math.min(rankIdx(lv), CARS.length - 1)];
+  // 최우수BM 사진 아래를 감싸는 금빛 월계수 (잎을 원호를 따라 좌우로 배치)
+  const LAUREL = (() => {
+    let leaves = ''; const R = 41, deg = Math.PI / 180;
+    // 아래 가운데(90°)에서 시작해 양옆으로 올라가는 두 가지 — 위쪽은 비워 둠 (화면 좌표: y가 아래로)
+    [[100, 205], [80, -25]].forEach(([from, to]) => {
+      const n = 7, dir = Math.sign(to - from);
+      for (let k = 0; k < n; k++) {
+        const th = (from + (to - from) * k / (n - 1)) * deg, tx = -Math.sin(th) * dir, ty = Math.cos(th) * dir; // 가지가 뻗는 방향
+        const ang = Math.atan2(ty, tx) / deg, size = 1 - k * 0.05;
+        [[R + 5, -32], [R - 4, 32]].forEach(([rr, tilt]) => { // 바깥 잎 · 안쪽 잎 한 쌍
+          const x = 50 + Math.cos(th) * rr, y = 50 + Math.sin(th) * rr, t = ang + tilt * dir;
+          leaves += `<ellipse cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" rx="${(7.2 * size).toFixed(1)}" ry="${(3.1 * size).toFixed(1)}" transform="rotate(${t.toFixed(0)} ${x.toFixed(1)} ${y.toFixed(1)})"/>`;
+        });
+      }
+    });
+    return `<svg class="pk-laurel" viewBox="0 0 100 100" aria-hidden="true"><defs><linearGradient id="lgold" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff1a8"/><stop offset=".5" stop-color="#f2c447"/><stop offset="1" stop-color="#b8860b"/></linearGradient></defs>
+      <path d="M9 33 A41 41 0 0 0 46 91 M91 33 A41 41 0 0 1 54 91" fill="none" stroke="#b8860b" stroke-width="2" stroke-linecap="round"/><g fill="url(#lgold)" stroke="#8a6408" stroke-width=".8">${leaves}</g>
+      <path d="M44 93 L50 88 L56 93 L53 99 L50 95 L47 99 Z" fill="#d6332f" stroke="#8a1a17" stroke-width=".6"/></svg>`;
+  })();
   const TIME_ORDER = ['auto', 'morning', 'day', 'sunset', 'night'];
   let parkTime = 'auto';
   async function openParking() {
@@ -1319,7 +1338,7 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
     if (!has('vip')) list.unshift({ sample: 'vip', lv: SAMPLE.vip.from.lv, name: SAMPLE.vip.title });
     const label = (x) => x.sample
       ? `<span class="pk-av pk-lock">🔒</span><b>${esc(x.name)}</b><small>${esc(SAMPLE[x.sample].from.title)}부터 주차</small>`
-      : `${x.best ? `<em class="pk-best">${x.best}</em>` : ''}<span class="pk-av">${avatar(x)}</span><b>${esc(x.name)}${x.me ? ' (나)' : ''}</b><small>Lv.${x.lv} ${rankOf(x.lv).title}</small>`;
+      : `${x.best ? `<em class="pk-best">${x.best}</em><span class="pk-avw">${LAUREL}<span class="pk-av">${avatar(x)}</span></span>` : `<span class="pk-av">${avatar(x)}</span>`}<b>${esc(x.name)}${x.me ? ' (나)' : ''}</b><small>Lv.${x.lv} ${rankOf(x.lv).title}</small>`;
     el.querySelector('.pk-info').textContent = `BM ${list.filter((x) => !x.sample).length}명 · 레벨 높은 순서로 주차돼 있어요`;
     const mi = list.findIndex((x) => x.me), tb = el.querySelector('[data-time]');
     // 주차장 짓기 (꾸미기를 바꾸면 내 차 앞에서 다시 지음 — 차 모델은 받아 둔 것을 씀)
