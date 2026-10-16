@@ -80,6 +80,11 @@ const Mini = (() => {
     return new Promise((done) => {
       const COLS = 9, ROWS = 13, LIMIT = 60000, SPEED = 4.2; // 칸/초
       const g = makeMaze(COLS, ROWS, rng(opts.seed || Date.now()));
+      // 이스터 에그: 막다른 길 하나에 비밀 금고 (그날 미로마다 같은 자리 · 표시 없음)
+      const bits = (v) => (v & 1) + (v >> 1 & 1) + (v >> 2 & 1) + (v >> 3 & 1);
+      const ends = []; g.forEach((row, y) => row.forEach((v, x) => { if (bits(v) === 1 && !(x === 0 && y === 0) && !(x === COLS - 1 && y === ROWS - 1)) ends.push({ x, y }); }));
+      const egg = ends.length ? ends[Math.floor(rng((opts.seed || '') + '|egg')() * ends.length)] : null;
+      let eggHit = false, eggShow = 0;
       const sh = shell('🗺️ 출근길 미로', 'four');
       let size = sh.fit(ROWS / COLS), cs = size.w / COLS;
       const onResize = () => { size = sh.fit(ROWS / COLS); cs = size.w / COLS; };
@@ -97,6 +102,10 @@ const Mini = (() => {
         if (car.t >= 1) {
           car.x = car.tx; car.y = car.ty; car.t = 1;
           if (car.x === COLS - 1 && car.y === ROWS - 1) return true;
+          if (egg && !eggHit && car.x === egg.x && car.y === egg.y) { // 비밀 금고 발견!
+            eggHit = true; const r = opts.onEgg && opts.onEgg();
+            if (r) { eggShow = performance.now(); const n = document.createElement('div'); n.className = 'mini-egg'; n.innerHTML = r; sh.el.querySelector('.mini-stage').appendChild(n); setTimeout(() => n.remove(), 2600); }
+          }
           const nd = want && open(car.x, car.y, want) ? want : car.dir && open(car.x, car.y, car.dir) ? car.dir : null;
           car.dir = nd;
           if (nd) { car.tx = car.x + DIRS[nd][0]; car.ty = car.y + DIRS[nd][1]; car.t = 0; }
@@ -128,6 +137,7 @@ const Mini = (() => {
         c.stroke(); c.setLineDash([]);
         c.font = `${cs * 0.62}px sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle';
         c.fillText('🏢', cs / 2, cs / 2); c.fillText('🏦', (COLS - 0.5) * cs, (ROWS - 0.5) * cs);
+        if (eggHit && performance.now() - eggShow < 2600) c.fillText('💰', (egg.x + 0.5) * cs, (egg.y + 0.5) * cs - cs * 0.3 * Math.sin((performance.now() - eggShow) / 200));
         // 자동차
         const fx = car.x + (car.tx - car.x) * car.t, fy = car.y + (car.ty - car.y) * car.t;
         if (car.dir) { const ta = Math.atan2(DIRS[car.dir][1], DIRS[car.dir][0]) + Math.PI / 2; let da = ta - car.ang; while (da > Math.PI) da -= 2 * Math.PI; while (da < -Math.PI) da += 2 * Math.PI; car.ang += da * 0.35; }
@@ -158,7 +168,7 @@ const Mini = (() => {
         sh.el.querySelector('[data-q]').onclick = quit;
       }
       async function start() {
-        reset(); draw(); await countdown(sh);
+        reset(); eggHit = false; draw(); await countdown(sh);
         t0 = performance.now(); last = 0; running = true; raf = requestAnimationFrame(loop);
       }
       function quit() { running = false; cancelAnimationFrame(raf); offDir(); removeEventListener('resize', onResize); sh.el.remove(); done(); }

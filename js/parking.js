@@ -8,7 +8,8 @@
 const Parking = (() => {
   const CDN = 'https://cdn.jsdelivr.net/npm/three@0.160.0';
   const LEN = [3.0, 4.0, 4.8, 4.8, 5.1, 5.3, 6.6]; // 직급별 차 길이(m) — 차마다 크기를 실제 비율로 맞춤
-  const GAP = 3.6;      // 주차칸 폭(m)
+  const GAP = 3.6;      // 일반 주차칸 폭(m)
+  const SLOT = { vip: 5.4, exec: 4.2, bm: GAP }; // 구역별 칸 폭 — VIP는 넓게
   const ZGAP = 3.0;     // 구역 사이 화단 폭(m)
   const VIEW_W = 5.8;   // 화면에 보이는 폭(m) — 세로 휴대폰에서 두 대 남짓
   const zoneOf = (rank) => (rank >= 5 ? 'vip' : rank >= 3 ? 'exec' : 'bm');
@@ -55,12 +56,12 @@ const Parking = (() => {
     const slots = [], zones = [];
     let x = 0, zPrev = null;
     people.forEach((p, i) => {
-      const z = zoneOf(p.rank);
-      if (zPrev && z !== zPrev) x += ZGAP;
+      const z = zoneOf(p.rank), w = SLOT[z];
+      if (zPrev) x += SLOT[zPrev] / 2 + w / 2 + (z !== zPrev ? ZGAP : 0);
       if (z !== zPrev) zones.push({ z, from: x, to: x });
       zones[zones.length - 1].to = x;
-      slots.push({ p, i, x, zone: z, top: 1.6, wrap: null, el: null, night: [], glow: null });
-      x += GAP; zPrev = z;
+      slots.push({ p, i, x, w, zone: z, top: p.sample ? 1.3 : 1.6, wrap: null, el: null, night: [], glow: null });
+      zPrev = z;
     });
     const span = slots.length ? slots[slots.length - 1].x : 0;
 
@@ -124,28 +125,28 @@ const Parking = (() => {
       const fw = Math.min(rw - 0.2, 4.2), face = new T.Mesh(new T.PlaneGeometry(fw, fw / 8), basic({ map: fas })); face.position.set(mid, y - 0.06, z1 + 0.085); scene.add(face);
       // 다운라이트 (밤에 바닥으로 빛이 떨어짐)
       const dl = basic({ color: '#fff1c8' }), pool = glowMat(radial([[0, 'rgba(255,226,160,.6)'], [1, 'rgba(255,226,160,0)']]));
-      for (let px = a + GAP / 2; px < b; px += GAP) [-3.4, -1.6].forEach((pz) => {
+      for (let px = a + SLOT.vip / 2; px < b; px += SLOT.vip) [-3.4, -1.6].forEach((pz) => {
         const d = new T.Mesh(new T.CylinderGeometry(0.11, 0.11, 0.03, 16), dl); d.position.set(px, y - 0.03, pz); scene.add(d);
         const p = noPick(flat(2.6, 2.6, pool, px, 0.03, pz + 0.4)); scene.add(p); vipNight.push(p);
       });
       // 금장 기둥 (뒤쪽) + 토피어리 화분 (앞쪽 양 끝)
-      const nPost = Math.max(2, Math.round(zw / (GAP * 2)) + 1);
+      const nPost = Math.max(2, Math.round(zw / (SLOT.vip * 1.5)) + 1);
       for (let k = 0; k < nPost; k++) {
         const px = mid - rw / 2 + 0.1 + (rw - 0.2) * k / (nPost - 1);
         const post = new T.Mesh(new T.CylinderGeometry(0.09, 0.09, y, 16), darkM); post.position.set(px, y / 2, z0 + 0.05); scene.add(post);
         [0.08, y - 0.12, y * 0.5].forEach((ry) => { const ring = new T.Mesh(new T.TorusGeometry(0.1, 0.025, 8, 20), goldM); ring.rotation.x = Math.PI / 2; ring.position.set(px, ry, z0 + 0.05); scene.add(ring); });
       }
-      [a - 0.15, b + 0.15].forEach((px) => {
-        const pot = new T.Mesh(new T.CylinderGeometry(0.32, 0.24, 0.55, 18), goldM); pot.position.set(px, 0.275, 2.6); scene.add(pot);
-        const ball = new T.Mesh(new T.SphereGeometry(0.42, 18, 14), std({ color: '#2f7a3b', roughness: 0.85 })); ball.position.set(px, 0.95, 2.6); scene.add(ball);
-        const ball2 = new T.Mesh(new T.SphereGeometry(0.28, 16, 12), std({ color: '#358a43', roughness: 0.85 })); ball2.position.set(px, 1.55, 2.6); scene.add(ball2);
+      [a + 0.05, b - 0.05].forEach((px) => { // 칸 바깥 모서리 맨 앞 — 차를 가리지 않게 작게
+        const pot = new T.Mesh(new T.CylinderGeometry(0.24, 0.18, 0.42, 18), goldM); pot.position.set(px, 0.21, 3.5); scene.add(pot);
+        const ball = new T.Mesh(new T.SphereGeometry(0.3, 18, 14), std({ color: '#2f7a3b', roughness: 0.85 })); ball.position.set(px, 0.7, 3.5); scene.add(ball);
+        const ball2 = new T.Mesh(new T.SphereGeometry(0.2, 16, 12), std({ color: '#358a43', roughness: 0.85 })); ball2.position.set(px, 1.12, 3.5); scene.add(ball2);
       });
     }
 
     // ---- 구역 꾸밈: 벽 간판 · VIP 지붕 · 구역 사이 화단 ----
     const lineMats = {}; Object.keys(ZONES).forEach((k) => lineMats[k] = basic({ color: ZONES[k].line }));
     zones.forEach((zn, zi) => {
-      const Z = ZONES[zn.z], a = zn.from - GAP / 2, b = zn.to + GAP / 2, mid = (a + b) / 2, zw = b - a;
+      const Z = ZONES[zn.z], a = zn.from - SLOT[zn.z] / 2, b = zn.to + SLOT[zn.z] / 2, mid = (a + b) / 2, zw = b - a;
       const sign = canvasTex(1024, 220, (g, w, h) => {
         g.fillStyle = Z.bg; g.fillRect(0, 0, w, h); g.strokeStyle = Z.fg; g.lineWidth = 8; g.strokeRect(10, 10, w - 20, h - 20);
         g.fillStyle = Z.fg; g.textAlign = 'center'; g.textBaseline = 'middle';
@@ -155,7 +156,7 @@ const Parking = (() => {
       const sg = new T.Mesh(new T.PlaneGeometry(sw, sw * 220 / 1024), basic({ map: sign })); sg.position.set(mid, 5.45, -5.15); scene.add(sg);
       if (zn.z === 'vip') vipCanopy(a, b);
       if (zi > 0) { // 구역 사이 화단
-        const px = zn.from - GAP / 2 - ZGAP / 2;
+        const px = a - ZGAP / 2;
         const bed = new T.Mesh(new T.BoxGeometry(ZGAP - 0.9, 0.35, 6.4), std({ color: '#b9b4a8', roughness: 0.9 })); bed.position.set(px, 0.175, -0.4); scene.add(bed);
         scene.add(flat(ZGAP - 1.1, 6.2, std({ color: '#4d3a2a', roughness: 1 }), px, 0.36, -0.4));
         const leaf = std({ color: '#3f8f4a', roughness: 0.8 });
@@ -182,10 +183,22 @@ const Parking = (() => {
     const signPole = new T.CylinderGeometry(0.04, 0.04, 1.3, 8), signPoleMat = std({ color: '#777', metalness: 0.7, roughness: 0.4 });
     slots.forEach((s, i) => {
       const lm = lineMats[s.zone], prev = slots[i - 1], next = slots[i + 1];
-      if (!prev || prev.zone !== s.zone) scene.add(flat(0.14, 7.2, lm, s.x - GAP / 2, 0.012, -0.2));
-      scene.add(flat(0.14, 7.2, lm, s.x + GAP / 2, 0.012, -0.2));
-      if (!next || next.zone !== s.zone) { const zn = zones.find((q) => q.z === s.zone && q.to === s.x); scene.add(flat(zn.to - zn.from + GAP, 0.14, lm, (zn.from + zn.to) / 2, 0.012, -3.8)); }
-      if (s.zone === 'vip') { scene.add(flat(GAP - 0.5, 6.6, basic({ map: carpetTex }), s.x, 0.008, -0.3)); [-1, 1].forEach((d) => stanchions(s.x + d * (GAP / 2 - 0.12), 1.4, 3.2, 'z')); }
+      if (!prev || prev.zone !== s.zone) scene.add(flat(0.14, 7.2, lm, s.x - s.w / 2, 0.012, -0.2));
+      scene.add(flat(0.14, 7.2, lm, s.x + s.w / 2, 0.012, -0.2));
+      if (!next || next.zone !== s.zone) { const zn = zones.find((q) => q.z === s.zone && q.to === s.x); scene.add(flat(zn.to - zn.from + s.w, 0.14, lm, (zn.from + zn.to) / 2, 0.012, -3.8)); }
+      if (s.zone === 'vip') { scene.add(flat(s.w - 0.6, 6.6, basic({ map: carpetTex }), s.x, 0.008, -0.3)); [-1, 1].forEach((d) => stanchions(s.x + d * (s.w / 2 - 0.15), 1.4, 3.2, 'z')); }
+      if (s.p.sample) { // 빈 샘플 자리: 차 대신 RESERVED 입간판만 — 궁금하게
+        const Z2 = ZONES[s.zone];
+        const rt = canvasTex(256, 320, (g, w, h) => {
+          g.fillStyle = Z2.bg; g.fillRect(0, 0, w, h); g.strokeStyle = Z2.line; g.lineWidth = 10; g.strokeRect(8, 8, w - 16, h - 16);
+          g.fillStyle = Z2.fg; g.textAlign = 'center'; g.textBaseline = 'middle';
+          g.font = 'bold 120px serif'; g.fillText(s.zone === 'vip' ? '♛' : '★', w / 2, 100);
+          g.font = 'bold 44px sans-serif'; g.fillText('RESERVED', w / 2, 205); g.font = 'bold 30px sans-serif'; g.fillText(s.zone === 'vip' ? '부사장 이상' : '지역단장 이상', w / 2, 262);
+        });
+        const st = new T.Mesh(new T.PlaneGeometry(0.8, 1.0), basic({ map: rt, side: T.DoubleSide })); st.position.set(s.x, 0.62, 0.6); st.rotation.x = -0.12; scene.add(st);
+        const leg = new T.Mesh(new T.BoxGeometry(0.05, 0.6, 0.05), goldM); leg.position.set(s.x, 0.3, 0.45); leg.rotation.x = 0.5; scene.add(leg);
+        scene.add(flat(s.w - 1.2, 0.5, basic({ map: canvasTex(512, 96, (g, w, h) => { g.fillStyle = Z2.line; g.font = 'bold 70px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('RESERVED', w / 2, h / 2 + 4); }), transparent: true, opacity: 0.8 }), s.x, 0.016, -1.6));
+      }
       const Z = ZONES[s.zone];
       if (Z.paint) {
         paintTex[s.zone] = paintTex[s.zone] || canvasTex(256, 96, (g, w, h) => { g.fillStyle = Z.line; g.font = 'bold 72px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(Z.paint, w / 2, h / 2 + 4); });
@@ -196,8 +209,8 @@ const Parking = (() => {
           g.font = 'bold 30px sans-serif'; g.fillText(Z.paint + ' 전용', w / 2, 36);
           g.font = 'bold 44px sans-serif'; g.fillText(s.p.sample ? 'RESERVED' : String(s.p.name || '').slice(0, 7), w / 2, 86);
         });
-        const pole = new T.Mesh(signPole, signPoleMat); pole.position.set(s.x + GAP * 0.32, 0.65, -3.95); scene.add(pole);
-        const pl = new T.Mesh(new T.PlaneGeometry(0.9, 0.45), basic({ map: t })); pl.position.set(s.x + GAP * 0.32, 1.45, -3.93); scene.add(pl);
+        const pole = new T.Mesh(signPole, signPoleMat); pole.position.set(s.x + s.w * 0.32, 0.65, -3.95); scene.add(pole);
+        const pl = new T.Mesh(new T.PlaneGeometry(0.9, 0.45), basic({ map: t })); pl.position.set(s.x + s.w * 0.32, 1.45, -3.93); scene.add(pl);
       }
     });
 
@@ -404,6 +417,7 @@ const Parking = (() => {
     (async () => {
       for (const s of order) {
         if (!alive) return;
+        if (s.p.sample || !s.p.glb) { status(++done, slots.length); continue; } // 샘플 자리는 비워 둠
         try {
           const src = await getModel(s.p.glb);
           const P = cur();

@@ -1322,7 +1322,7 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
       : `${x.best ? `<em class="pk-best">${x.best}</em>` : ''}<span class="pk-av">${avatar(x)}</span><b>${esc(x.name)}${x.me ? ' (나)' : ''}</b><small>Lv.${x.lv} ${rankOf(x.lv).title}</small>`;
     el.querySelector('.pk-info').textContent = `BM ${list.filter((x) => !x.sample).length}명 · 레벨 높은 순서로 주차돼 있어요`;
     try {
-      park = await Parking.open(stage, list.map((x) => ({ rank: x.sample ? SAMPLE[x.sample].rank : rankIdx(x.lv), glb: CARS[x.sample ? SAMPLE[x.sample].rank : rankIdx(x.lv)].glb,
+      park = await Parking.open(stage, list.map((x) => ({ rank: x.sample ? SAMPLE[x.sample].rank : rankIdx(x.lv), glb: x.sample ? null : CARS[rankIdx(x.lv)].glb,
         html: label(x), name: x.name, me: x.me, sample: !!x.sample, best: !!x.best, cr: x.me ? carCR() : (x.look || {}).cr })), {
         time: parkTime,
         onPick: (i) => { Snd.tap(); openCarView(list[i]); },
@@ -1343,13 +1343,15 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
   }
   // 주차장에서 고른 차를 3D로 구경
   function openCarView(x) {
-    const c = x.sample ? CARS[x.sample === 'vip' ? 6 : 4] : carOf(x.lv || 1), r = rankOf(x.lv || 1);
+    if (x.sample) { // 빈 전용석: 어떤 차가 서게 될지는 비밀
+      const r = rankOf(x.lv);
+      modal(`<h2 style="font-size:22px">${x.sample === 'vip' ? '♛' : '★'} ${esc(x.name)}</h2><p style="text-align:center;line-height:1.7">아직 이 구역에 주차한 BM이 없어요.<br><b>${esc(r.title)}(Lv.${r.lv})</b>으로 승진하면<br>이 자리에 내 차가 주차돼요!</p>
+        <p class="muted" style="text-align:center">어떤 차가 서게 될지는… 승진해서 확인해 보세요 🤫</p><button class="btn full" data-close>좋아요</button>`);
+      return;
+    }
+    const c = carOf(x.lv || 1), r = rankOf(x.lv || 1);
     const el = document.createElement('div'); el.id = 'carView';
-    el.innerHTML = x.sample
-      ? `<div class="ov-top"><button class="mini-x" data-x aria-label="닫기">✕</button><span class="pk-av sm pk-lock">🔒</span><b>${esc(x.name)} (샘플)</b></div>
-      <div class="gv-stage"><div class="gv-view"></div><div class="gv-load"><div class="spin"></div>차 문 여는 중…</div></div>
-      <div class="gv-info"><b>${esc(c.name)}</b><small>아직 이 구역에 주차한 BM이 없어요. ${esc(r.title)}(Lv.${r.lv})으로 승진하면 이 자리에 내 차가 주차돼요!</small></div>`
-      : `<div class="ov-top"><button class="mini-x" data-x aria-label="닫기">✕</button><span class="pk-av sm">${avatar(x)}</span><b>${esc(x.name)}${x.me ? ' (나)' : ''}의 차</b></div>
+    el.innerHTML = `<div class="ov-top"><button class="mini-x" data-x aria-label="닫기">✕</button><span class="pk-av sm">${avatar(x)}</span><b>${esc(x.name)}${x.me ? ' (나)' : ''}의 차</b></div>
       <div class="gv-stage"><div class="gv-view"></div><div class="gv-load"><div class="spin"></div>차 문 여는 중…</div></div>
       <div class="gv-info"><b>${esc(c.name)}</b><small>${x.best ? esc(x.best) + ' · ' : ''}Lv.${x.lv} ${esc(r.title)} · ${esc(c.desc)}${carDecoText(x.me ? carCR() : (x.look || {}).cr)}</small></div>`;
     el.querySelector('[data-x]').onclick = () => el.remove();
@@ -1453,10 +1455,18 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
     checkAch(); save(); syncNow(); renderHud();
     return { msg: lines.join('<br>') };
   }
+  // 출근길 미로 이스터 에그: 막다른 길 하나에 숨은 비밀 금고 (하루 한 번 50,000원)
+  const EGG_CASH = 50000;
+  function mazeEgg() {
+    const m = miniState();
+    if (m.egg === today()) return '<b>🔒 빈 금고</b><small>오늘의 비밀 금고는 이미 열었어요. 내일 또 찾아보세요!</small>';
+    m.egg = today(); m.eggs = (m.eggs || 0) + 1; S.money += EGG_CASH; inc('eggs'); Snd.coin(); save();
+    return `<b>💰 비밀 금고 발견!</b><small>막다른 길에 숨겨진 비상금 +${won(EGG_CASH)}</small>`;
+  }
   async function playMini(kind) {
     const m = miniState();
     inSession = true; els.nav.classList.add('hidden');
-    try { await Mini.play(kind, { seed: 'maze|' + today(), best: kind === 'maze' ? m.maze.best : m.run.best, onResult: (r) => miniResult(kind, r) }); }
+    try { await Mini.play(kind, { seed: 'maze|' + today(), best: kind === 'maze' ? m.maze.best : m.run.best, onResult: (r) => miniResult(kind, r), onEgg: mazeEgg }); }
     finally { inSession = false; els.nav.classList.remove('hidden'); go('drive'); }
   }
   async function pageDrive() {
