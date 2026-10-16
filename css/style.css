@@ -667,3 +667,7 @@ img.sprite.bust.illust { width: 135%; left: -17%; top: -3%; }
 .pk-laurel { position: absolute; left: 50%; top: 50%; width: 82px; height: 82px; transform: translate(-50%, -48%); z-index: 2; pointer-events: none; filter: drop-shadow(0 2px 3px rgba(0,0,0,.35)); }
 .pk-label.best .pk-av { box-shadow: 0 0 0 3px #f2c447, 0 4px 10px rgba(0,0,0,.3); }
 .pk-label.best b { margin-top: 17px; }
+/* 주차장 확대·축소 버튼 */
+.pk-zoom { position: absolute; right: 10px; top: 10px; z-index: 3; display: flex; flex-direction: column; gap: 6px; }
+.pk-zoom button { width: 38px; height: 38px; border: 0; border-radius: 12px; background: rgba(20,15,30,.72); color: #fff; font-size: 22px; font-weight: 800; line-height: 1; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,.25); }
+.pk-zoom button:active { transform: scale(.94); }

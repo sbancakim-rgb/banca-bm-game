@@ -1306,7 +1306,7 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
     const admin = !!(Api.user || {}).admin;
     const el = document.createElement('div'); el.id = 'parkView';
     el.innerHTML = `<div class="ov-top"><button class="mini-x" data-x aria-label="닫기">✕</button><b>🅿️ 회사 주차장</b></div>
-      <div class="pk-stage"><div class="gv-load"><div class="spin"></div><span>주차장 문 여는 중…</span></div><div class="pk-hint">↔ 옆으로 밀어서 둘러보세요 · 차를 누르면 3D로 구경</div></div>
+      <div class="pk-stage"><div class="gv-load"><div class="spin"></div><span>주차장 문 여는 중…</span></div><div class="pk-hint">↔ 밀어서 이동 · 두 손가락으로 확대 · 차를 누르면 3D</div></div>
       <div class="pk-info">레벨 높은 순서로 주차돼 있어요</div>
       <div class="ov-bar pk-bar"><button class="btn ghost" data-time>⏱</button>${admin ? '' : '<button class="btn ghost" data-mine>📍 내 차</button><button class="btn" data-deco>🎨 꾸미기</button>'}</div>`;
     document.body.appendChild(el);

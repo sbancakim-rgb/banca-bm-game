@@ -340,15 +340,19 @@ const Parking = (() => {
 
     // ---- 카메라 ----
     const cam = new T.PerspectiveCamera(32, 1, 0.5, 140);
-    let camX = 0, vel = 0, dirty = true, alive = true, viewW = VIEW_W, time = 'auto';
+    let camX = 0, vel = 0, dirty = true, alive = true, viewW = VIEW_W, time = 'auto', zoom = 1;
+    const ZMIN = 0.5, ZMAX = 1.6; // 확대 2배 · 축소 1.6배
     const fit = () => {
       const w = host.clientWidth || 1, h = host.clientHeight || 1;
       renderer.setSize(w, h, false); cam.aspect = w / h;
-      viewW = Math.max(VIEW_W, Math.min(span + GAP * 2, w / h * 9));
+      viewW = Math.max(VIEW_W, Math.min(span + GAP * 2, w / h * 9)) * zoom; // zoom < 1 이면 확대
       const hf = 2 * Math.atan(Math.tan(T.MathUtils.degToRad(cam.fov / 2)) * cam.aspect);
-      cam.userData.d = Math.max(7, (viewW / 2) / Math.tan(hf / 2)); cam.updateProjectionMatrix(); dirty = true;
+      cam.userData.d = Math.max(zoom >= 1 ? 7 : 4.6, (viewW / 2) / Math.tan(hf / 2)); cam.updateProjectionMatrix(); dirty = true; // 너무 가까이 가면 긴 차 안으로 들어가므로 4.6m까지
     };
-    const place = () => { const d = cam.userData.d || 12; cam.position.set(camX, 1.6 + d * 0.2, d + 0.5); cam.lookAt(camX, 1.75, -0.8); };
+    const place = () => { // 확대할수록 시선을 낮춰 차가 화면 가운데에 오게
+      const d = cam.userData.d || 12, ly = 1.75 - Math.max(0, 1 - zoom) * 1.3;
+      cam.position.set(camX, 1.6 + d * 0.2, d + 0.5); cam.lookAt(camX, ly, -0.8);
+    };
 
     // ---- 시간대 적용 ----
     const cur = () => TIMES[time === 'auto' ? autoTime() : time];
@@ -421,16 +425,28 @@ const Parking = (() => {
     let down = null, moved = 0, lastX = 0, lastT = 0;
     const perPx = () => viewW / (host.clientWidth || 1);
     const clamp = () => { const c = Math.max(0, Math.min(span, camX)); if (c !== camX) { camX = c; vel = 0; } };
-    cv.addEventListener('pointerdown', (e) => { down = e.clientX; lastX = e.clientX; lastT = performance.now(); moved = 0; vel = 0; try { cv.setPointerCapture(e.pointerId); } catch (er) { } });
+    const setZoom = (z) => { const nz = Math.max(ZMIN, Math.min(ZMAX, z)); if (nz !== zoom) { zoom = nz; fit(); } };
+    // 두 손가락: 벌리면 확대 · 오므리면 축소 / 한 손가락: 옆으로 이동
+    const pts = new Map(); let pinch = null;
+    const pdist = () => { const [a, b] = [...pts.values()]; return Math.hypot(a.x - b.x, a.y - b.y) || 1; };
+    cv.addEventListener('pointerdown', (e) => {
+      pts.set(e.pointerId, { x: e.clientX, y: e.clientY }); try { cv.setPointerCapture(e.pointerId); } catch (er) { }
+      if (pts.size === 2) { pinch = { d: pdist(), z: zoom }; down = null; moved = 99; vel = 0; return; }
+      down = e.clientX; lastX = e.clientX; lastT = performance.now(); moved = 0; vel = 0;
+    });
     cv.addEventListener('pointermove', (e) => {
+      if (pts.has(e.pointerId)) pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pinch && pts.size === 2) { setZoom(pinch.z * pinch.d / pdist()); opts.onMove && opts.onMove(); return; }
       if (down == null) return;
       const dx = e.clientX - lastX, now = performance.now();
       camX -= dx * perPx(); moved += Math.abs(dx); clamp();
       vel = -dx * perPx() / Math.max(8, now - lastT) * 16; lastX = e.clientX; lastT = now; dirty = true;
       opts.onMove && opts.onMove();
     });
+    const lift = (e) => { pts.delete(e.pointerId); if (pts.size < 2) pinch = null; };
     const ray = new T.Raycaster(), ndc = new T.Vector2();
     cv.addEventListener('pointerup', (e) => {
+      lift(e);
       if (down == null) return; down = null;
       if (performance.now() - lastT > 80) vel = 0;
       if (moved > 8) return;
@@ -439,8 +455,19 @@ const Parking = (() => {
       const hit = ray.intersectObjects(slots.map((s) => s.wrap).filter(Boolean), true).find((h) => h.object.userData.slot != null);
       if (hit && opts.onPick) opts.onPick(hit.object.userData.slot);
     });
-    cv.addEventListener('pointercancel', () => { down = null; });
-    cv.addEventListener('wheel', (e) => { e.preventDefault(); camX += (e.deltaX || e.deltaY) * perPx() * 0.6; clamp(); dirty = true; opts.onMove && opts.onMove(); }, { passive: false });
+    cv.addEventListener('pointercancel', (e) => { lift(e); down = null; });
+    // PC: 휠 위아래 = 확대·축소, 가로 휠(또는 Shift+휠) = 옆으로 이동
+    cv.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      if (e.shiftKey || Math.abs(e.deltaX) > Math.abs(e.deltaY)) { camX += (e.deltaX || e.deltaY) * perPx() * 0.6; clamp(); dirty = true; }
+      else setZoom(zoom * Math.exp(e.deltaY * 0.0015));
+      opts.onMove && opts.onMove();
+    }, { passive: false });
+    // 화면 위 + / − 버튼
+    const zb = document.createElement('div'); zb.className = 'pk-zoom';
+    zb.innerHTML = '<button data-z="in" aria-label="확대">＋</button><button data-z="out" aria-label="축소">－</button>';
+    zb.querySelectorAll('button').forEach((b) => b.onclick = (e) => { e.stopPropagation(); setZoom(zoom * (b.dataset.z === 'in' ? 0.75 : 1 / 0.75)); });
+    host.appendChild(zb);
 
     // ---- 차 위 얼굴·이름표 위치 ----
     const v3 = new T.Vector3();
@@ -476,7 +503,7 @@ const Parking = (() => {
           if (o.material) [].concat(o.material).forEach((m) => { if (m.map) m.map.dispose(); m.dispose(); });
         });
         skyTex.dispose(); pm.dispose(); if (scene.environment) scene.environment.dispose();
-        renderer.dispose(); renderer.forceContextLoss(); renderer.domElement.remove(); labels.remove();
+        renderer.dispose(); renderer.forceContextLoss(); renderer.domElement.remove(); labels.remove(); zb.remove();
       }
     };
   }
