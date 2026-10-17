@@ -811,6 +811,7 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
     $('#garageGo').onclick = () => { Snd.tap(); openGarage(); };
     $('#parkGo').onclick = () => { Snd.tap(); openParking(); };
     $('#charTap').onclick = charTalk;
+    if (!peerCache) setTimeout(() => { if (!peerCache) pickPeer(); }, 1500); // 동료 생각풍선용 회원 목록 미리 받아 두기
     const evGo = $('#evGo'); if (evGo) evGo.onclick = runEvent;
     checkInbox();
     $('#bossBtn').onclick = async () => {
@@ -863,14 +864,25 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
       '항상': true, '아침(10시 전)': h < 10, '야근(21시 이후)': h >= 21, '일정 시작 전': !done,
       '일정 모두 완료': open.length > 0 && done === open.length, '활동비 500원 미만': S.money < 500, '활동비 2만원 이상': S.money >= 20000,
       '3일 이상 연속 출근': S.streak.count >= 3, '오답 20개 이상': Object.keys(S.wrong).length >= 20,
-      '사업부장 이상': S.lv >= 30, '사장': S.lv >= 50, '희귀 보스 등장': b.stars >= 4 && !S.dailyBoss.done
+      '사업부장 이상': S.lv >= 30, '사장': S.lv >= 50, '희귀 보스 등장': b.stars >= 4 && !S.dailyBoss.done,
+      '점심(11~14시)': h >= 11 && h < 14, '금요일': new Date().getDay() === 5, '월요일': new Date().getDay() === 1, '주말': [0, 6].includes(new Date().getDay()),
+      '인턴': S.lv < 5, '레벨 10 이상': S.lv >= 10, '보스 격파': !!S.dailyBoss.done
     };
     const fill = (t) => t.replace(/\{이름\}/g, S.name).replace(/\{직급\}/g, rankOf(S.lv).title).replace(/\{레벨\}/g, S.lv)
       .replace(/\{연속\}/g, S.streak.count).replace(/\{보스\}/g, b.title);
-    const L = (TALK && TALK.length ? TALK : TALK_DEFAULT).filter((r) => (r.cond in ok ? ok[r.cond] : true))
+    const L = [...(TALK && TALK.length ? TALK : TALK_DEFAULT), ...TALK_MORE].filter((r) => (r.cond in ok ? ok[r.cond] : true))
       .map((r) => [TALK_TYPE[r.type] || 'say', TALK_EXPR[r.expr] || 'normal', fill(String(r.text))]);
     return L.length ? L : [['say', 'smile', '오늘도 힘내 봅시다!']];
   }
+  const PEER_THINK = [
+    '({동료} BM은 잘하고 계시나…)',
+    '({동료} BM은 잘하고 계시나… 요즘 통 못 봤네.)',
+    '({동료} BM님 요즘 경험치 엄청 쌓던데… 나도 분발해야지!)',
+    '({동료} BM님한테 커피 한 잔 사야 하는데.)',
+    '(아 맞다, {동료} BM님한테 물어볼 게 있었는데…)',
+    '({동료} BM님 이번 주 최우수BM 노린다던데?)',
+    '({동료} BM님 차 꾸민 거 봤어? 부럽다…)'
+  ];
   function charTalk() {
     const now = Date.now();
     talkTaps = talkTaps.filter((t) => now - t < 3000); talkTaps.push(now);
@@ -881,10 +893,19 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
       do { i = Math.floor(Math.random() * L.length); } while (L.length > 1 && i === talkLast);
       talkLast = i; line = L[i];
     }
+    // 가끔은 동료 생각: 왼쪽에 그 동료 얼굴이 생각풍선으로 두둥실 (나는 절대 안 나옴)
+    const peers = (peerCache || []).filter((x) => !x.me && x.name && x.name !== S.name);
+    if (!peerCache) pickPeer(); // 목록을 뒤에서 받아 두기 (다음 터치부터)
+    let peer = null;
+    if (talkTaps.length < 6 && peers.length && Math.random() < 0.3) {
+      peer = pick(peers);
+      line = ['think', pick(['normal', 'smile', 'worried']), pick(PEER_THINK).replace(/\{동료\}/g, peer.name)];
+    }
     const [type, expr, msg] = line;
     setChar(playerSpec(), expr, expr === 'angry' ? 'shake' : 'hop'); Snd.tap();
-    els.fx.querySelectorAll('.talk').forEach((x) => x.remove());
+    els.fx.querySelectorAll('.talk, .talk-peer').forEach((x) => x.remove());
     const n = fx(`<div class="talk ${type}">${esc(msg)}</div>`, 3600);
+    if (peer) fx(`<div class="talk-peer"><span class="tp-cloud"><span class="pk-av">${avatar(peer)}</span><small>${esc(peer.name)}</small></span><i></i><i></i></div>`, 3600);
     clearTimeout(talkTimer); talkTimer = setTimeout(() => { if (!inSession && $('#stage').className === 'home') setChar(playerSpec(), rest()); }, 3600);
     return n;
   }
