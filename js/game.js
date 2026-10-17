@@ -937,7 +937,7 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
       els.choices.innerHTML = '';
     }
   }
-  /* ---- 동료(실제 회원)가 내 게임에 찾아와 퀴즈를 내고 격려 — 나 자신은 절대 나오지 않음 ---- */
+  /* ---- 동료(실제 회원)가 전화해서 모르는 걸 물어봄 — 나 자신은 절대 나오지 않음 ---- */
   let peerCache = null; // 최우수BM · 주차장에서 받아 둔 회원 목록 재사용
   async function pickPeer() {
     let list = peerCache;
@@ -945,52 +945,55 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
     const others = (list || []).filter((x) => !x.me && x.name && x.name !== S.name); // 본인 제외 (관리자는 서버에서 이미 빠짐)
     return others.length ? pick(others) : null;
   }
+  // 동료가 전화해서 모르는 걸 물어봄 → 내가 답해 주는 컨셉
   const PEER_HI = [
-    '{나}님! 지나가다 들렀어요 😄 요즘 공부 열심히 하신다면서요?',
-    '어, {나}님! 마침 잘 만났다. 나 방금 재밌는 문제 하나 봤거든요.',
-    '{나}님~ 커피 한잔 하실래요? ☕ 대신 문제 하나 맞히면 제가 살게요!',
-    '{나}님, 이번 주 최우수BM 노리신다던데… 실력 좀 볼까요? 😏'
+    '{나}님, 바쁘신데 죄송해요! 지금 고객님이 앞에 계신데 하나만 여쭤볼게요 😥',
+    '여보세요? {나}님! 급하게 확인할 게 있어서요. 이거 아세요?',
+    '{나}님~ 저 지금 지점인데요, 갑자기 헷갈려서 전화드렸어요!',
+    '{나}님 잠깐 통화 괜찮으세요? 교육 자료 보다가 막혀서요 🙏'
   ];
-  const PEER_CHEER = [
-    '역시 {나}님! 우리 같이 사장까지 가 봐요 💪',
-    '오늘도 화이팅! 지점에서 {나}님 칭찬 자자하던데요?',
-    '{나}님 덕분에 저도 자극받고 가요. 다음엔 제가 이길 거예요!',
-    '이번 주 최우수BM, {나}님이 될 것 같은데요? 👑'
+  const PEER_THANKS = [
+    '와, 역시 {나}님! 덕분에 고객님께 바로 설명드렸어요. 감사해요 🙏',
+    '살았다… {나}님 아니었으면 큰일 날 뻔했어요. 다음에 커피 쏠게요 ☕',
+    '{나}님 진짜 척척박사네요! 지점장님도 옆에서 감탄하세요 👍',
+    '고마워요 {나}님! 이번 주 최우수BM은 {나}님이 될 것 같은데요? 👑'
   ];
-  const PEER_COMFORT = [
-    '괜찮아요! 저도 처음엔 이거 틀렸어요. 같이 힘내요 🙌',
-    '아깝다! 해설 한번 읽어 보면 다음엔 무조건 맞힐 거예요.',
-    '틀려도 괜찮아요. 오늘 배운 건 고객 상담 때 꼭 써먹게 될 거예요!'
+  const PEER_OOPS = [
+    '앗, 제가 다시 찾아보니까 정답이 따로 있네요! 저희 둘 다 다시 공부해요 😅',
+    '음… 자료 확인해 보니 조금 다르네요. 그래도 같이 고민해 주셔서 고마워요!',
+    '어? 방금 본부에 확인해 보니 답이 달라요. 헷갈리는 거 맞죠? 😂'
   ];
   async function peerVisit() {
     const p = await pickPeer();
-    if (!p) { await say(NARR, '복도에서 동료들의 웃음소리가 들린다. 오늘도 다들 열심이다!'); return grant({ honor: 5 }); }
+    if (!p) { await say(NARR, '📞 전화가 울렸지만… 금방 끊겼다. 다들 바쁜가 보다!'); return grant({ honor: 5 }); }
     if (p.face) { primePeerFaces([p]); await loadPeerFaces([pfid(p)]).catch(() => { }); }
-    const spec = peerSpec(p), who = { name: p.name, role: rankOf(p.lv || 1).title }, nm = (t) => t.replace(/\{나\}/g, S.name);
-    setChar(spec, 'smile', 'enter');
-    await say(NARR, `👋 ${rankOf(p.lv || 1).title} ${p.name}님이 찾아왔다!`);
+    const title = rankOf(p.lv || 1).title, spec = peerSpec(p), who = { name: `📞 ${p.name}`, role: title }, nm = (t) => t.replace(/\{나\}/g, S.name);
+    Snd.tap(); setTimeout(() => Snd.tap(), 180);
+    await say(NARR, `📞 따르릉~ ${p.name} ${title}에게 전화가 왔다!`);
+    setChar(spec, 'worried', 'enter');
     await say(who, nm(pick(PEER_HI)));
     const q = rankForPick(pool())[0];
-    if (!q) { await say(who, nm(pick(PEER_CHEER))); return grant({ honor: 10 }); }
+    if (!q) { setChar(spec, 'smile', 'hop'); await say(who, nm('아, 방금 해결됐어요! 그래도 목소리 들으니 힘나네요. 수고하세요 {나}님!')); return grant({ honor: 10 }); }
     const r = await ask(q, who, { spec }, 20, { sess: {}, noItems: true });
     els.dlg.classList.remove('asking'); els.meta.innerHTML = ''; S.seen[q.id] = dayNum();
     if (r.correct) {
       Snd.ok(); setChar(spec, 'happy', 'hop'); fx('<div class="stamp ok">정답!</div>', 1100);
       inc('correct'); inc('c_' + q.cat);
-      await say(who, nm(pick(PEER_CHEER)), { extra: `<span class="exp">📘 ${esc(q.exp || '')}</span>` });
+      await say(who, nm(pick(PEER_THANKS)), { extra: `<span class="exp">📘 ${esc(q.exp || '')}</span>` });
       els.choices.innerHTML = '';
       inc('peerVisits'); await grant({ xp: 30, cash: 300, honor: 10 });
     } else {
       Snd.ng(); revealAnswer(q); setChar(spec, 'worried', 'shake');
       S.wrong[q.id] = { n: ((S.wrong[q.id] || {}).n || 0) + 1, t: Date.now() };
-      await say(who, nm(pick(PEER_COMFORT)), { extra: `<span class="exp">정답: <span class="ans">${esc(answerText(q))}</span>\n📘 ${esc(q.exp || '')}</span>` });
+      await say(who, nm(pick(PEER_OOPS)), { extra: `<span class="exp">정답: <span class="ans">${esc(answerText(q))}</span>\n📘 ${esc(q.exp || '')}</span>` });
       els.choices.innerHTML = '';
-      setChar(spec, 'smile', 'hop'); await say(who, nm('그래도 {나}님 응원해요! 다음에 또 올게요 👋'));
+      setChar(spec, 'smile', 'hop'); await say(who, nm('그래도 전화 받아 주셔서 고마워요 {나}님! 다음에 또 여쭤볼게요 👋'));
       inc('peerVisits'); await grant({ honor: 5 });
     }
+    await say(NARR, '📴 뚝. 통화가 끝났다.');
   }
   const RANDOM_EVENTS = [
-    { id: 'peer', w: 24, bg: 'office', npc: null, run: peerVisit }, // 실제 동료 방문 (가장 자주)
+    { id: 'peer', w: 24, bg: 'office', npc: null, run: peerVisit }, // 실제 동료의 전화 (가장 자주)
     { id: 'coffee', w: 10, bg: 'bank', npc: 'worker', run: async (w) => {
       await say(w, 'BM님! 지난번에 알려주신 대로 설명했더니 고객님이 바로 이해하셨어요.');
       await say(w, '감사의 의미로… 커피 쿠폰이에요! ☕');
