@@ -366,6 +366,8 @@ const MINI_REWARD = { maze: { cash: 100, xp: 5 }, run: { cash: 100, xp: 5, need:
 /* 방카 상품 출제 비중: 주력 플래티넘행복연금 2 · 즉시연금 1 · 그 밖의 상품 0.5 (태그·질문으로 구분) */
 const PRODUCT_FOCUS = [{ re: /플래티넘/, w: 2 }, { re: /즉시연금|즉시형/, w: 1 }];
 const PRODUCT_OTHER_W = 0.5;
+/* 이벤트 기간: 오늘 일정 카드를 하루에 몇 번이든 다시 풀 수 있음 (끝나면 false) */
+const EVENT_UNLIMITED = true;
 const CAT_ORDER = ['banca_general', 'banca_product', 'banca_backoffice', 'market', 'econ', 'term'];
 const GROUPS = {
   banca: { label: '방카슈랑스', cats: ['banca_general', 'banca_product', 'banca_backoffice'] },

@@ -50,7 +50,7 @@
     ensurePeriod();
     const at = S.updated;
     try {
-      const r = await Api.saveProgress(JSON.stringify(S), S.lv, S.totalXp, { name: S.name, ...S.period }, reset);
+      const r = await Api.saveProgress(JSON.stringify(S), S.lv, S.totalXp, { name: S.name, ...S.period, rk: rankStats() }, reset);
       if (r && r.stale) adoptRemote(r.data); else lastSynced = at;
     } catch (e) { if (reset) throw e; }
   }
@@ -243,19 +243,33 @@
   const periodKeys = () => {
     const lw = new Date(); lw.setDate(lw.getDate() - 7);
     const lm = new Date(); lm.setDate(1); lm.setMonth(lm.getMonth() - 1);
-    return { wk: isoWeek(), lastWk: isoWeek(lw), mo: monthKey(), lastMo: monthKey(lm) };
+    return { wk: isoWeek(), lastWk: isoWeek(lw), mo: monthKey(), lastMo: monthKey(lm), day: dkey() };
   };
   function ensurePeriod() {
     const p = S.period || (S.period = { week: '', weekXp: 0, prevWeek: '', prevWeekXp: 0, month: '', monthXp: 0, prevMonth: '', prevMonthXp: 0 });
     const k = periodKeys();
     if (p.week !== k.wk) { if (p.week) { p.prevWeek = p.week; p.prevWeekXp = p.weekXp; } p.week = k.wk; p.weekXp = 0; }
     if (p.month !== k.mo) { if (p.month) { p.prevMonth = p.month; p.prevMonthXp = p.monthXp; } p.month = k.mo; p.monthXp = 0; }
+    if (p.day !== k.day) { p.day = k.day; p.dayXp = 0; } // 일간 최우수BM
     return p;
+  }
+  // 이번 주 과목별 정답·풀이 수 (다득점·정답률 주간 순위)
+  function weekStat(cat) {
+    const wk = isoWeek();
+    if (!S.wstats || S.wstats.wk !== wk) S.wstats = { wk, c: {} };
+    return S.wstats.c[cat] || (S.wstats.c[cat] = [0, 0]);
+  }
+  // 서버로 보내는 순위 통계 (작게)
+  function rankStats() {
+    const p = ensurePeriod(), s = {};
+    Object.entries(S.stats || {}).forEach(([c, v]) => { s[c] = [v.c || 0, v.n || 0]; });
+    const w = S.wstats && S.wstats.wk === isoWeek() ? S.wstats : { wk: isoWeek(), c: {} };
+    return { s, w: w.wk, ws: w.c, d: p.day, dx: p.dayXp || 0 };
   }
   function addXp(x) {
     const ups = [];
     x = Math.round(x);
-    if (x > 0) { const p = ensurePeriod(); p.weekXp += x; p.monthXp += x; }
+    if (x > 0) { const p = ensurePeriod(); p.weekXp += x; p.monthXp += x; p.dayXp = (p.dayXp || 0) + x; }
     S.totalXp += x;
     if (S.lv >= MAX_LV) return ups;
     S.xp += x;
@@ -532,7 +546,7 @@
     const evs = todayEvents();
     const evMult = (cat) => evs.filter((e) => e.cats.includes(cat)).reduce((m, e) => m * e.mult, 1);
     const scored = kind === 'daily' || kind === 'extra' || kind === 'boss';
-    const label = boss ? `일간 보스 · ${boss.title}` : kind === 'review' ? '오답노트 복습' : kind === 'practice' ? `학습회 · ${CATS[key].label}` : CATS[key].label + (kind === 'extra' ? ' (활기력)' : '');
+    const label = boss ? `일간 보스 · ${boss.title}` : kind === 'review' ? '오답노트 복습' : kind === 'practice' ? `학습회 · ${CATS[key].label}` : CATS[key].label + (kind === 'extra' ? (EVENT_UNLIMITED ? ' (이벤트)' : ' (활기력)') : '');
     const ctx = { sess: {}, noItems: kind === 'review' };
     let combo = 0, sat = 60, xpSum = 0, cashSum = 0, okN = 0, prev = null, total = plan.length;
     const drawSess = (i) => {
@@ -591,11 +605,12 @@
         continue;
       }
       const st = S.stats[q.cat] || (S.stats[q.cat] = { c: 0, n: 0 }); st.n++;
+      const wst = weekStat(q.cat); wst[1]++;
       const grp = CATS[q.cat] ? CATS[q.cat].group : 'banca';
       let line, extra;
       const obj = `<button class="objbtn" data-obj="${esc(q.id)}">⚠️ 이의 제기</button>`;
       if (r.correct) {
-        combo++; okN++; st.c++; S.honor += 1;
+        combo++; okN++; st.c++; wst[0]++; S.honor += 1;
         inc('correct'); inc('c_' + q.cat);
         if (NPC_CNT.includes(nk)) inc('npc_' + nk);
         const fast = r.ms < sec * 1000 * 0.35;
@@ -802,16 +817,15 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
         if (!n) return `<div class="card empty" style="--c:${c.color}"><div class="ic">${c.icon}</div><div class="t">${c.label}</div><div class="d">📭 문제 준비 중</div><div class="who">관리자가 자료를 등록하면 열려요</div></div>`;
         return `<button class="card ${d ? 'done' : ''}" data-cat="${k}" style="--c:${c.color}" ${d ? `data-res="${d.ok}/${d.n} · +${d.xp}XP"` : ''}>
           ${x2 && !d ? '<span class="x2">EVENT</span>' : ''}<div class="ic">${c.icon}</div><div class="t">${c.label}</div><div class="d">${c.desc}</div>
-          ${d ? `<div class="who">${vig ? '🧃 활기력으로 한 번 더 →' : '오늘 완료 · 내일 다시'}</div>` : `<div class="who">출제: ${esc(who)}</div>`}</button>`;
+          ${d ? `<div class="who">${EVENT_UNLIMITED ? '🎉 이벤트 · 한 번 더 풀기 →' : vig ? '🧃 활기력으로 한 번 더 →' : '오늘 완료 · 내일 다시'}</div>` : `<div class="who">출제: ${esc(who)}</div>`}</button>`;
       }).join('')}</div>
-      <div class="row" style="margin-top:12px"><button class="studycta" data-go2="study" style="margin-top:0">📚 <b>학습회</b>에서<br>계속 공부하기 →</button>
-        <button class="studycta rankcta" data-go2="rank" style="margin-top:0">🏆 <b>최우수BM</b><br>주간·월간 랭킹 →</button></div>
-      <button class="studycta drivecta" data-go2="drive">🚗 <b>BM 드라이빙</b> · 출근길 미로 / 고속도로 질주 <small>미니게임 · 시간 대결 →</small></button>
+      <button class="studycta drivecta" data-go2="drive" style="margin-top:12px">🚗 <b>BM 드라이빙</b> · 출근길 미로 / 고속도로 질주 <small>미니게임 · 시간 대결 →</small></button>
     </div>
     <button class="chartap" id="charTap" aria-label="내 캐릭터에게 말 걸기"></button>`;
     els.screen.querySelectorAll('.card[data-cat]').forEach((c) => c.onclick = () => {
       const k = c.dataset.cat;
       if (!S.daily.done[k]) return runSession('daily', k);
+      if (EVENT_UNLIMITED) return runSession('extra', k); // 이벤트 기간: 제한 없이 다시
       useVigor(k);
     });
     els.screen.querySelectorAll('[data-go2]').forEach((b) => b.onclick = () => go(b.dataset.go2));
@@ -1103,7 +1117,6 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
   }
 
   /* ---------------- 최우수BM 랭킹 ---------------- */
-  let rankTab = 'week';
   // 순위 응답 기억 (이 기기) — 다시 열 때 바로 보여 주고 뒤에서 새로 받음
   const RK_KEY = 'bmq_rank_cache';
   let rankMem = null;
@@ -1120,26 +1133,50 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
     peerCache = v.week.list;
     return clone(v);
   }
+  /* ---------------- RANK: 시상 항목 (최우수BM · 다득점 · 정답률) ---------------- */
+  let rankMain = 'best', rankTab = 'month', rankCat = 'all', rankData = null;
+  const RK_MAIN = [['best', '👑 최우수BM'], ['cnt', '🎯 다득점(누계)'], ['wcnt', '🎯 다득점(주간)'], ['acc', '📈 정답률(누계)'], ['wacc', '📈 정답률(주간)']];
+  const RK_CATS = [['all', '총'], ['banca_general', '방카슈랑스 전반'], ['banca_product', '방카 상품'], ['banca_backoffice', '백오피스'], ['market', '경제환경'], ['econ', '경제학'], ['term', '경제용어']];
+  const RK_MIN = { acc: 50, wacc: 10 }; // 정답률 순위에 오르려면 이 과목에서 이만큼은 풀어야 함
   async function pageRank() {
-    setNav('home');
-    els.screen.innerHTML = `<div class="page">${backBtn('home', '오늘 일정')}<h2>🏆 최우수BM</h2><div id="rankBody"><div class="loading"><div class="spin"></div>순위를 불러오는 중…</div></div></div>`;
-    bindBack();
+    setNav('rank');
+    els.screen.innerHTML = `<div class="page"><h2>🏆 RANK</h2>
+      <div class="rk-main">${RK_MAIN.map(([k, l]) => `<button data-rm="${k}" class="${rankMain === k ? 'on' : ''}">${l}</button>`).join('')}</div>
+      <div class="rk-sub" id="rankSub"></div><div id="rankBody"><div class="loading"><div class="spin"></div>순위를 불러오는 중…</div></div></div>`;
+    els.screen.querySelectorAll('[data-rm]').forEach((b) => b.onclick = () => {
+      rankMain = b.dataset.rm; Snd.tap();
+      els.screen.querySelectorAll('[data-rm]').forEach((x) => x.classList.toggle('on', x === b));
+      if (rankData) drawRank(clone(rankData));
+    });
     const old = rankCached();
-    if (old) { peerCache = old.week.list; drawRank(old); }
+    if (old) { peerCache = old.week.list; rankData = old; drawRank(clone(old)); }
     let r;
-    try { r = await rankFetch(); } catch (e) { if (!old) toast(e.message); return; }
-    if (curPage === 'rank' && $('#rankBody')) drawRank(r);
+    try { r = await rankFetch(); } catch (e) { if (!old) { const bd = $('#rankBody'); if (bd) bd.innerHTML = `<p class="muted" style="text-align:center">${esc(e.message)}</p>`; } return; }
+    rankData = r;
+    if (curPage === 'rank' && $('#rankBody')) drawRank(clone(r));
   }
+  // 내 줄은 이 기기의 최신 기록으로 (관리자는 순위에서 빠짐)
+  function withMe(list) {
+    if ((Api.user || {}).admin) return list.filter((x) => !x.me);
+    let me = list.find((x) => x.me);
+    if (!me) { me = { name: S.name, lv: S.lv, me: true, uid: '', xp: 0 }; list.push(me); }
+    const p = ensurePeriod(), rs = rankStats();
+    Object.assign(me, { name: S.name, lv: S.lv, s: rs.s, ws: rs.ws, dx: p.dayXp || 0 });
+    return list;
+  }
+  const catSum = (m, cat) => { m = m || {}; if (cat !== 'all') return m[cat] || [0, 0]; return Object.values(m).reduce((a, v) => [a[0] + (v[0] || 0), a[1] + (v[1] || 0)], [0, 0]); };
   async function drawRank(r) {
-    // 저장과 동시에 불러왔으니 내 최신 실적은 이 기기 값으로 반영
-    const pd = ensurePeriod();
+    const body = $('#rankBody'), sub = $('#rankSub'); if (!body || !sub) return;
+    const pd = ensurePeriod(), admin = !!(Api.user || {}).admin;
+    // 최우수BM: 내 이번 주·이번 달 XP는 이 기기 값으로
     [[r.week, pd.week === r.week.key ? pd.weekXp : 0], [r.month, pd.month === r.month.key ? pd.monthXp : 0]].forEach(([box, xp]) => {
-      if (!(xp > 0) || (Api.user || {}).admin) return; // 관리자는 최우수BM에서 제외
+      if (!(xp > 0) || admin) return;
       let mine = box.list.find((x) => x.me);
       if (!mine) { mine = { name: S.name, lv: S.lv, me: true, uid: '', xp: 0 }; box.list.push(mine); }
       mine.xp = Math.max(mine.xp, xp); mine.lv = S.lv; mine.name = S.name;
       box.list.sort((a, c) => c.xp - a.xp);
     });
+    // 지난 주·달 최우수BM으로 뽑혔으면 상 받기 (한 번만)
     S.awards = S.awards || {};
     for (const [k, w] of [['week', r.lastWeek], ['month', r.lastMonth]]) {
       const id = `${k}:${w.key}`;
@@ -1149,25 +1186,41 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
         await grant({ honor: BEST_BM[k].honor, cash: BEST_BM[k].cash });
       }
     }
-    const cur = rankTab === 'week' ? r.week : r.month, last = rankTab === 'week' ? r.lastWeek : r.lastMonth;
-    primePeerFaces(cur.list);
-    const cheer = r.cheer || { left: 0, to: [] };
     const medal = (i) => ['🥇', '🥈', '🥉'][i] || `${i + 1}`;
-    const body = $('#rankBody'); if (!body) return;
-    body.innerHTML = `
-      <div class="seg"><button data-rt="week" class="${rankTab === 'week' ? 'on' : ''}">주간 (${esc(r.week.key)})</button><button data-rt="month" class="${rankTab === 'month' ? 'on' : ''}">월간 (${esc(r.month.key)})</button></div>
-      <div class="box winner">${last.winner ? `👑 지난 ${rankTab === 'week' ? '주' : '달'} 최우수BM <b>${esc(last.winner.name)}</b> <span class="muted">Lv.${last.winner.lv} · ${last.winner.xp.toLocaleString()} XP</span>` : `<span class="muted">지난 ${rankTab === 'week' ? '주' : '달'} 기록이 아직 없어요.</span>`}</div>
-      <p class="muted">이번 ${rankTab === 'week' ? '주' : '달'}에 얻은 경험치로 순위를 매겨요. 1위는 다음 ${rankTab === 'week' ? '주' : '달'}에 최우수BM으로 선정돼 명예 +${BEST_BM[rankTab].honor} · ${won(BEST_BM[rankTab].cash)}을 받아요.</p>
-      <div class="box row" style="justify-content:space-between;padding:10px 14px"><span>📣 오늘 남은 응원 <b id="cheerLeft">${cheer.left}</b>/${SOCIAL.cheerPerDay}</span><span class="muted">응원받은 동료는 ${won(SOCIAL.cheerCash)} · 명예 +${SOCIAL.cheerHonor}</span></div>
-      ${cur.list.length ? cur.list.map((x, i) => `<div class="rankrow ${x.me ? 'me' : ''}"><span class="rk">${x.xp > 0 ? medal(i) : '·'}</span><button class="rkav" data-av="${i}" aria-label="${esc(x.name)} 캐릭터 보기">${avatar(x)}</button><span class="nm" data-av="${i}">${esc(x.name)}${x.me ? ' (나)' : ''}<small>Lv.${x.lv} ${rankOf(x.lv).title} · ${x.xp.toLocaleString()} XP</small></span>
-        ${x.me ? '' : `<span class="acts"><button class="btn mini" data-cheer="${esc(x.uid)}" data-nm="${esc(x.name)}" ${cheer.left <= 0 || cheer.to.includes(x.uid) ? 'disabled' : ''}>${cheer.to.includes(x.uid) ? '응원 완료' : '📣 응원'}</button><button class="btn ghost mini" data-send="${esc(x.uid)}" data-nm="${esc(x.name)}">💸</button></span>`}</div>`).join('')
-        : '<p class="muted" style="text-align:center;margin-top:30px">아직 이번 기간 기록이 없어요. 첫 1위를 노려 보세요!</p>'}`;
-    els.screen.querySelectorAll('[data-rt]').forEach((b) => b.onclick = () => { rankTab = b.dataset.rt; const c = rankCached(); if (c) drawRank(c); else pageRank(); });
-    els.screen.querySelectorAll('[data-av]').forEach((b) => b.onclick = () => charViewer(cur.list[+b.dataset.av]));
-    // 실물 캐릭터 사진은 기본 표정만 먼저 받아서 바꿔 끼운다
-    const fl = needFull(cur.list);
+    const cheer = r.cheer || { left: 0, to: [] };
+    let list, val, note = '', empty;
+    if (rankMain === 'best') {
+      sub.innerHTML = [['month', '월간'], ['week', '주간'], ['day', '일간']].map(([k, l]) => `<button data-rt="${k}" class="${rankTab === k ? 'on' : ''}">${l} 최우수BM</button>`).join('');
+      if (rankTab === 'day') list = withMe(r.week.list).map((x) => ({ ...x, xp: x.dx || 0 })).sort((a, c) => c.xp - a.xp || c.lv - a.lv);
+      else list = (rankTab === 'week' ? r.week : r.month).list;
+      const last = rankTab === 'week' ? r.lastWeek : rankTab === 'month' ? r.lastMonth : null, unit = { month: '달', week: '주', day: '날' }[rankTab];
+      note = `${last ? `<div class="box winner">${last.winner ? `👑 지난 ${unit} 최우수BM <b>${esc(last.winner.name)}</b> <span class="muted">Lv.${last.winner.lv} · ${last.winner.xp.toLocaleString()} XP</span>` : `<span class="muted">지난 ${unit} 기록이 아직 없어요.</span>`}</div>` : ''}
+        <p class="muted">${rankTab === 'day' ? '오늘' : `이번 ${unit}`}에 얻은 경험치로 순위를 매겨요.${last ? ` 1위는 다음 ${unit}에 최우수BM으로 선정돼 명예 +${BEST_BM[rankTab].honor} · ${won(BEST_BM[rankTab].cash)}을 받아요.` : ''}</p>
+        <div class="box row" style="justify-content:space-between;padding:10px 14px"><span>📣 오늘 남은 응원 <b id="cheerLeft">${cheer.left}</b>/${SOCIAL.cheerPerDay}</span><span class="muted">응원받은 동료는 ${won(SOCIAL.cheerCash)} · 명예 +${SOCIAL.cheerHonor}</span></div>`;
+      val = (x) => `${(x.xp || 0).toLocaleString()} XP`;
+      empty = '아직 기록이 없어요. 첫 1위를 노려 보세요!';
+    } else {
+      sub.innerHTML = RK_CATS.map(([k, l]) => `<button data-rc="${k}" class="${rankCat === k ? 'on' : ''}">${l}</button>`).join('');
+      const weekly = rankMain === 'wcnt' || rankMain === 'wacc', acc = rankMain === 'acc' || rankMain === 'wacc', min = RK_MIN[rankMain] || 0;
+      const rows = withMe(r.week.list).map((x) => { const [c, n] = catSum(weekly ? x.ws : x.s, rankCat); return { ...x, c, n, rate: n ? c / n : 0 }; });
+      list = acc ? rows.filter((x) => x.n >= min).sort((a, b) => b.rate - a.rate || b.n - a.n) : rows.filter((x) => x.c > 0).sort((a, b) => b.c - a.c || b.rate - a.rate);
+      val = acc ? (x) => `${(x.rate * 100).toFixed(1)}%<small>${x.c}/${x.n}</small>` : (x) => `${x.c.toLocaleString()}개<small>${x.n}문제 중</small>`;
+      const mine = rows.find((x) => x.me), catL = RK_CATS.find(([k]) => k === rankCat)[1];
+      note = `<p class="muted">${weekly ? '이번 주' : '지금까지'} 「${catL}」에서 ${acc ? `정답률이 높은 순서예요. <b>${min}문제 이상</b> 푼 사람만 이름이 올라가요.` : '정답을 많이 맞힌 순서예요.'}</p>
+        ${mine && !admin ? `<div class="box rk-mine">내 기록 · ${acc ? (mine.n ? `정답률 <b>${(mine.rate * 100).toFixed(1)}%</b> (${mine.c}/${mine.n})` : '아직 푼 문제가 없어요') : `정답 <b>${mine.c}</b>개 (${mine.n}문제 중)`}${acc && mine.n < min ? ` · <span class="muted">${min - mine.n}문제 더 풀면 순위에 올라요</span>` : ''}</div>` : ''}`;
+      empty = acc ? `아직 ${min}문제 이상 푼 사람이 없어요.` : '아직 기록이 없어요.';
+    }
+    const showActs = rankMain === 'best';
+    body.innerHTML = note + (list.length ? list.map((x, i) => `<div class="rankrow ${x.me ? 'me' : ''}"><span class="rk">${medal(i)}</span><button class="rkav" data-av="${i}" aria-label="${esc(x.name)} 캐릭터 보기">${avatar(x)}</button><span class="nm" data-av="${i}">${esc(x.name)}${x.me ? ' (나)' : ''}<small>Lv.${x.lv} ${rankOf(x.lv).title}</small></span>
+        ${showActs && !x.me ? `<span class="acts"><button class="btn mini" data-cheer="${esc(x.uid)}" data-nm="${esc(x.name)}" ${cheer.left <= 0 || cheer.to.includes(x.uid) ? 'disabled' : ''}>${cheer.to.includes(x.uid) ? '응원 완료' : '📣'}</button><button class="btn ghost mini" data-send="${esc(x.uid)}" data-nm="${esc(x.name)}">💸</button></span>` : ''}
+        <b class="rk-val">${val(x)}</b></div>`).join('') : `<p class="muted" style="text-align:center;margin-top:30px">${empty}</p>`);
+    els.screen.querySelectorAll('[data-rt]').forEach((b) => b.onclick = () => { rankTab = b.dataset.rt; Snd.tap(); drawRank(clone(rankData)); });
+    els.screen.querySelectorAll('[data-rc]').forEach((b) => b.onclick = () => { rankCat = b.dataset.rc; Snd.tap(); drawRank(clone(rankData)); });
+    els.screen.querySelectorAll('[data-av]').forEach((b) => b.onclick = () => charViewer(list[+b.dataset.av]));
+    primePeerFaces(list);
+    const fl = needFull(list);
     if (fl.length) loadPeerFaces(fl.map(pfid), ['normal']).then(() => {
-      els.screen.querySelectorAll('button.rkav').forEach((b) => { const x = cur.list[+b.dataset.av]; if (x && x.face && !x.me) b.innerHTML = avatar(x); });
+      els.screen.querySelectorAll('button.rkav').forEach((b) => { const x = list[+b.dataset.av]; if (x && x.face && !x.me) b.innerHTML = avatar(x); });
     });
     els.screen.querySelectorAll('[data-cheer]').forEach((b) => b.onclick = () => doCheer(b.dataset.cheer, b.dataset.nm, b));
     els.screen.querySelectorAll('[data-send]').forEach((b) => b.onclick = () => sendMoneyModal(b.dataset.send, b.dataset.nm));
@@ -2751,7 +2804,7 @@ Lv.${S.lv} ${rankOf(S.lv).title} ${S.name}의 모든 기록(경험치 ${S.totalX
       ['home', 'partjang', 'smirk', [
         "여기가 '오늘 일정'이다. 출근하면 제일 먼저 여기부터 확인해.",
         '카드 하나가 일정 하나다. 분야마다 하루에 한 번씩 문제를 풀 수 있고, 맞히면 경험치와 활동비가 쌓여서 승진하지.',
-        "가끔 '오늘의 보스'로 은행 높으신 분들이 찾아오고, 아래쪽에서 최우수BM 순위도 볼 수 있다. 긴장 늦추지 마라."]],
+        "가끔 '오늘의 보스'로 은행 높으신 분들이 찾아오고, 맨 아래 RANK 메뉴에서는 최우수BM이랑 다득점·정답률 순위도 볼 수 있다. 긴장 늦추지 마라."]],
       ['study', 'kimpro', 'smile', [
         "'학습회'는 제가 안내할게요! 점수 부담 없이 연습문제를 풀면서 실력을 쌓는 곳이에요.",
         "틀린 문제는 '오답노트'에 모이고, 오늘의 경제 기사랑 자료실도 여기 있어요. 경험치는 아주 조금이지만, 꾸준함이 최고의 무기죠!"]],

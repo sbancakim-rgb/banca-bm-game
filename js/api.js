@@ -212,7 +212,7 @@ const Demo = (() => {
         { title: '[데모] 서버를 연결하면 구글 뉴스의 최신 경제 기사가 여기에 나와요', link: 'https://news.google.com/search?q=%EA%B8%B0%EC%A4%80%EA%B8%88%EB%A6%AC&hl=ko', source: '데모', date: new Date().toString(), topic: '기준금리' },
         { title: '[데모] 보험·방카슈랑스 뉴스', link: 'https://news.google.com/search?q=%EB%B0%A9%EC%B9%B4%EC%8A%88%EB%9E%91%EC%8A%A4&hl=ko', source: '데모', date: new Date().toString(), topic: '보험' }] });
       case 'ranking': {
-        const rows = Object.entries(d.progress).map(([e, raw]) => { try { const p = JSON.parse(raw); return { email: e, name: p.name, lv: p.lv, look: demoLook(p), ...(p.period || {}) }; } catch (er) { return null; } }).filter((r) => r && !(d.users[r.email] || {}).admin); // 관리자 제외
+        const rows = Object.entries(d.progress).map(([e, raw]) => { try { const p = JSON.parse(raw); return { email: e, name: p.name, lv: p.lv, look: demoLook(p), ...(p.period || {}), rk: demoRk(p) }; } catch (er) { return null; } }).filter((r) => r && !(d.users[r.email] || {}).admin); // 관리자 제외
         const r = rankingFrom(rows, b, email); ['week', 'month'].forEach((k) => r[k].list.forEach((x) => x.uid = 'u:' + x.email)); r.cheer = demoCheer(d, email); return ok(r);
       }
       case 'changePassword':
@@ -265,11 +265,18 @@ const Demo = (() => {
   return { handle, loadData, questions, ADMIN, ADMIN_PW };
 })();
 
+/* 순위 통계 (데모) — 게임이 서버에 보내는 것과 같은 모양 */
+function demoRk(p) {
+  const s = {}; Object.entries(p.stats || {}).forEach(([c, v]) => s[c] = [v.c || 0, v.n || 0]);
+  const pd = p.period || {};
+  return { s, w: (p.wstats || {}).wk || '', ws: (p.wstats || {}).c || {}, d: pd.day || '', dx: pd.dayXp || 0 };
+}
 /* 랭킹 계산 — 데모 모드용 (서버는 Code.gs ranking_ 이 같은 규칙으로 계산) */
 function rankingFrom(rows, k, myEmail) {
   const pick = (curKey, xpField, prevKeyField, prevXpField, target) => rows.map((r) => ({
     name: r.name || '이름없음', lv: r.lv || 1, me: r.email === myEmail, email: r.email, look: r.look || null, face: false,
-    xp: r[curKey] === target ? (r[xpField] || 0) : r[prevKeyField] === target ? (r[prevXpField] || 0) : 0
+    xp: r[curKey] === target ? (r[xpField] || 0) : r[prevKeyField] === target ? (r[prevXpField] || 0) : 0,
+    s: (r.rk || {}).s || {}, ws: (r.rk || {}).w === k.wk ? (r.rk || {}).ws || {} : {}, dx: (r.rk || {}).d === k.day ? (r.rk || {}).dx || 0 : 0
   })).filter((x) => x.name && x.name !== '이름없음').sort((a, b) => b.xp - a.xp || b.lv - a.lv);
   return {
     week: { key: k.wk, list: pick('week', 'weekXp', 'prevWeek', 'prevWeekXp', k.wk).slice(0, 60) },
