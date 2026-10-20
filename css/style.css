@@ -744,3 +744,15 @@ img.sprite.bust.illust { width: 135%; left: -17%; top: -3%; }
 .duelvs > div { display: flex; flex-direction: column; align-items: center; min-width: 80px; }
 .duelvs b { font-family: 'Jua', sans-serif; font-weight: 400; font-size: 44px; line-height: 1; } .duelvs small, .duelvs span { font-size: 12px; color: var(--ink2); }
 .duelvs i { font-style: normal; font-family: 'Jua', sans-serif; font-size: 22px; color: #e8467c; }
+
+/* 사내 소식 한 줄 */
+.feedbar { display: flex; align-items: center; gap: 8px; width: 100%; margin: 8px 0 2px; padding: 9px 12px; border: 0; border-radius: 12px; background: linear-gradient(90deg, #fff7e0, #fff); box-shadow: inset 0 0 0 2px #ffe3a1; font: inherit; text-align: left; cursor: pointer; overflow: hidden; }
+.feedbar > b { flex: none; font-size: 12px; color: #a0660a; white-space: nowrap; }
+.feedbar #feedTxt { flex: 1; min-width: 0; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--ink); }
+.feedbar #feedTxt i { font-style: normal; font-size: 11px; color: var(--ink2); margin-left: 4px; }
+.feedbar #feedTxt.roll { animation: feedroll .45s ease; }
+@keyframes feedroll { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.feedlist { max-height: 55vh; overflow-y: auto; }
+.feedrow { display: flex; gap: 10px; align-items: flex-start; padding: 9px 4px; border-bottom: 1px solid #f1e4ea; font-size: 14px; line-height: 1.45; }
+.feedrow .fi { font-size: 20px; width: 28px; text-align: center; flex: none; }
+.feedrow small { display: block; font-size: 11.5px; color: var(--ink2); }

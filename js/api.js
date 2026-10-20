@@ -89,6 +89,7 @@ const Api = (() => {
     cheer: (uid) => call('cheer', { uid }),
     duelCreate: (uid, qids, score, ms) => call('duelCreate', { uid, qids, score, ms }),
     duelList: () => call('duelList'),
+    feed: () => call('feed').then((r) => r.items || []),
     duelAnswer: (id, score, ms) => call('duelAnswer', { id, score, ms }),
     sendMoney: (uid, amount, msg) => call('sendMoney', { uid, amount, msg }),
     inbox: () => call('inbox').then((r) => r.items),
@@ -210,6 +211,7 @@ const Demo = (() => {
           park: rows.filter((r) => r.p.mini.park && r.p.mini.park.date === b.day && r.p.mini.park.best).map((r) => item(r, r.p.mini.park.best)).sort((a, c) => a.ms - c.ms).slice(0, 10)
         });
       }
+      case 'feed': return ok({ items: d.feed || [] });
       case 'duelCreate': {
         const to = String(b.uid).replace(/^u:/, ''); d.duels = d.duels || [];
         d.duels.push({ id: 'D' + Date.now(), at: Date.now(), from: email, to, qids: b.qids, a: [b.score, b.ms], st: '대기' }); store(d); return ok({ id: d.duels[d.duels.length - 1].id });

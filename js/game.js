@@ -50,8 +50,10 @@
     ensurePeriod();
     const at = S.updated;
     try {
-      const r = await Api.saveProgress(JSON.stringify(S), S.lv, S.totalXp, { name: S.name, ...S.period, rk: rankStats() }, reset);
-      if (r && r.stale) adoptRemote(r.data); else lastSynced = at;
+      const news = (S.newsQ || []).slice(0, 5);
+      const r = await Api.saveProgress(JSON.stringify(S), S.lv, S.totalXp, { name: S.name, ...S.period, rk: rankStats(), news }, reset);
+      if (r && r.stale) adoptRemote(r.data);
+      else { lastSynced = at; if (news.length && S.newsQ) { S.newsQ.splice(0, news.length); Store.save(S); feedAt = 0; } }
     } catch (e) { if (reset) throw e; }
   }
   // 서버에 더 진행된 기록이 있으면(다른 기기에서 플레이) 그걸로 바꾼다 — 진행한 기록은 절대 뒤로 가지 않음
@@ -308,9 +310,12 @@
     if (S.extra.date !== t) S.extra = { date: t, ready: {} };
     if (S.study.date !== t) S.study = { date: t, xp: 0, articles: [], notes: [] };
   }
+  // 사내 소식으로 올릴 일 (다음 저장 때 서버로 — 문구는 서버가 정함)
+  function feedEv(k, p = {}) { S.newsQ = (S.newsQ || []).concat([{ k, ...p }]).slice(-10); }
   function touchStreak() {
     if (S.streak.last === today()) return;
     S.streak.count = S.streak.last === yesterday() ? S.streak.count + 1 : 1;
+    if ([7, 14, 30, 50, 100].includes(S.streak.count)) feedEv('streak', { n: S.streak.count });
     S.streak.last = today();
     earn(CASH.daily, true);
     toast(`☀️ 출근 보너스 +${won(CASH.daily)} (🔥 ${S.streak.count}일 연속)`);
@@ -671,7 +676,7 @@
     const n = total, lastKey = prev || plan[0].npc, last = NPCS[lastKey];
     const good = okN >= Math.ceil(n * 0.6);
     let bonus = 0;
-    if (!abortSession && okN === n && scored) { bonus = Math.round(xpSum * 0.3) + 20; xpSum += bonus; cashSum += CASH.perfect; inc('perfect'); }
+    if (!abortSession && okN === n && scored) { bonus = Math.round(xpSum * 0.3) + 20; xpSum += bonus; cashSum += CASH.perfect; inc('perfect'); if (!boss && n >= 3) feedEv('perfect', { t: CATS[key].label }); }
     if (!abortSession && last && last.end) {
       setChar(last.spec, good ? 'happy' : 'normal');
       await say(whoOf(lastKey), good ? last.end.good : last.end.bad);
@@ -682,6 +687,7 @@
     if (boss) {
       S.dailyBoss.done = { ok: okN, n, xp: xpSum }; S.dailyBoss.tries++;
       bossWin = !abortSession && good;
+      if (bossWin) feedEv('boss', { t: boss.npcs ? NPCS[bossNpc(boss)].name : boss.title });
       if (bossWin) { inc('boss_' + boss.id); cashSum += boss.cash; }
     }
     const ups = addXp(xpSum);
@@ -811,6 +817,7 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
     els.screen.innerHTML = `<button class="officebtn" id="officeGo">🏢 사무실 가기</button><button class="officebtn garagebtn" id="garageGo">🚗 내 차고</button><button class="officebtn parkbtn" id="parkGo">🅿️ 주차장</button><div class="sheet">
       ${S.events && S.events.pending ? '<button class="newsflash" id="evGo">📨 새 소식이 도착했어요! <b>확인하기 →</b></button>' : ''}
       <h3><span>${greeting()},<br>${esc(S.name)} ${r.title}님!</span><small>오늘 ${doneN}/${open.length} 완료<br>🔥 ${S.streak.count}일 연속 출근</small></h3>
+      <button class="feedbar" id="feedBar"><b>📢 사내 소식</b><span id="feedTxt">${feedLine(0)}</span></button>
       ${evs.length ? `<div class="events">${evs.map((e) => `<div class="event">${e.icon} ${e.title}<small>${e.desc}</small></div>`).join('')}</div>` : ''}
       <div class="bosswrap">
         <button class="boss ${bd ? 'done' : ''}" id="bossBtn">
@@ -841,6 +848,8 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
     els.screen.querySelectorAll('[data-go2]').forEach((b) => b.onclick = () => go(b.dataset.go2));
     $('#officeGo').onclick = () => { Snd.tap(); openOffice(); };
     $('#duelGo').onclick = () => { Snd.tap(); duelHub(); };
+    $('#feedBar').onclick = () => { Snd.tap(); feedModal(); };
+    refreshFeed(); startFeedTicker();
     refreshDuels();
     $('#garageGo').onclick = () => { Snd.tap(); openGarage(); };
     $('#parkGo').onclick = () => { Snd.tap(); openParking(); };
@@ -1193,7 +1202,7 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
     for (const [k, w] of [['week', r.lastWeek], ['month', r.lastMonth]]) {
       const id = `${k}:${w.key}`;
       if (w.winner && w.winner.me && !S.awards[id]) {
-        S.awards[id] = Date.now(); confetti(90); Snd.lv();
+        S.awards[id] = Date.now(); confetti(90); Snd.lv(); feedEv('best', { t: BEST_BM[k].label });
         modal(`<h2>👑 ${BEST_BM[k].label} 최우수BM!</h2><p style="text-align:center;line-height:1.6">${esc(w.key)} ${BEST_BM[k].label} 최우수BM으로 선정됐어요!<br>명예 +${BEST_BM[k].honor} · 활동비 +${won(BEST_BM[k].cash)}</p><button class="btn full" data-close>감사합니다!</button>`);
         await grant({ honor: BEST_BM[k].honor, cash: BEST_BM[k].cash });
       }
@@ -1594,7 +1603,7 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
     if (c.owned[id]) return true;
     if (S.money < it.price) { toast(`활동비가 ${won(it.price - S.money)} 부족해요`); return false; }
     if (!(await confirmBox(`${it.icon} ${it.name}을(를) ${won(it.price)}에 살까요?\n회사 주차장의 내 차에 바로 달려요.`, '구매'))) return false;
-    S.money -= it.price; c.owned[id] = Date.now(); c.shown[id] = true; inc('purchases');
+    S.money -= it.price; c.owned[id] = Date.now(); c.shown[id] = true; inc('purchases'); if (it.price >= 15000) feedEv('buy', { t: it.name });
     if (id === 'plate' && !c.plate) c.plate = '방카 ' + String(1000 + Math.floor(Math.random() * 9000));
     Snd.coin(); toast(`${it.icon} ${it.name} 구매! 주차장에서 확인해 보세요`); checkAch(); save(); renderHud();
     return true;
@@ -1663,7 +1672,7 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
     } else if (kind === 'park') {
       if (!res.ok) return { msg: res.why === 'crash' ? '천천히 · 조금씩 핸들을 돌려 보세요. 후진도 적극 활용!' : '칸 안에 반듯하게 들어가서 멈춰야 성공이에요!' };
       if (!m.park.best || res.ms < m.park.best) { lines.push(m.park.best ? `🎉 오늘 최고 기록 경신! (이전 ${Mini.fmt(m.park.best)})` : '🎉 오늘 첫 주차 성공!'); m.park.best = res.ms; }
-      if (!res.bumps) { inc('parkClean'); lines.push('🏆 무사고 주차!'); }
+      if (!res.bumps) { inc('parkClean'); lines.push('🏆 무사고 주차!'); if (m.park.posted !== today()) { m.park.posted = today(); feedEv('park'); } }
     } else {
       if (!m.run.best || res.ms > m.run.best) { lines.push(m.run.best ? `🎉 최고 기록 경신! (이전 ${Mini.fmt(m.run.best)})` : '🎉 첫 기록!'); m.run.best = res.ms; }
     }
@@ -1682,7 +1691,7 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
     const m = miniState();
     if (m.egg !== today()) { m.egg = today(); m.eggN = 0; }
     if ((m.eggN || 0) >= EGG_MAX) return `<b>🔒 빈 금고</b><small>오늘은 ${EGG_MAX}번 모두 열었어요. 내일 또 찾아보세요!</small>`;
-    m.eggN = (m.eggN || 0) + 1; m.eggs = (m.eggs || 0) + 1; S.money += EGG_CASH; inc('eggs'); Snd.coin(); save();
+    m.eggN = (m.eggN || 0) + 1; m.eggs = (m.eggs || 0) + 1; S.money += EGG_CASH; inc('eggs'); Snd.coin(); if (m.eggN === 1) feedEv('egg'); save();
     return `<b>💰 비밀 금고 발견!</b><small>비상금 +${won(EGG_CASH)} · 오늘 ${m.eggN}/${EGG_MAX}번째</small>`;
   }
   async function playMini(kind) {
@@ -1756,6 +1765,40 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
     });
     Snd.coin(); checkAch(); save(); syncNow(); renderHud();
     modal(`<h2>📬 우편함</h2>${lines.join('')}<p class="muted" style="text-align:center">합계 ${won(cash)}${honor ? ` · 명예 +${honor}` : ''}</p><button class="btn full" data-close>받기</button>`);
+  }
+
+  /* ---------------- 사내 소식 피드 ---------------- */
+  const FEED_ICON = { 승진: '🎉', 레벨: '⬆️', 대결: '⚔️', boss: '👹', perfect: '💯', egg: '💰', park: '🅿️', buy: '✨', streak: '🔥', best: '👑' };
+  let feedItems = null, feedAt = 0, feedTick = null, feedIdx = 0;
+  try { const c = JSON.parse(localStorage.getItem('bmq_feed')); if (c) feedItems = c; } catch (e) { }
+  const ago = (t) => { const m = Math.floor((Date.now() - t) / 60000); return m < 1 ? '방금' : m < 60 ? `${m}분 전` : m < 1440 ? `${Math.floor(m / 60)}시간 전` : `${Math.floor(m / 1440)}일 전`; };
+  function feedLine(i) {
+    if (!feedItems) return '소식을 불러오는 중…';
+    if (!feedItems.length) return '아직 새 소식이 없어요. 첫 소식의 주인공이 되어 보세요!';
+    const x = feedItems[i % feedItems.length];
+    return `${FEED_ICON[x.kind] || '📢'} <b>${esc(x.name)}</b>님이 ${esc(x.text)} <i>${ago(x.at)}</i>`;
+  }
+  async function refreshFeed(force) {
+    if (!force && Date.now() - feedAt < 60000) return;
+    feedAt = Date.now();
+    try { feedItems = await Api.feed(); localStorage.setItem('bmq_feed', JSON.stringify(feedItems)); } catch (e) { return; }
+    feedIdx = 0; const t = $('#feedTxt'); if (t) t.innerHTML = feedLine(0);
+  }
+  function startFeedTicker() {
+    clearInterval(feedTick);
+    feedTick = setInterval(() => {
+      const t = $('#feedTxt'); if (!t || inSession) { if (!t) clearInterval(feedTick); return; }
+      if (!feedItems || feedItems.length < 2) return;
+      feedIdx++; t.classList.remove('roll'); void t.offsetWidth; t.classList.add('roll'); t.innerHTML = feedLine(feedIdx);
+    }, 4500);
+  }
+  async function feedModal() {
+    const draw = () => `<h2 style="font-size:22px">📢 사내 소식</h2><p class="muted" style="text-align:center">최근 3일 동안 동료들의 소식이에요.</p>
+      <div class="feedlist">${feedItems && feedItems.length ? feedItems.map((x) => `<div class="feedrow"><span class="fi">${FEED_ICON[x.kind] || '📢'}</span><span><b>${esc(x.name)}</b>님이 ${esc(x.text)}<small>${ago(x.at)}</small></span></div>`).join('')
+        : '<p class="muted" style="text-align:center">아직 새 소식이 없어요.</p>'}</div><button class="btn full" data-close style="margin-top:10px">닫기</button>`;
+    const m = modal(draw());
+    await refreshFeed(true);
+    if (els.modal.classList.contains('on') && m.el.isConnected) { m.el.innerHTML = draw(); m.el.querySelectorAll('[data-close]').forEach((b) => b.onclick = m.close); }
   }
 
   /* ---------------- 1:1 퀴즈 대결 (도전장) ---------------- */
