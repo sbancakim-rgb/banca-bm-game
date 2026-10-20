@@ -257,7 +257,10 @@ const Parking = (() => {
     });
     const flagTex = canvasTex(256, 160, (g, w, h) => { g.fillStyle = '#1f2a44'; g.fillRect(0, 0, w, h); g.fillStyle = '#ffd66b'; g.font = 'bold 54px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('BANCA', w / 2, h / 2 + 3); });
     const ribbonMat = std({ color: '#e8243c', roughness: 0.35, metalness: 0.1 });
-    const vipFlagTex = canvasTex(256, 160, (g, w, h) => { g.fillStyle = '#8f1d2c'; g.fillRect(0, 0, w, h); g.fillStyle = '#ffd66b'; g.font = 'bold 64px serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('VIP', w / 2, h / 2 + 4); });
+    const vipFlagTex = canvasTex(256, 160, (g, w, h) => {
+      g.fillStyle = '#16245a'; g.fillRect(0, 0, w, h); g.fillStyle = '#d9a93a'; g.fillRect(0, 0, w, 14); g.fillRect(0, h - 14, w, 14);
+      g.fillStyle = '#ffd66b'; g.font = 'bold 44px serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('★ VIP ★', w / 2, h / 2 + 2);
+    });
     const starTex = canvasTex(64, 64, (g, w, h) => { const r = g.createRadialGradient(32, 32, 0, 32, 32, 32); r.addColorStop(0, 'rgba(255,255,255,1)'); r.addColorStop(0.15, 'rgba(255,255,240,.9)'); r.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = r; g.fillRect(0, 0, w, h); g.fillStyle = '#fff'; g.fillRect(30, 2, 4, 60); g.fillRect(2, 30, 60, 4); });
     const lineM = new T.LineBasicMaterial({ color: '#eeeeee' }), surfRay = new T.Raycaster(), DOWN = new T.Vector3(0, -1, 0);
     const anims = [];
@@ -346,8 +349,88 @@ const Parking = (() => {
         }
         anims.push((t) => sp.forEach((st) => { const v = Math.max(0, Math.sin(t * 2.6 + st.userData.ph)); st.scale.setScalar(0.05 + v * 0.38); }));
       }
-      // 밤: 헤드라이트 · 바닥 불빛
-      [-1, 1].forEach((d) => { const hl = noPick(new T.Sprite(new T.SpriteMaterial({ map: headTex, transparent: true, depthWrite: false, blending: T.AdditiveBlending }))); hl.scale.set(0.9, 0.9, 1); hl.position.set(d * Wd * 0.33, H * 0.36, L / 2 + 0.06); wrap.add(hl); s.night.push(hl); });
+      // ---- 지붕 위 꾸밈 (지붕 높이 + 루프박스가 있으면 그 위) ----
+      const roofY = H + (has.has('roofbox') ? 0.3 : 0), mat = (c, o = {}) => std({ color: c, roughness: 0.45, ...o });
+      const add = (geo, m, x, y, z, parent = wrap) => { const o = new T.Mesh(geo, m); o.position.set(x, y, z); parent.add(o); return o; };
+      if (has.has('catears')) { // 앞쪽 지붕 양옆
+        const fur = mat('#2b2b2b'), pink = mat('#ff9fc0');
+        [-1, 1].forEach((d) => {
+          const g = new T.Group(); g.position.set(d * Wd * 0.26, roofY, L * 0.06); g.rotation.z = -d * 0.15; wrap.add(g);
+          add(new T.ConeGeometry(0.2, 0.38, 4), fur, 0, 0.17, 0, g).rotation.y = Math.PI / 4;
+          add(new T.ConeGeometry(0.11, 0.24, 4), pink, 0, 0.14, 0.06, g).rotation.y = Math.PI / 4;
+        });
+        extra = Math.max(extra, roofY - H + 0.4);
+      }
+      if (has.has('reindeer')) { // 사슴뿔 (앞쪽 지붕) + 빨간 코 (앞 범퍼)
+        const horn = mat('#7a4a22');
+        [-1, 1].forEach((d) => {
+          const g = new T.Group(); g.position.set(d * Wd * 0.22, roofY, L * 0.12); g.rotation.z = -d * 0.35; wrap.add(g);
+          add(new T.CylinderGeometry(0.03, 0.04, 0.5, 6), horn, 0, 0.25, 0, g);
+          [[0.12, 0.32, 0.6], [-0.1, 0.42, -0.6], [0.1, 0.5, 0.5]].forEach(([x, y, r]) => { const b = add(new T.CylinderGeometry(0.022, 0.028, 0.22, 6), horn, x * d, y, 0, g); b.rotation.z = -r * d; });
+        });
+        const nose = add(new T.SphereGeometry(0.12, 14, 10), std({ color: '#ff2a2a', emissive: '#ff2a2a', emissiveIntensity: 0.8, roughness: 0.3 }), 0, H * 0.36, L / 2 + 0.08);
+        nose.userData.glow = true; extra = Math.max(extra, roofY - H + 0.6);
+      }
+      if (has.has('teddy')) { // 지붕 뒤쪽에 앉은 곰인형
+        const fur = mat('#a8703f', { roughness: 0.9 }), lite = mat('#e7c39a', { roughness: 0.9 }), dark = mat('#2a1a10', { roughness: 0.4 });
+        const g = new T.Group(); g.position.set(-Wd * 0.2, roofY, -L * 0.34); g.rotation.y = 0.5; wrap.add(g);
+        add(new T.SphereGeometry(0.24, 16, 12), fur, 0, 0.22, 0, g).scale.y = 1.1;
+        add(new T.SphereGeometry(0.19, 16, 12), fur, 0, 0.58, 0.02, g);
+        [-1, 1].forEach((d) => { add(new T.SphereGeometry(0.07, 10, 8), fur, d * 0.14, 0.73, 0, g); add(new T.SphereGeometry(0.08, 10, 8), fur, d * 0.24, 0.3, 0.06, g); add(new T.SphereGeometry(0.085, 10, 8), fur, d * 0.12, 0.06, 0.16, g); add(new T.SphereGeometry(0.022, 8, 6), dark, d * 0.06, 0.63, 0.17, g); });
+        add(new T.SphereGeometry(0.075, 12, 8), lite, 0, 0.55, 0.17, g).scale.z = 0.7;
+        add(new T.SphereGeometry(0.025, 8, 6), dark, 0, 0.57, 0.23, g);
+        extra = Math.max(extra, roofY - H + 0.85);
+      }
+      if (has.has('dish')) { // 지붕 뒤쪽 오른편 위성 안테나
+        const white = mat('#f3f3f3', { roughness: 0.3 }), grey = mat('#9aa0a8', { metalness: 0.6, roughness: 0.4 });
+        const g = new T.Group(); g.position.set(Wd * 0.22, roofY, -L * 0.22); wrap.add(g);
+        add(new T.CylinderGeometry(0.03, 0.05, 0.22, 8), grey, 0, 0.11, 0, g);
+        const bowl = add(new T.SphereGeometry(0.34, 20, 10, 0, Math.PI * 2, 0, 0.75), std({ color: '#f3f3f3', roughness: 0.3, side: T.DoubleSide }), 0, 0.5, -0.05, g); bowl.rotation.x = -2.1;
+        add(new T.CylinderGeometry(0.015, 0.015, 0.36, 6), grey, 0, 0.42, 0.14, g).rotation.x = 0.9;
+        add(new T.BoxGeometry(0.07, 0.06, 0.08), white, 0, 0.55, 0.27, g);
+        extra = Math.max(extra, roofY - H + 0.75);
+      }
+      // 가운데 지붕: 경광등 · 왕관 (함께 달면 위로 쌓음)
+      let mid = roofY + (has.has('ribbon') ? 0.5 : 0);
+      if (has.has('siren')) {
+        const g = new T.Group(); g.position.set(0, mid, -L * 0.02); wrap.add(g);
+        add(new T.BoxGeometry(0.9, 0.08, 0.26), mat('#202228', { metalness: 0.5 }), 0, 0.04, 0, g);
+        const red = std({ color: '#ff2a2a', emissive: '#ff2a2a', emissiveIntensity: 1, transparent: true, opacity: 0.92 }), blue = std({ color: '#2a6bff', emissive: '#2a6bff', emissiveIntensity: 1, transparent: true, opacity: 0.92 });
+        add(new T.BoxGeometry(0.38, 0.14, 0.22), red, -0.22, 0.15, 0, g); add(new T.BoxGeometry(0.38, 0.14, 0.22), blue, 0.22, 0.15, 0, g);
+        const flareR = noPick(new T.Sprite(new T.SpriteMaterial({ map: headTex, color: '#ff3030', transparent: true, depthWrite: false, blending: T.AdditiveBlending })));
+        const flareB = noPick(new T.Sprite(new T.SpriteMaterial({ map: headTex, color: '#3070ff', transparent: true, depthWrite: false, blending: T.AdditiveBlending })));
+        flareR.position.set(-0.22, 0.16, 0.05); flareB.position.set(0.22, 0.16, 0.05); g.add(flareR, flareB);
+        const ph = Math.random() * 6;
+        anims.push((t) => { const a = (Math.sin(t * 9 + ph) + 1) / 2; flareR.scale.setScalar(0.3 + a * 1.1); flareB.scale.setScalar(0.3 + (1 - a) * 1.1); red.emissiveIntensity = 0.4 + a * 1.4; blue.emissiveIntensity = 0.4 + (1 - a) * 1.4; });
+        mid += 0.26;
+      }
+      if (has.has('crown')) {
+        const gold = std({ color: '#ffcf3a', metalness: 0.95, roughness: 0.2 }), gem = (c) => std({ color: c, emissive: c, emissiveIntensity: 0.4, roughness: 0.2 });
+        const g = new T.Group(); g.position.set(0, mid, 0); wrap.add(g);
+        add(new T.CylinderGeometry(0.3, 0.27, 0.16, 24, 1, true), std({ color: '#ffcf3a', metalness: 0.95, roughness: 0.2, side: T.DoubleSide }), 0, 0.08, 0, g);
+        for (let k = 0; k < 8; k++) { const a = k / 8 * Math.PI * 2; add(new T.ConeGeometry(0.06, 0.2, 6), gold, Math.cos(a) * 0.285, 0.25, Math.sin(a) * 0.285, g); add(new T.SphereGeometry(0.035, 8, 6), gold, Math.cos(a) * 0.285, 0.36, Math.sin(a) * 0.285, g); }
+        ['#e8243c', '#2a6bff', '#2fb67c', '#e8243c'].forEach((c, k) => { const a = k / 4 * Math.PI * 2 + 0.4; add(new T.SphereGeometry(0.045, 10, 8), gem(c), Math.cos(a) * 0.3, 0.08, Math.sin(a) * 0.3, g); });
+        const sp = Math.random() * 6; anims.push((t) => { g.rotation.y = t * 0.6 + sp; });
+        mid += 0.4;
+      }
+      extra = Math.max(extra, mid - H);
+      if (has.has('eyes')) { // 보닛 위 왕눈이 (눈동자가 데굴데굴)
+        const white = mat('#ffffff', { roughness: 0.25 }), black = mat('#111111', { roughness: 0.2 });
+        const pupils = [], eys = [];
+        [-1, 1].forEach((d) => {
+          const ex = d * Wd * 0.2, ez = L * 0.2, ey = surf(ex, ez); eys.push(ey);
+          const eye = add(new T.SphereGeometry(0.17, 16, 12), white, ex, ey + 0.1, ez); eye.scale.set(1, 1, 0.8);
+          pupils.push(add(new T.SphereGeometry(0.075, 12, 10), black, ex, ey + 0.13, ez + 0.13));
+        });
+        const ph = Math.random() * 6;
+        anims.push((t) => pupils.forEach((pp, k) => { const bx = Math.sin(t * 1.7 + ph) * 0.05, by = Math.cos(t * 2.3 + ph) * 0.035; pp.position.x = (k ? 1 : -1) * Wd * 0.2 + bx; pp.position.y = eys[k] + 0.13 + by; }));
+      }
+      // 밤: 헤드라이트 · 바닥 불빛 (라이트 색 변경을 달았으면 그 색, 낮에도 렌즈가 은은하게)
+      const lc = has.has('lightcolor') && /^#[0-9a-f]{6}$/i.test(cr.l || '') ? cr.l : null;
+      [-1, 1].forEach((d) => {
+        const hl = noPick(new T.Sprite(new T.SpriteMaterial({ map: headTex, color: lc || '#ffffff', transparent: true, depthWrite: false, blending: T.AdditiveBlending }))); hl.scale.set(0.9, 0.9, 1); hl.position.set(d * Wd * 0.33, H * 0.36, L / 2 + 0.06); wrap.add(hl); s.night.push(hl);
+        if (lc) { const day = noPick(new T.Sprite(new T.SpriteMaterial({ map: headTex, color: lc, transparent: true, opacity: 0.85, depthWrite: false, blending: T.AdditiveBlending }))); day.scale.set(0.45, 0.45, 1); day.position.set(d * Wd * 0.33, H * 0.36, L / 2 + 0.07); wrap.add(day); }
+      });
       const bg = noPick(flat(2.8, 3.4, glowMat(beamGround), 0, 0.022, L / 2 + 1.7)); wrap.add(bg); s.night.push(bg);
       return extra;
     }

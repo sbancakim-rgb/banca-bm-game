@@ -338,29 +338,23 @@ const CAR_ITEMS = [
   { id: 'balloons', icon: '🎈', name: '풍선 다발', price: 2500, desc: '차 옆에서 둥실둥실 흔들려요' },
   { id: 'shine', icon: '💎', name: '광택 코팅', price: 3000, desc: '차체가 반짝반짝 빛나요' },
   { id: 'flowers', icon: '💐', name: '웨딩 꽃장식', price: 4000, desc: '보닛 위 화사한 꽃다발' },
-  { id: 'envoy', icon: '🎌', name: '의전 깃발', price: 7000, desc: '앞 펜더 양쪽에 꽂는 의전용 깃발' },
+  { id: 'envoy', icon: '⚜️', name: '의전 깃발', price: 7000, desc: '앞 펜더 양쪽에 꽂는 의전용 깃발' },
   { id: 'carpet', icon: '🟥', name: '레드카펫 마중', price: 8000, desc: '운전석 문 앞 레드카펫과 금색 차단봉' },
+  { id: 'catears', icon: '🐱', name: '고양이 귀', price: 2000, desc: '지붕 위 쫑긋한 고양이 귀 한 쌍' },
+  { id: 'eyes', icon: '👀', name: '왕눈이', price: 1500, desc: '보닛 위 데굴데굴 커다란 눈알' },
+  { id: 'teddy', icon: '🧸', name: '곰인형', price: 3000, desc: '지붕 위에 앉은 커다란 곰인형' },
+  { id: 'reindeer', icon: '🦌', name: '루돌프 세트', price: 3500, desc: '사슴뿔 + 반짝이는 빨간 코' },
+  { id: 'lightcolor', icon: '💡', name: '라이트 색 변경', price: 4000, desc: '헤드라이트 색을 바꿔요 (밤에 더 잘 보여요)' },
+  { id: 'dish', icon: '📡', name: '위성 안테나', price: 4500, desc: '지붕 위 하얀 접시 안테나' },
+  { id: 'siren', icon: '🚨', name: '경광등', price: 6000, desc: '빨강·파랑으로 번쩍번쩍 도는 경광등' },
+  { id: 'crown', icon: '👑', name: '황금 왕관', price: 15000, desc: '지붕 위 번쩍이는 황금 왕관' },
   { id: 'driver', icon: '🧑‍✈️', name: '전속 기사님 고용', price: 50000, desc: '운전석 옆에서 기사님이 대기하고 있어요' },
   { id: 'guards', icon: '🕴️', name: '경호원 고용', price: 80000, desc: '검은 정장 · 선글라스 경호원이 차 옆을 지켜요' }
 ];
+const LIGHT_COLORS = [['#7fc8ff', '아이스 블루'], ['#ffd23f', '옐로'], ['#ff5ab4', '핑크'], ['#7dffb2', '민트'], ['#c49bff', '퍼플']];
 const GLOW_COLORS = [['#ff4fa3', '핑크'], ['#3fa9ff', '블루'], ['#3ee08f', '그린'], ['#ffc93c', '골드'], ['#b26bff', '퍼플']];
 /* 사무실 꾸밈 물품 (매점에서 구매 → 사무실에 비치 · 보관 선택) */
-const OFFICE_ITEMS = [
-  { id: 'cactus', icon: '🌵', name: '미니 선인장', price: 500, desc: '책상 위의 작은 친구' },
-  { id: 'teddy', icon: '🧸', name: '곰인형', price: 800, desc: '야근할 때 위로가 돼요' },
-  { id: 'plant', icon: '🪴', name: '몬스테라 화분', price: 1500, desc: '사무실 공기 정화 담당' },
-  { id: 'globe', icon: '🌏', name: '지구본', price: 2000, desc: '글로벌 감각 UP' },
-  { id: 'laptop', icon: '💻', name: '최신 노트북', price: 2500, desc: '상품 설계도 척척' },
-  { id: 'coffee', icon: '☕', name: '커피머신', price: 3000, desc: '진열장 위 바리스타' },
-  { id: 'fish', icon: '🐠', name: '어항', price: 5000, desc: '보고만 있어도 힐링' },
-  { id: 'putter', icon: '⛳', name: '퍼팅 연습기', price: 6000, desc: '지점장님 라운딩 대비' },
-  { id: 'clock', icon: '🕰️', name: '앤티크 괘종시계', price: 7000, desc: '시간은 금이다' },
-  { id: 'painting', icon: '🖼️', name: '명화 액자', price: 8000, desc: '품격 있는 사무실의 완성' },
-  { id: 'dog', icon: '🐕', name: '사무실 강아지', price: 9000, desc: '출근하면 꼬리 흔들며 반겨요' },
-  { id: 'sofa', icon: '🛋️', name: '가죽 소파', price: 10000, desc: 'VIP 고객 응대용' },
-  { id: 'statue', icon: '🗿', name: '조각상', price: 15000, desc: '성공한 사람의 상징' },
-  { id: 'crystal', icon: '💎', name: '크리스탈 장식', price: 30000, desc: '사장실에 어울리는 최고급 장식' }
-];
+const OFFICE_ITEMS = []; // 사무실 꾸밈 물품은 없앰 (비치가 자연스럽지 않아서) — 보유 물품도 정리됨
 /* 미니게임 보상 (하루 한 번씩) — 미로: 제한 시간 안에 도착 / 질주: 30초 이상 버티기 */
 const MINI_REWARD = { maze: { cash: 100, xp: 5 }, run: { cash: 100, xp: 5, need: 30000 }, park: { cash: 100, xp: 5 } };
 /* 방카 상품 출제 비중: 주력 플래티넘행복연금 2 · 즉시연금 1 · 그 밖의 상품 0.5 (태그·질문으로 구분) */
@@ -368,6 +362,8 @@ const PRODUCT_FOCUS = [{ re: /플래티넘/, w: 2 }, { re: /즉시연금|즉시�
 const PRODUCT_OTHER_W = 0.5;
 /* 이벤트 기간: 오늘 일정 카드를 하루에 몇 번이든 다시 풀 수 있음 (끝나면 false) */
 const EVENT_UNLIMITED = true;
+/* 1:1 퀴즈 대결: 하루 도전장 수 · 대기 기한(일) · 문제 수 · 문제당 보상 · 결과 보상 (서버 Code.gs DUEL 과 같은 값) */
+const DUEL = { perDay: 5, days: 3, count: 5, perQ: { xp: 6, cash: 30 }, win: { cash: 1000, honor: 10 }, draw: { cash: 500, honor: 5 }, lose: { cash: 200, honor: 2 } };
 const CAT_ORDER = ['banca_general', 'banca_product', 'banca_backoffice', 'market', 'econ', 'term'];
 const GROUPS = {
   banca: { label: '방카슈랑스', cats: ['banca_general', 'banca_product', 'banca_backoffice'] },

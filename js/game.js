@@ -377,6 +377,8 @@
         const sub = list.filter((q) => q.cat === cats[i % cats.length]);
         const q = takeByDiff(sub.length ? sub : list, d, used); q && plan.push({ q, npc: bossNpc(b) });
       });
+    } else if (kind === 'duel') {
+      (key || []).forEach((id) => { const q = all.find((x) => x.id === id); if (q && !used.has(id)) { used.add(id); plan.push({ q, npc: npcFor(q) }); } });
     } else if (kind === 'review') {
       const ids = Object.keys(S.wrong);
       rankForPick(all.filter((q) => ids.includes(q.id) && (!key || key === 'all' || q.cat === key))).slice(0, DAILY_Q)
@@ -546,9 +548,9 @@
     const evs = todayEvents();
     const evMult = (cat) => evs.filter((e) => e.cats.includes(cat)).reduce((m, e) => m * e.mult, 1);
     const scored = kind === 'daily' || kind === 'extra' || kind === 'boss';
-    const label = boss ? `일간 보스 · ${boss.title}` : kind === 'review' ? '오답노트 복습' : kind === 'practice' ? `학습회 · ${CATS[key].label}` : CATS[key].label + (kind === 'extra' ? (EVENT_UNLIMITED ? ' (이벤트)' : ' (활기력)') : '');
-    const ctx = { sess: {}, noItems: kind === 'review' };
-    let combo = 0, sat = 60, xpSum = 0, cashSum = 0, okN = 0, prev = null, total = plan.length;
+    const label = kind === 'duel' ? `⚔️ ${opts.duel.name}님과 대결` : boss ? `일간 보스 · ${boss.title}` : kind === 'review' ? '오답노트 복습' : kind === 'practice' ? `학습회 · ${CATS[key].label}` : CATS[key].label + (kind === 'extra' ? (EVENT_UNLIMITED ? ' (이벤트)' : ' (활기력)') : '');
+    const ctx = { sess: {}, noItems: kind === 'review' || kind === 'duel' }; // 대결은 아이템 없이 공정하게
+    let combo = 0, sat = 60, xpSum = 0, cashSum = 0, okN = 0, prev = null, total = plan.length, msSum = 0;
     const drawSess = (i) => {
       els.sess.classList.remove('hidden');
       els.sess.innerHTML = `<span class="chip">${esc(label)} · ${Math.min(i + 1, total)}/${total}</span>
@@ -566,7 +568,10 @@
     };
     renderHud();
 
-    if (boss) {
+    if (kind === 'duel') {
+      setBg('office'); setChar(null);
+      await say(NARR, `⚔️ ${opts.duel.name}님과의 퀴즈 대결!\n같은 문제 ${plan.length}개 · 많이 맞힌 사람이 이기고, 같으면 빨리 푼 사람이 이겨요.`);
+    } else if (boss) {
       S.bossSeen[boss.id] = 1;
       setBg(NPCS[bossNpc(boss)].bg); setChar(null);
       const bn = boss.npcs ? NPCS[bossNpc(boss)] : null; // 여러 명 중 오늘 온 사람
@@ -596,6 +601,7 @@
       const r = await ask(q, who, npc, sec, ctx);
       els.dlg.classList.remove('asking'); els.meta.innerHTML = '';
       if (abortSession || r.quit) { els.choices.innerHTML = ''; break; } // 그만하기: 풀던 문제는 기록하지 않음
+      msSum += Math.round(r.ms || 0);
       S.seen[q.id] = dayNum();
       if (r.skipped) {
         const rep = replace(q, nk);
@@ -625,6 +631,8 @@
           S.groupXp[grp] = (S.groupXp[grp] || 0) + xp;
         } else if (kind === 'practice') {
           xp = STUDY_XP.practice; cash = CASH.practice; inc('practice');
+        } else if (kind === 'duel') {
+          xp = DUEL.perQ.xp; cash = DUEL.perQ.cash;
         } else {
           delete S.wrong[q.id]; inc('fixed'); S.honor += 4;
         }
@@ -686,7 +694,8 @@
     checkAch(); save(); syncNow();
     inSession = false;
     els.vn.classList.remove('on'); els.sess.classList.add('hidden'); els.choices.innerHTML = '';
-    if (abortSession) toast(`그만했어요 · 지금까지 +${xpSum} XP${cashSum ? ` · +${won(cashSum)}` : ''}`); // 결과 창 없이 바로 나가기
+    if (kind === 'duel') { if (abortSession) toast('대결을 그만뒀어요'); else await duelFinish(opts.duel, okN, n, msSum); }
+    else if (abortSession) toast(`그만했어요 · 지금까지 +${xpSum} XP${cashSum ? ` · +${won(cashSum)}` : ''}`); // 결과 창 없이 바로 나가기
     else await showResult({ kind, label, okN, n, xpSum, cashSum, bonus, sat, ups, scored, bossWin, boss });
     const afterRank = rankOf(S.lv);
     if (afterRank !== beforeRank) await promotion(afterRank);
@@ -811,7 +820,7 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
         </button>
         <button class="bossinfo" id="bossInfo" aria-label="보스 설명">!</button>
       </div>
-      <div class="cards">${CAT_ORDER.map((k) => {
+      <div class="cards ${EVENT_UNLIMITED ? 'unl' : ''}">${CAT_ORDER.map((k) => {
         const c = CATS[k], d = S.daily.done[k], x2 = evs.some((e) => e.cats.includes(k)), n = catCount(k);
         const who = c.npcs.map((x) => NPCS[x].name).join(' · ');
         if (!n) return `<div class="card empty" style="--c:${c.color}"><div class="ic">${c.icon}</div><div class="t">${c.label}</div><div class="d">📭 문제 준비 중</div><div class="who">관리자가 자료를 등록하면 열려요</div></div>`;
@@ -819,7 +828,8 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
           ${x2 && !d ? '<span class="x2">EVENT</span>' : ''}<div class="ic">${c.icon}</div><div class="t">${c.label}</div><div class="d">${c.desc}</div>
           ${d ? `<div class="who">${EVENT_UNLIMITED ? '🎉 이벤트 · 한 번 더 풀기 →' : vig ? '🧃 활기력으로 한 번 더 →' : '오늘 완료 · 내일 다시'}</div>` : `<div class="who">출제: ${esc(who)}</div>`}</button>`;
       }).join('')}</div>
-      <button class="studycta drivecta" data-go2="drive" style="margin-top:12px">🚗 <b>BM 드라이빙</b> · 출근길 미로 / 고속도로 질주 <small>미니게임 · 시간 대결 →</small></button>
+      <button class="studycta duelcta" id="duelGo" style="margin-top:12px">⚔️ <b>퀴즈 대결</b> · 동료에게 도전장 보내기 <small id="duelBadge">${duelBadge()}</small></button>
+      <button class="studycta drivecta" data-go2="drive">🚗 <b>BM 드라이빙</b> · 출근길 미로 / 고속도로 질주 <small>미니게임 · 시간 대결 →</small></button>
     </div>
     <button class="chartap" id="charTap" aria-label="내 캐릭터에게 말 걸기"></button>`;
     els.screen.querySelectorAll('.card[data-cat]').forEach((c) => c.onclick = () => {
@@ -830,6 +840,8 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
     });
     els.screen.querySelectorAll('[data-go2]').forEach((b) => b.onclick = () => go(b.dataset.go2));
     $('#officeGo').onclick = () => { Snd.tap(); openOffice(); };
+    $('#duelGo').onclick = () => { Snd.tap(); duelHub(); };
+    refreshDuels();
     $('#garageGo').onclick = () => { Snd.tap(); openGarage(); };
     $('#parkGo').onclick = () => { Snd.tap(); openParking(); };
     $('#charTap').onclick = charTalk;
@@ -1384,7 +1396,7 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
           ${photo ? `<button class="ov-hide" data-hide>${hide ? '🙋 캐릭터 보이기' : '🙈 캐릭터 치우기'}</button>` : ''}</div>
         <div class="ov-stage">${stage}<div class="ov-tip"></div>${photo ? '<div class="ov-hint">↔ 좌우로 밀어서 둘러보세요</div>' : ''}</div>
         <div class="ov-info">🏆 트로피 ${c.trophies.length} · 📜 상장 ${c.certs.length} · 📚 책 ${c.books}권 · 🪑 물품 ${c.items.length}개<small>${esc(c.title)} · ${esc(Office.PLACE[r])} · 물건을 눌러 보세요</small></div>
-        <div class="ov-bar">${me ? '<button class="btn" data-deco>🪑 꾸미기</button><button class="btn ghost" data-case>🏆 진열장</button><button class="btn ghost" data-shop>🛒 매점</button><button class="btn ghost" data-car>🚗 차고</button>'
+        <div class="ov-bar">${me ? '<button class="btn ghost" data-case>🏆 진열장</button><button class="btn ghost" data-shop>🛒 매점</button><button class="btn ghost" data-car>🚗 차고</button>'
           : '<button class="btn ghost" data-case>🏆 진열장</button><button class="btn" data-x>닫기</button>'}</div>`;
       el.querySelectorAll('[data-x]').forEach((b) => b.onclick = close);
       const tip = el.querySelector('.ov-tip');
@@ -1573,7 +1585,7 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
   function carCR() {
     const c = S && S.car; if (!c) return null;
     const i = CAR_ITEMS.filter((it) => c.owned[it.id] && c.shown[it.id] !== false).map((it) => it.id);
-    return i.length ? { i, p: c.plate || '', g: c.glow || GLOW_COLORS[0][0] } : null;
+    return i.length ? { i, p: c.plate || '', g: c.glow || GLOW_COLORS[0][0], l: c.light || LIGHT_COLORS[0][0] } : null;
   }
   const carDecoText = (cr) => { const i = (cr && cr.i) || []; return i.length ? ' · 꾸밈 ' + i.map((id) => (CAR_ITEMS.find((t) => t.id === id) || {}).icon || '').join('') : ''; };
   const cleanPlate = (t) => String(t || '').replace(/[^0-9A-Za-z가-힣 ]/g, '').replace(/\s+/g, ' ').trim().slice(0, 8);
@@ -1592,15 +1604,16 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
     const m = modal(`<h2 style="font-size:22px">🎨 내 차 꾸미기</h2><p class="muted" style="text-align:center">꾸민 모습은 🅿️ 회사 주차장에서 동료들도 볼 수 있어요.</p>
       <div class="decolist">${CAR_ITEMS.map((it) => {
         const own = c.owned[it.id], on = own && c.shown[it.id] !== false;
-        return `<div class="decorow ${own ? '' : 'locked'}"><span class="di">${it.icon}</span><span class="dn"><b>${it.name}</b><small>${esc(it.desc)}</small>
-          ${own && it.id === 'plate' ? `<span class="cdplate"><input id="cdPlate" maxlength="8" value="${esc(c.plate || '')}" placeholder="예: 방카왕 1004"><button class="btn mini" data-plate>저장</button></span>` : ''}
-          ${own && it.id === 'glow' ? `<span class="cdglow">${GLOW_COLORS.map(([v, n]) => `<button class="${c.glow === v ? 'on' : ''}" data-glow="${v}" style="--g:${v}" aria-label="${n}"></button>`).join('')}</span>` : ''}</span>
-          ${own ? `<button class="btn mini ${on ? '' : 'ghost'}" data-tg="${it.id}">${on ? '장착 중' : '빼 둠'}</button>` : `<button class="btn mini ${S.money >= it.price ? '' : 'ghost'}" data-cbuy="${it.id}">${won(it.price)}</button>`}</div>`;
+        const colors = it.id === 'glow' ? [GLOW_COLORS, c.glow, 'glow'] : it.id === 'lightcolor' ? [LIGHT_COLORS, c.light || LIGHT_COLORS[0][0], 'light'] : null;
+        return `<div class="decorow ${own ? '' : 'locked'}"><span class="di">${it.icon}</span><span class="dn"><b>${it.name}</b><small>${esc(it.desc)}</small></span>
+          ${own ? `<button class="btn mini cdtg ${on ? 'on' : ''}" data-tg="${it.id}">${on ? '✅ 장착 중' : '장착하기'}</button>` : `<button class="btn mini ${S.money >= it.price ? '' : 'ghost'}" data-cbuy="${it.id}">${won(it.price)}</button>`}
+          ${own && it.id === 'plate' ? `<div class="cdx cdplate"><input id="cdPlate" maxlength="8" value="${esc(c.plate || '')}" placeholder="예: 방카왕 1004"><button class="btn mini" data-plate>저장</button></div>` : ''}
+          ${own && colors ? `<div class="cdx cdglow">${colors[0].map(([v, n]) => `<button class="${colors[1] === v ? 'on' : ''}" data-color="${colors[2]}" data-v="${v}" style="--g:${v}" aria-label="${n}" title="${n}"></button>`).join('')}</div>` : ''}</div>`;
       }).join('')}</div><button class="btn full" data-close style="margin-top:10px">완료</button>`, () => { if (!reopening && onDone) onDone(); });
     let reopening = false;
     m.el.querySelectorAll('[data-tg]').forEach((b) => b.onclick = () => {
       const id = b.dataset.tg, on = c.shown[id] !== false;
-      c.shown[id] = !on; b.textContent = on ? '빼 둠' : '장착 중'; b.classList.toggle('ghost', on); Snd.tap(); save();
+      c.shown[id] = !on; b.textContent = on ? '장착하기' : '✅ 장착 중'; b.classList.toggle('on', !on); Snd.tap(); save();
     });
     m.el.querySelectorAll('[data-cbuy]').forEach((b) => b.onclick = async () => { reopening = true; m.close(); await buyCarItem(b.dataset.cbuy); carDecoPanel(onDone); });
     const pb = m.el.querySelector('[data-plate]');
@@ -1609,8 +1622,8 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
       if (!t) return toast('번호판 문구를 한 글자 이상 적어 주세요 (한글·영문·숫자)');
       c.plate = t; m.el.querySelector('#cdPlate').value = t; Snd.coin(); save(); toast(`🔢 번호판을 "${t}"(으)로 바꿨어요`);
     };
-    m.el.querySelectorAll('[data-glow]').forEach((b) => b.onclick = () => {
-      c.glow = b.dataset.glow; m.el.querySelectorAll('[data-glow]').forEach((x) => x.classList.toggle('on', x === b)); Snd.tap(); save();
+    m.el.querySelectorAll('[data-color]').forEach((b) => b.onclick = () => { // 네온 · 라이트 색 고르기
+      c[b.dataset.color] = b.dataset.v; b.parentNode.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b)); Snd.tap(); save();
     });
   }
   function showCase(c) {
@@ -1736,11 +1749,77 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
       const body = m.kind === '응원' ? `📣 <b>${who}</b>님이 응원을 보냈어요!`
         : m.kind === '활동비' ? `💸 <b>${who}</b>님이 활동비 <b>${won(m.cash)}</b>을 보냈어요${m.msg ? `<br><span class="muted">"${esc(m.msg)}"</span>` : ''}`
         : m.kind === '출제보상' ? `✍️ ${esc(m.msg)}`
+        : m.kind === '도전장' ? `⚔️ ${esc(m.msg)}`
+        : m.kind === '대결결과' ? `${esc(m.msg)}`
         : `📝 ${esc(m.msg)}`;
       return `<div class="mail">${body}${m.cash || m.honor ? `<small>${m.cash ? '+' + won(m.cash) : ''}${m.honor ? ` · 명예 +${m.honor}` : ''}</small>` : ''}</div>`;
     });
     Snd.coin(); checkAch(); save(); syncNow(); renderHud();
     modal(`<h2>📬 우편함</h2>${lines.join('')}<p class="muted" style="text-align:center">합계 ${won(cash)}${honor ? ` · 명예 +${honor}` : ''}</p><button class="btn full" data-close>받기</button>`);
+  }
+
+  /* ---------------- 1:1 퀴즈 대결 (도전장) ---------------- */
+  let duelData = null, duelAt = 0;
+  const duelBadge = () => (duelData && duelData.got.length ? `📨 도전장 ${duelData.got.length}건 도착!` : '같은 문제로 승부 · 이기면 +' + won(DUEL.win.cash));
+  async function refreshDuels(force) {
+    if (!force && Date.now() - duelAt < 60000) return;
+    duelAt = Date.now();
+    try { duelData = await Api.duelList(); } catch (e) { return; }
+    const b = $('#duelBadge'); if (b) b.textContent = duelBadge();
+    const g = $('#duelGo'); if (g) g.classList.toggle('hot', !!duelData.got.length);
+  }
+  const fmtMs = (ms) => (ms / 1000).toFixed(1) + '초';
+  async function duelHub() {
+    const m = modal(`<h2 style="font-size:22px">⚔️ 퀴즈 대결</h2><div class="loading" style="position:static;background:none;color:var(--ink)"><div class="spin"></div>불러오는 중…</div>`);
+    await refreshDuels(true);
+    if (!els.modal.classList.contains('on')) return;
+    const d = duelData || { got: [], sent: [], done: [] };
+    const peers = ((rankCached() || {}).week || { list: peerCache || [] }).list.filter((x) => !x.me && x.name && x.name !== S.name);
+    const pend = new Set(d.sent.map((x) => x.uid));
+    const resL = { win: '🏆 승리', lose: '😢 패배', draw: '🤝 무승부' };
+    m.el.innerHTML = `<h2 style="font-size:22px">⚔️ 퀴즈 대결</h2><p class="muted" style="text-align:center">같은 문제 ${DUEL.count}개로 승부! 많이 맞히고, 같으면 빨리 푼 사람이 이겨요.<br>승리 +${won(DUEL.win.cash)} · 무승부 +${won(DUEL.draw.cash)} · 패배 +${won(DUEL.lose.cash)}</p>
+      ${d.got.length ? `<h4 class="sec">📨 받은 도전장</h4>${d.got.map((x, i) => `<div class="duelrow hot"><span>⚔️ <b>${esc(x.with)}</b>님의 도전</span><button class="btn mini" data-acc="${i}">받아들이기</button></div>`).join('')}` : ''}
+      <h4 class="sec">✉️ 도전장 보내기 <small class="muted">하루 ${DUEL.perDay}번</small></h4>
+      <div class="duellist">${peers.length ? peers.map((x, i) => `<div class="duelrow"><span class="rkav sm">${avatar(x)}</span><span class="dn"><b>${esc(x.name)}</b><small>Lv.${x.lv} ${rankOf(x.lv).title}</small></span>
+        ${pend.has(x.uid) ? '<span class="muted dp">답장 대기 중</span>' : `<button class="btn mini ghost" data-ch="${i}">도전!</button>`}</div>`).join('') : '<p class="muted">아직 대결할 동료가 없어요. RANK 화면을 한 번 열면 동료 목록이 생겨요.</p>'}</div>
+      ${d.done.length ? `<h4 class="sec">📜 최근 결과</h4>${d.done.map((x) => `<div class="duelrow"><span>${resL[x.res]} vs <b>${esc(x.with)}</b></span><span class="muted">${x.my} : ${x.their}</span></div>`).join('')}` : ''}
+      <button class="btn full" data-close style="margin-top:10px">닫기</button>`;
+    m.el.querySelectorAll('[data-close]').forEach((b) => b.onclick = m.close);
+    m.el.querySelectorAll('[data-acc]').forEach((b) => b.onclick = () => { const x = d.got[+b.dataset.acc]; m.close(); runSession('duel', x.qids, { duel: { mode: 'answer', id: x.id, name: x.with } }); });
+    m.el.querySelectorAll('[data-ch]').forEach((b) => b.onclick = async () => {
+      const x = peers[+b.dataset.ch];
+      if (!(await confirmBox(`⚔️ ${x.name}님에게 도전장을 보낼까요?\n먼저 ${DUEL.count}문제를 풀고, 내 기록이 도전장으로 가요.`, '도전!'))) return;
+      const qids = duelQuestions(); if (qids.length < 3) return toast('출제할 문제가 부족해요');
+      runSession('duel', qids, { duel: { mode: 'create', uid: x.uid, name: x.name, qids } });
+    });
+  }
+  // 대결 문제: 과목을 섞어서 5개 (보통~어려움 위주)
+  function duelQuestions() {
+    const all = pool(), out = [];
+    for (const cat of shuffle(CAT_ORDER.slice())) {
+      const list = shuffle(all.filter((q) => q.cat === cat && (q.diff || 2) >= 2)); const q = list[0] || shuffle(all.filter((x) => x.cat === cat))[0];
+      if (q && !out.includes(q.id)) out.push(q.id);
+      if (out.length >= DUEL.count) break;
+    }
+    return out;
+  }
+  async function duelFinish(info, ok, n, ms) {
+    if (info.mode === 'create') {
+      try { await Api.duelCreate(info.uid, info.qids, ok, ms); inc('duels'); }
+      catch (e) { return void modal(`<h2>⚠️ 도전장을 못 보냈어요</h2><p style="text-align:center">${esc(e.message)}</p><button class="btn full" data-close>확인</button>`); }
+      duelAt = 0;
+      await new Promise((res) => modal(`<h2>📨 도전장을 보냈어요!</h2><div class="grade" style="font-size:44px">${ok} / ${n}</div><p style="text-align:center">내 기록 · ${fmtMs(ms)}<br><b>${esc(info.name)}</b>님이 같은 문제를 풀면 결과가 우편함으로 와요.</p><p class="muted" style="text-align:center">${DUEL.days}일 안에 답이 없으면 사라져요.</p><button class="btn full" data-close>확인</button>`, res));
+      return;
+    }
+    let r;
+    try { r = await Api.duelAnswer(info.id, ok, ms); }
+    catch (e) { return void modal(`<h2>⚠️ 결과를 저장하지 못했어요</h2><p style="text-align:center">${esc(e.message)}</p><button class="btn full" data-close>확인</button>`); }
+    duelAt = 0; inc('duels'); if (r.res === 'win') inc('duelWins');
+    earn(r.reward.cash); S.honor += r.reward.honor; save(); renderHud();
+    if (r.res === 'win') { confetti(90); Snd.lv(); } else Snd.coin();
+    const title = { win: '🏆 승리!', lose: '😢 아쉽게 패배', draw: '🤝 무승부!' }[r.res];
+    await new Promise((res) => modal(`<h2>${title}</h2><div class="duelvs"><div><small>나</small><b>${r.my}</b><span>${fmtMs(r.myMs)}</span></div><i>VS</i><div><small>${esc(info.name)}</small><b>${r.their}</b><span>${fmtMs(r.theirMs)}</span></div></div>
+      <p style="text-align:center">대결 보상 +${won(r.reward.cash)} · 명예 +${r.reward.honor}</p><button class="btn full" data-close>확인</button>`, res));
   }
 
   /* ---------------- 응원 · 활동비 보내기 ---------------- */
@@ -2030,7 +2109,7 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
         <div class="si">${it.icon}</div><div class="sn"><b>${it.name}</b><small>${esc(it.desc)}</small><span class="own">보유 ${S.items[it.id] || 0}개</span></div>
         <button class="btn mini ${S.money >= it.price ? '' : 'ghost'}" data-buy="${it.id}">${won(it.price)}</button></div>`).join('')}</div>
       <p class="muted">💡 문제용 아이템은 퀴즈 중 선택지 위 아이템 바에서 써요. 🧃 활기력 아이템은 완료한 일정 카드를 누르면 쓸 수 있어요.</p>
-      <h4 class="sec">🏢 사무실 꾸미기</h4>
+      ${OFFICE_ITEMS.length ? '<h4 class="sec">🏢 사무실 꾸미기</h4>' : ''}
       <div class="shop">${OFFICE_ITEMS.map((it) => { const own = ((S.office || {}).owned || {})[it.id]; return `<div class="sitem">
         <div class="si">${it.icon}</div><div class="sn"><b>${it.name}</b><small>${esc(it.desc)}</small>${own ? '<span class="own">✅ 보유 중 · 사무실에서 비치/보관</span>' : ''}</div>
         ${own ? '<button class="btn mini ghost" data-office>사무실</button>' : `<button class="btn mini ${S.money >= it.price ? '' : 'ghost'}" data-deco="${it.id}">${won(it.price)}</button>`}</div>`; }).join('')}</div>
@@ -2040,7 +2119,7 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
         ${own ? '<button class="btn mini ghost" data-cardeco>설정</button>' : `<button class="btn mini ${S.money >= it.price ? '' : 'ghost'}" data-carbuy="${it.id}">${won(it.price)}</button>`}</div>`; }).join('')}</div>
     </div>`;
     els.screen.querySelectorAll('[data-cardeco]').forEach((b) => b.onclick = () => carDecoPanel());
-    els.screen.querySelectorAll('[data-carbuy]').forEach((b) => b.onclick = async () => { if (await buyCarItem(b.dataset.carbuy)) { pageShop(); if (b.dataset.carbuy === 'plate' || b.dataset.carbuy === 'glow') carDecoPanel(); } });
+    els.screen.querySelectorAll('[data-carbuy]').forEach((b) => b.onclick = async () => { if (await buyCarItem(b.dataset.carbuy)) { pageShop(); if (['plate', 'glow', 'lightcolor'].includes(b.dataset.carbuy)) carDecoPanel(); } });
     $('#sendMoney').onclick = () => sendMoneyModal();
     els.screen.querySelectorAll('[data-office]').forEach((b) => b.onclick = () => openOffice());
     els.screen.querySelectorAll('[data-deco]').forEach((b) => b.onclick = async () => {
@@ -2716,6 +2795,7 @@ Lv.${S.lv} ${rankOf(S.lv).title} ${S.name}의 모든 기록(경험치 ${S.totalX
     }
     S = pickSave(local, remote) || Store.fresh(u.email);
     S.email = u.email;
+    if (S.office && Object.keys(S.office.owned || {}).length) S.office = { owned: {}, shown: {} }; // 사무실 꾸밈 물품은 없앰
     Store.save(S);
     if (S === remote) lastSynced = S.updated;
     if (S.name && remote && S !== remote) syncNow();

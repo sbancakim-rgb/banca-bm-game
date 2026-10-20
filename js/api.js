@@ -87,6 +87,9 @@ const Api = (() => {
     myFace: () => call('myFace').then((r) => r.face),
     players: () => call('players').then((r) => r.items),
     cheer: (uid) => call('cheer', { uid }),
+    duelCreate: (uid, qids, score, ms) => call('duelCreate', { uid, qids, score, ms }),
+    duelList: () => call('duelList'),
+    duelAnswer: (id, score, ms) => call('duelAnswer', { id, score, ms }),
     sendMoney: (uid, amount, msg) => call('sendMoney', { uid, amount, msg }),
     inbox: () => call('inbox').then((r) => r.items),
     submitQuestion: (question) => call('submitQuestion', { question }),
@@ -206,6 +209,24 @@ const Demo = (() => {
           run: rows.filter((r) => r.p.mini.run && r.p.mini.run.best).map((r) => item(r, r.p.mini.run.best)).sort((a, c) => c.ms - a.ms).slice(0, 10),
           park: rows.filter((r) => r.p.mini.park && r.p.mini.park.date === b.day && r.p.mini.park.best).map((r) => item(r, r.p.mini.park.best)).sort((a, c) => a.ms - c.ms).slice(0, 10)
         });
+      }
+      case 'duelCreate': {
+        const to = String(b.uid).replace(/^u:/, ''); d.duels = d.duels || [];
+        d.duels.push({ id: 'D' + Date.now(), at: Date.now(), from: email, to, qids: b.qids, a: [b.score, b.ms], st: '대기' }); store(d); return ok({ id: d.duels[d.duels.length - 1].id });
+      }
+      case 'duelList': {
+        const nm = (e) => { try { return JSON.parse(d.progress[e]).name; } catch (er) { return e; } }, out = { got: [], sent: [], done: [] };
+        (d.duels || []).forEach((x) => { const mine = x.from === email; if (!mine && x.to !== email) return;
+          const base = { id: x.id, at: x.at, with: nm(mine ? x.to : x.from), uid: 'u:' + (mine ? x.to : x.from), sent: mine };
+          if (x.st === '대기') (mine ? out.sent : out.got).push({ ...base, qids: x.qids });
+          else { const my = mine ? x.a : x.b, th = mine ? x.b : x.a; out.done.push({ ...base, my: my[0], myMs: my[1], their: th[0], theirMs: th[1], res: my[0] !== th[0] ? (my[0] > th[0] ? 'win' : 'lose') : my[1] < th[1] ? 'win' : my[1] > th[1] ? 'lose' : 'draw' }); } });
+        return ok(out);
+      }
+      case 'duelAnswer': {
+        const x = (d.duels || []).find((y) => y.id === b.id); if (!x || x.to !== email || x.st !== '대기') throw new Error('대결을 찾지 못했어요');
+        x.b = [b.score, b.ms]; x.st = '완료'; store(d);
+        const res = x.b[0] !== x.a[0] ? (x.b[0] > x.a[0] ? 'win' : 'lose') : x.b[1] < x.a[1] ? 'win' : x.b[1] > x.a[1] ? 'lose' : 'draw';
+        return ok({ res, my: x.b[0], myMs: x.b[1], their: x.a[0], theirMs: x.a[1], with: x.from, reward: DUEL[res] });
       }
       case 'report': { const no = 'R' + Date.now().toString().slice(-8); d.reports.unshift({ no, at: new Date().toISOString(), email, qid: b.qid, cat: b.cat, snapshot: b.snapshot, kind: b.kind, reason: b.reason, status: '접수' }); store(d); return ok({ no }); }
       case 'news': return ok({ items: [

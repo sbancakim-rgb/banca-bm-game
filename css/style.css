@@ -720,3 +720,27 @@ img.sprite.bust.illust { width: 135%; left: -17%; top: -3%; }
 .rk-val { flex: none; text-align: right; font-size: 14px; display: flex; flex-direction: column; align-items: flex-end; line-height: 1.2; }
 .rk-val small { font-size: 11px; font-weight: 600; color: var(--ink2); }
 .rk-mine { font-size: 13.5px; padding: 10px 14px; background: #fff5f8; box-shadow: inset 0 0 0 2px var(--pink-l); }
+
+/* 이벤트 기간: 완료한 과목 카드도 선명하게 (다시 풀 수 있으니까) */
+.cards.unl .card.done { opacity: 1; }
+/* 차 꾸미기 창: 설정 칸은 줄 전체 · 장착 버튼은 버튼답게 */
+.decolist .decorow { flex-wrap: wrap; }
+.decorow .cdx { flex-basis: 100%; margin: 4px 0 2px 48px; }
+.decorow .cdplate { display: flex; gap: 6px; } .decorow .cdplate input { flex: 1; min-width: 0; }
+.decolist .btn.cdtg { background: #fff; color: var(--pink); box-shadow: inset 0 0 0 2px var(--pink); }
+.decolist .btn.cdtg.on { background: var(--pink); color: #fff; box-shadow: none; }
+
+/* 1:1 퀴즈 대결 */
+.duelcta { background: linear-gradient(135deg, #fff1f1, #ffe0ea); box-shadow: inset 0 0 0 2px #ffc2d3; }
+.duelcta small { display: block; font-size: 12px; color: var(--ink2); margin-top: 2px; }
+.duelcta.hot { animation: duelhot 1.6s ease-in-out infinite; } .duelcta.hot small { color: #e8467c; font-weight: 800; }
+@keyframes duelhot { 50% { box-shadow: inset 0 0 0 3px #ff6f91, 0 0 16px rgba(255,111,145,.45); } }
+.duellist { max-height: 40vh; overflow-y: auto; }
+.duelrow { display: flex; align-items: center; gap: 10px; padding: 8px 4px; border-bottom: 1px solid #f1e4ea; font-size: 14px; }
+.duelrow > span:first-child { flex: 1; } .duelrow .dn { flex: 1; display: flex; flex-direction: column; } .duelrow .dn small { color: var(--ink2); font-size: 12px; }
+.duelrow .rkav.sm { width: 38px; height: 38px; flex: none; }
+.duelrow.hot { background: #fff5f8; border-radius: 12px; padding: 10px; border: 0; margin-bottom: 6px; }
+.duelvs { display: flex; align-items: center; justify-content: center; gap: 16px; margin: 10px 0; }
+.duelvs > div { display: flex; flex-direction: column; align-items: center; min-width: 80px; }
+.duelvs b { font-family: 'Jua', sans-serif; font-weight: 400; font-size: 44px; line-height: 1; } .duelvs small, .duelvs span { font-size: 12px; color: var(--ink2); }
+.duelvs i { font-style: normal; font-family: 'Jua', sans-serif; font-size: 22px; color: #e8467c; }
