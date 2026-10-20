@@ -820,6 +820,7 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
     $('#parkGo').onclick = () => { Snd.tap(); openParking(); };
     $('#charTap').onclick = charTalk;
     if (!peerCache) setTimeout(() => { if (!peerCache) pickPeer(); }, 1500); // 동료 생각풍선용 회원 목록 미리 받아 두기
+    if (!preloaded3d) { preloaded3d = true; setTimeout(() => { if (!inSession) Parking.preload([carOf(S.lv).glb]); }, 4000); } // 주차장·차고용 3D를 한가할 때 미리
     const evGo = $('#evGo'); if (evGo) evGo.onclick = runEvent;
     checkInbox();
     $('#bossBtn').onclick = async () => {
@@ -967,7 +968,7 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
     }
   }
   /* ---- 동료(실제 회원)가 전화해서 모르는 걸 물어봄 — 나 자신은 절대 나오지 않음 ---- */
-  let peerCache = null; // 최우수BM · 주차장에서 받아 둔 회원 목록 재사용
+  let peerCache = null, preloaded3d = false; // 최우수BM · 주차장에서 받아 둔 회원 목록 재사용
   async function pickPeer() {
     let list = peerCache;
     if (!list) { const c = rankCached(10 * 60000); if (c) list = peerCache = c.week.list; }
@@ -1437,7 +1438,8 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
     const stage = el.querySelector('.pk-stage'), load = el.querySelector('.gv-load'), ltxt = load.querySelector('span');
     let list, rk;
     try {
-      rk = rankCached(60000) || await rankFetch(); peerCache = rk.week.list;
+      Parking.preload(S.lv ? [carOf(S.lv).glb] : []); // 순위를 기다리는 동안 3D 엔진·내 차부터 받기
+      rk = rankCached(10 * 60000) || await rankFetch(); peerCache = rk.week.list; // 10분 안에 본 순위면 서버에 다시 묻지 않음
       list = rk.week.list.filter((x) => !(admin && x.me)); // 관리자는 주차장에서 제외
     } catch (e) { if (!closed) { toast(e.message); close(); } return; }
     if (closed) return;

@@ -36,6 +36,16 @@ const Parking = (() => {
   ]).then(([T, G, R]) => ({ T, GLTFLoader: G.GLTFLoader, RoomEnvironment: R.RoomEnvironment }))
     .catch((e) => { libP = null; throw e; }));
 
+  // 차 모델: 한 번 받은 건 다시 열어도 재사용 · 미리 받아 두기(preload) 가능
+  let gltfLoader = null;
+  function model(url) {
+    if (!models[url]) models[url] = lib().then(({ GLTFLoader }) => new Promise((res, rej) => (gltfLoader || (gltfLoader = new GLTFLoader())).load(url, (g) => res(g.scene), undefined, rej)))
+      .catch((e) => { delete models[url]; throw e; });
+    return models[url];
+  }
+  /** 3D 엔진과 차를 뒤에서 미리 받아 둔다 (주차장·차고를 열 때 바로 뜨게) */
+  function preload(urls = []) { lib().catch(() => { }); urls.filter(Boolean).forEach((u) => model(u).catch(() => { })); }
+
   async function open(host, people, opts = {}) {
     const { T, GLTFLoader, RoomEnvironment } = await lib();
     const SR = !!opts.showroom;
@@ -384,8 +394,7 @@ const Parking = (() => {
     }
 
     // ---- 차 세우기 — 같은 차는 한 번만 받아서 복제 ----
-    const loader = new GLTFLoader();
-    const getModel = (url) => models[url] || (models[url] = new Promise((res, rej) => loader.load(url, (g) => res(g.scene), undefined, rej)).catch((e) => { delete models[url]; throw e; }));
+    const getModel = model;
     slots.forEach((s) => {
       const el = document.createElement('button');
       el.className = 'pk-label' + (s.p.me ? ' me' : '') + (s.p.sample ? ' sample' : '') + (s.p.best ? ' best' : '');
@@ -409,6 +418,10 @@ const Parking = (() => {
     const status = opts.onProgress || (() => { });
     status(0, slots.length);
     const v1 = new T.Vector3(), v2 = new T.Vector3();
+    // 필요한 차를 한꺼번에 받기 시작 (가까운 차 2종 먼저, 나머지는 첫 차가 뜨면 바로)
+    const urls = [...new Set(order.filter((s) => !s.p.sample && s.p.glb).map((s) => s.p.glb))];
+    urls.slice(0, 2).forEach((u) => model(u).catch(() => { }));
+    if (urls.length) model(urls[0]).catch(() => { }).finally(() => urls.slice(2).forEach((u) => model(u).catch(() => { })));
     (async () => {
       for (const s of order) {
         if (!alive) return;
@@ -524,5 +537,5 @@ const Parking = (() => {
       }
     };
   }
-  return { open, TIMES };
+  return { open, preload, TIMES };
 })();
