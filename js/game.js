@@ -2656,15 +2656,17 @@ Lv.${S.lv} ${rankOf(S.lv).title} ${S.name}의 모든 기록(경험치 ${S.totalX
     stageMode('creating'); setBg('office');
     els.hud.classList.add('hidden'); els.nav.classList.add('hidden');
     const render = () => {
-      const presets = Sprites.presets(S.gender);
-      if (!hasFace && !(S.illust && presets.includes(S.illust))) S.illust = presets[0] || null;
+      // 실물 캐릭터가 없으면 img/player 의 일러스트 캐릭터 전체(여성·남성 모두) 중에서 고른다 — 성별은 고른 캐릭터를 따라감
+      const presets = [...Sprites.presets('f'), ...Sprites.presets('m')];
+      if (!hasFace && !(S.illust && presets.includes(S.illust))) S.illust = Sprites.presets(S.gender)[0] || presets[0] || null;
+      if (!hasFace && S.illust) S.gender = S.illust[0] === 'f' ? 'f' : 'm';
       setChar(playerSpec(), rest());
-      const illustPart = `<label>일러스트 캐릭터</label><div class="illusts">${presets.map((id, i) => `<button data-il="${id}" class="${S.illust === id ? 'on' : ''}"><div><img src="${Sprites.char('illust:' + id, 'normal')}" alt=""></div>${i + 1}번</button>`).join('')}</div>
+      const illustPart = `<label>캐릭터 선택 <small class="muted">${presets.length}명 중 마음에 드는 한 명을 골라 주세요</small></label><div class="illusts">${presets.map((id, i) => `<button data-il="${id}" class="${S.illust === id ? 'on' : ''}"><div><img src="${Sprites.char('illust:' + id, 'normal')}" alt="" loading="lazy"></div>${i + 1}번</button>`).join('')}</div>
         <p class="muted">입사 후에는 캐릭터를 바꿀 수 없으니 신중하게 골라 주세요!</p>`;
       els.screen.innerHTML = `<div class="create"><h3 class="cute" style="margin:0 0 4px;font-size:22px">신입사원 등록</h3>
         <div class="muted">○○생명 방카슈랑스사업부에 오신 걸 환영합니다!</div>
         <label>이름</label><input type="text" id="nm" maxlength="8" placeholder="이름 (최대 8자)" value="${esc(S.name)}">
-        <label>성별</label><div class="seg">${[['f', '여성'], ['m', '남성']].map(([v, l]) => `<button data-g="${v}" class="${S.gender === v ? 'on' : ''}">${l}</button>`).join('')}</div>
+        ${hasFace ? `<label>성별</label><div class="seg">${[['f', '여성'], ['m', '남성']].map(([v, l]) => `<button data-g="${v}" class="${S.gender === v ? 'on' : ''}">${l}</button>`).join('')}</div>` : ''}
         ${hasFace ? `<div class="box facebox">🎉 <b>${esc((Api.user || {}).name || S.name || '')}님만의 캐릭터</b>가 준비되어 있어요!<div class="muted">관리자가 만들어 둔 전용 캐릭터라 외모는 바꿀 수 없어요.</div></div>`
           : illustPart}
         ${hasFace ? '' : '<p class="muted" style="margin-top:12px">⚠️ 입사 후에는 외모를 바꿀 수 없어요.</p>'}
@@ -2672,7 +2674,7 @@ Lv.${S.lv} ${rankOf(S.lv).title} ${S.name}의 모든 기록(경험치 ${S.totalX
       const nm = $('#nm'); if (nm) nm.oninput = (e) => S.name = e.target.value;
       const on = (sel, fn) => els.screen.querySelectorAll(sel).forEach((b) => b.onclick = () => { fn(b); render(); });
       on('[data-g]', (b) => { S.gender = b.dataset.g; S.illust = hasFace ? null : Sprites.presets(S.gender)[0] || null; });
-      on('[data-il]', (b) => S.illust = b.dataset.il);
+      on('[data-il]', (b) => { S.illust = b.dataset.il; S.gender = S.illust[0] === 'f' ? 'f' : 'm'; });
       if (!S.name && hasFace && (Api.user || {}).name) { S.name = String(Api.user.name).slice(0, 8); const n = $('#nm'); if (n) n.value = S.name; }
       $('#go').onclick = () => {
         S.name = (S.name || '').trim();
