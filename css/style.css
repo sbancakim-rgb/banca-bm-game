@@ -67,7 +67,7 @@ button { font-family: inherit; color: inherit; cursor: pointer; border: 0; backg
 .xpbar { height: 7px; background: #eadbe3; border-radius: 9px; overflow: hidden; margin-top: 3px; }
 .xpbar i { display: block; height: 100%; background: linear-gradient(90deg, var(--pink), #ffb36b); border-radius: 9px; transition: width .6s; }
 .hud-btn { width: 44px; height: 44px; border-radius: 50%; background: rgba(255,255,255,.88); font-size: 20px; box-shadow: 0 2px 10px rgba(60,20,60,.15); flex: none; }
-.sess-hud { position: absolute; top: calc(60px + var(--safe-t)); left: 10px; right: 10px; z-index: 20; display: flex; gap: 6px; justify-content: space-between; }
+.sess-hud { position: absolute; top: calc(60px + var(--safe-t)); left: 10px; right: 10px; z-index: 27; display: flex; gap: 6px; justify-content: space-between; }
 .chip { background: rgba(255,255,255,.88); border-radius: 999px; padding: 5px 10px; font-size: 12px; font-weight: 700; box-shadow: 0 2px 8px rgba(0,0,0,.08); white-space: nowrap; }
 .chip.combo { background: linear-gradient(90deg,#ff8a00,#ff3d6e); color: #fff; }
 .sat { width: 70px; height: 6px; display: inline-block; background: #eee; border-radius: 6px; overflow: hidden; vertical-align: middle; margin-left: 4px; }
@@ -245,6 +245,7 @@ img.sprite.bust { position: absolute; width: 170%; max-width: none; left: -35%; 
 .charhead .big .bgx img.bgimg { width: 100%; height: 100%; object-fit: cover; }
 
 #place { position: absolute; top: calc(104px + var(--safe-t)); right: 14px; text-align: right; color: #fff; font-weight: 800; font-size: 13px; line-height: 1.45; text-shadow: 0 1px 3px rgba(0,0,0,.7), 0 0 8px rgba(0,0,0,.35); pointer-events: none; }
+#app:has(.officebtn) #place { display: none; } /* 홈 화면: 사무실·차고·주차장 버튼과 겹치지 않게 */
 
 #dialog { background: linear-gradient(180deg, rgba(24,46,92,.86), rgba(12,26,62,.92)); color: #fff; border-radius: 14px;
   box-shadow: 0 8px 28px rgba(0,0,30,.45), inset 0 0 0 2px rgba(150,195,255,.65); padding: 28px 18px 20px; }

@@ -373,7 +373,7 @@
   }
 
   /* ---------------- VN 엔진 ---------------- */
-  let tapResolve = null, typing = null;
+  let tapResolve = null, typing = null, askKill = null; // askKill: 진행 중인 문제를 바로 끝냄 (그만하기)
   els.dlg.addEventListener('click', (e) => {
     const ob = e.target.closest('[data-obj]');
     if (ob) { e.stopPropagation(); openReport(ob.dataset.obj); return; }
@@ -424,8 +424,10 @@
       let answered = false, raf, rushShown = false;
       const st = { retry: false, retryUsed: false, shield: false, calm: false, used: new Set() };
       const tStart = performance.now(); let deadline = tStart + sec * 1000, total = sec * 1000;
+      askKill = () => finish({ quit: true });
+      if (abortSession) return finish({ quit: true }); // 문제 글자가 나오는 중에 그만하기를 눌렀을 때
       const finish = (r) => {
-        if (answered) return; answered = true; cancelAnimationFrame(raf);
+        if (answered) return; answered = true; cancelAnimationFrame(raf); askKill = null;
         els.timer.classList.remove('on'); els.chara.classList.remove('rush');
         els.choices.querySelectorAll('button').forEach((b) => b.disabled = true);
         r.ms = performance.now() - tStart; r.shield = st.shield; res(r);
@@ -541,7 +543,11 @@
         <button class="chip" id="quit">✕</button>`;
       $('#quit').onclick = async () => {
         const msg = (kind === 'daily' || kind === 'boss') ? '지금 그만두면 이 일정은 오늘 완료 처리돼요.\n(지금까지 얻은 XP는 유지)' : '그만할까요?';
-        if (await confirmBox(msg, '그만하기', '계속하기')) abortSession = true;
+        if (!(await confirmBox(msg, '그만하기', '계속하기'))) return;
+        abortSession = true;
+        if (askKill) askKill();                                   // 풀던 문제 바로 끝내기
+        if (typing) typing();                                     // 나오던 대사 끝내기
+        if (tapResolve) { const t = tapResolve; tapResolve = null; t(); } // 터치 기다리던 대사 넘기기
       };
     };
     renderHud();
@@ -575,6 +581,7 @@
       const sec = boss && boss.stars >= 4 ? (boss.stars === 5 ? 12 : 15) : (npc.time || 25);
       const r = await ask(q, who, npc, sec, ctx);
       els.dlg.classList.remove('asking'); els.meta.innerHTML = '';
+      if (abortSession || r.quit) { els.choices.innerHTML = ''; break; } // 그만하기: 풀던 문제는 기록하지 않음
       S.seen[q.id] = dayNum();
       if (r.skipped) {
         const rep = replace(q, nk);
@@ -664,12 +671,13 @@
     checkAch(); save(); syncNow();
     inSession = false;
     els.vn.classList.remove('on'); els.sess.classList.add('hidden'); els.choices.innerHTML = '';
-    await showResult({ kind, label, okN, n, xpSum, cashSum, bonus, sat, ups, scored, bossWin, boss });
+    if (abortSession) toast(`그만했어요 · 지금까지 +${xpSum} XP${cashSum ? ` · +${won(cashSum)}` : ''}`); // 결과 창 없이 바로 나가기
+    else await showResult({ kind, label, okN, n, xpSum, cashSum, bonus, sat, ups, scored, bossWin, boss });
     const afterRank = rankOf(S.lv);
     if (afterRank !== beforeRank) await promotion(afterRank);
     if (S.lv >= CLASS_LV && !S.classShown) await classReveal();
     checkAch(); save();
-    eventRoll = true;
+    eventRoll = true; abortSession = false; // 다음 이벤트 퀴즈에 영향 없게
     if (kind === 'practice' || kind === 'review') pageStudy(); else goHome();
   }
 
@@ -763,7 +771,7 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
 
   function greeting() {
     const h = new Date().getHours();
-    return h < 11 ? '좋은 아침이에요' : h < 14 ? '점심은 드셨나요' : h < 18 ? '오후도 힘내요' : '야근 중이신가요';
+    return h < 5 ? '늦은 시간까지 수고 많아요' : h < 11 ? '좋은 아침이에요' : h < 14 ? '점심은 드셨나요' : h < 18 ? '오후도 힘내요' : '야근 중이신가요';
   }
   function goHome() {
     curPage = 'home';
