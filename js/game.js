@@ -2141,26 +2141,34 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
   }
 
   /* ---- 상점 ---- */
+  const shopOpen = { items: false, car: false }; // 매점 코너 펼침 상태 (사고 나서 다시 그려도 유지)
+  const shopHead = (k, label, n) => `<button class="shophead ${shopOpen[k] ? 'open' : ''}" data-fold="${k}"><span>${label} <small>${n}종</small></span><i>${shopOpen[k] ? '접기 ▲' : '펼치기 ▼'}</i></button>`;
   function pageShop() {
     setNav('shop');
     els.screen.innerHTML = `<div class="page"><h2>🛒 사내 매점</h2>
       <div class="box row" style="justify-content:space-between"><div><div class="muted">보유 활동비</div><b style="font-size:22px">💰 ${won(S.money)}</b></div>
         <div class="muted" style="text-align:right">정답 1개 30~80원<br>퍼펙트 +200원 · 보스 승리 보상</div></div>
       <button class="btn blue full" id="sendMoney" style="margin-bottom:6px">💸 동료에게 활동비 보내기</button>
-      <h4 class="sec">🛍️ 아이템</h4>
-      <div class="shop">${ITEMS.map((it) => `<div class="sitem">
+      ${shopHead('items', '🛍️ 게임 아이템', ITEMS.length)}
+      <div class="shopfold ${shopOpen.items ? 'open' : ''}" data-body="items"><div class="shop">${ITEMS.map((it) => `<div class="sitem">
         <div class="si">${it.icon}</div><div class="sn"><b>${it.name}</b><small>${esc(it.desc)}</small><span class="own">보유 ${S.items[it.id] || 0}개</span></div>
         <button class="btn mini ${S.money >= it.price ? '' : 'ghost'}" data-buy="${it.id}">${won(it.price)}</button></div>`).join('')}</div>
-      <p class="muted">💡 문제용 아이템은 퀴즈 중 선택지 위 아이템 바에서 써요. 🧃 활기력 아이템은 완료한 일정 카드를 누르면 쓸 수 있어요.</p>
+      <p class="muted">💡 문제용 아이템은 퀴즈 중 선택지 위 아이템 바에서 써요. 🧃 활기력 아이템은 완료한 일정 카드를 누르면 쓸 수 있어요.</p></div>
       ${OFFICE_ITEMS.length ? '<h4 class="sec">🏢 사무실 꾸미기</h4>' : ''}
       <div class="shop">${OFFICE_ITEMS.map((it) => { const own = ((S.office || {}).owned || {})[it.id]; return `<div class="sitem">
         <div class="si">${it.icon}</div><div class="sn"><b>${it.name}</b><small>${esc(it.desc)}</small>${own ? '<span class="own">✅ 보유 중 · 사무실에서 비치/보관</span>' : ''}</div>
         ${own ? '<button class="btn mini ghost" data-office>사무실</button>' : `<button class="btn mini ${S.money >= it.price ? '' : 'ghost'}" data-deco="${it.id}">${won(it.price)}</button>`}</div>`; }).join('')}</div>
-      <h4 class="sec">🚗 내 차 꾸미기 <small class="muted">회사 주차장에서 보여요</small></h4>
-      <div class="shop">${CAR_ITEMS.map((it) => { const own = ((S.car || {}).owned || {})[it.id]; return `<div class="sitem">
+      ${shopHead('car', '🚗 내 차 꾸미기', CAR_ITEMS.length)}
+      <div class="shopfold ${shopOpen.car ? 'open' : ''}" data-body="car"><p class="muted" style="margin:0 0 8px">꾸민 모습은 🅿️ 회사 주차장에서 동료들도 볼 수 있어요.</p><div class="shop">${CAR_ITEMS.map((it) => { const own = ((S.car || {}).owned || {})[it.id]; return `<div class="sitem">
         <div class="si">${it.icon}</div><div class="sn"><b>${it.name}</b><small>${esc(it.desc)}</small>${own ? '<span class="own">✅ 보유 중 · 주차장에서 장착/설정</span>' : ''}</div>
-        ${own ? '<button class="btn mini ghost" data-cardeco>설정</button>' : `<button class="btn mini ${S.money >= it.price ? '' : 'ghost'}" data-carbuy="${it.id}">${won(it.price)}</button>`}</div>`; }).join('')}</div>
+        ${own ? '<button class="btn mini ghost" data-cardeco>설정</button>' : `<button class="btn mini ${S.money >= it.price ? '' : 'ghost'}" data-carbuy="${it.id}">${won(it.price)}</button>`}</div>`; }).join('')}</div></div>
     </div>`;
+    // 코너 제목을 누르면 펼치고 · 다시 누르면 접기
+    els.screen.querySelectorAll('[data-fold]').forEach((b) => b.onclick = () => {
+      const k = b.dataset.fold; shopOpen[k] = !shopOpen[k]; Snd.tap();
+      b.classList.toggle('open', shopOpen[k]); b.querySelector('i').textContent = shopOpen[k] ? '접기 ▲' : '펼치기 ▼';
+      els.screen.querySelector(`[data-body="${k}"]`).classList.toggle('open', shopOpen[k]);
+    });
     els.screen.querySelectorAll('[data-cardeco]').forEach((b) => b.onclick = () => carDecoPanel());
     els.screen.querySelectorAll('[data-carbuy]').forEach((b) => b.onclick = async () => { if (await buyCarItem(b.dataset.carbuy)) { pageShop(); if (['plate', 'glow', 'lightcolor'].includes(b.dataset.carbuy)) carDecoPanel(); } });
     $('#sendMoney').onclick = () => sendMoneyModal();
