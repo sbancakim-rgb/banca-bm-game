@@ -232,7 +232,30 @@
       S.ach[a.id] = Date.now(); S.honor += a.honor; earn(a.cash, true);
       toast(`🏆 업적 달성: ${a.icon} ${a.name} (+${a.honor} 명예 · +${won(a.cash)})`, 3400);
     });
+    checkTitles();
   }
+  /* ---------------- 칭호 ---------------- */
+  function titleVal(stat) {
+    const st = Object.values(S.stats || {}).reduce((a, v) => ({ c: a.c + (v.c || 0), n: a.n + (v.n || 0) }), { c: 0, n: 0 });
+    if (stat === 'solved') return st.n;
+    if (stat === 'rate90') return st.n >= 100 && st.c / st.n >= 0.9 ? 1 : 0;
+    if (stat.startsWith('c_')) return (S.stats[stat.slice(2)] || {}).c || 0;
+    if (stat === 'bossWins') return BOSS_TIERS.reduce((a, t) => a + ((S.cnt || {})['boss_' + t.id] || 0), 0);
+    if (stat === 'streakBest') return Math.max(S.streakBest || 0, (S.streak || {}).count || 0);
+    return (S.cnt || {})[stat] || 0;
+  }
+  function checkTitles() {
+    S.titles = S.titles || {};
+    TITLES.forEach((t) => {
+      if (S.titles[t.id] || titleVal(t.stat) < t.goal) return;
+      S.titles[t.id] = Date.now(); feedEv('title', { t: t.name });
+      toast(`🏅 새 칭호 획득: ${t.icon} ${t.name}`, 3400);
+      if (!S.tt) S.tt = t.id; // 첫 칭호는 바로 달아 줌
+    });
+  }
+  const ttOf = (x) => (x.me ? S.tt : ((x.look || {}).tt || '')); // 그 사람이 단 칭호
+  const ttTag = (x) => { const t = titleText(ttOf(x)); return t ? ` · <span class="tt">${t}</span>` : ''; };
+  const titleText = (id) => { const t = TITLES.find((x) => x.id === id); return t ? `${t.icon} ${t.name}` : ''; };
   function earn(n, silent) { n = Math.round(n); if (!n) return; S.money += n; S.moneyTotal += n; if (!silent) Snd.coin(); }
   /* ---- 주간/월간 실적 (최우수BM 랭킹용) ---- */
   function isoWeek(d = new Date()) {
@@ -316,7 +339,7 @@
     if (S.streak.last === today()) return;
     S.streak.count = S.streak.last === yesterday() ? S.streak.count + 1 : 1;
     if ([7, 14, 30, 50, 100].includes(S.streak.count)) feedEv('streak', { n: S.streak.count });
-    S.streak.last = today();
+    S.streak.last = today(); S.streakBest = Math.max(S.streakBest || 0, S.streak.count);
     earn(CASH.daily, true);
     toast(`☀️ 출근 보너스 +${won(CASH.daily)} (🔥 ${S.streak.count}일 연속)`);
   }
@@ -663,6 +686,7 @@
         line = pick(r.timeout ? npc.timeout : npc.ng);
         extra = `<span class="exp">정답: <span class="ans">${esc(answerText(q))}</span>\n📘 ${esc(q.exp || '')}${obj}</span>`;
       }
+      misTick({ solved: 1, correct: r.correct ? 1 : 0, cat: q.cat, combo: r.correct ? combo : 0 });
       drawSess(i);
       checkAch();
       await sleep(350);
@@ -676,7 +700,7 @@
     const n = total, lastKey = prev || plan[0].npc, last = NPCS[lastKey];
     const good = okN >= Math.ceil(n * 0.6);
     let bonus = 0;
-    if (!abortSession && okN === n && scored) { bonus = Math.round(xpSum * 0.3) + 20; xpSum += bonus; cashSum += CASH.perfect; inc('perfect'); if (!boss && n >= 3) feedEv('perfect', { t: CATS[key].label }); }
+    if (!abortSession && okN === n && scored) { bonus = Math.round(xpSum * 0.3) + 20; xpSum += bonus; cashSum += CASH.perfect; inc('perfect'); misTick({ perfect: 1 }); if (!boss && n >= 3) feedEv('perfect', { t: CATS[key].label }); }
     if (!abortSession && last && last.end) {
       setChar(last.spec, good ? 'happy' : 'normal');
       await say(whoOf(lastKey), good ? last.end.good : last.end.bad);
@@ -687,7 +711,7 @@
     if (boss) {
       S.dailyBoss.done = { ok: okN, n, xp: xpSum }; S.dailyBoss.tries++;
       bossWin = !abortSession && good;
-      if (bossWin) feedEv('boss', { t: boss.npcs ? NPCS[bossNpc(boss)].name : boss.title });
+      if (bossWin) { feedEv('boss', { t: boss.npcs ? NPCS[bossNpc(boss)].name : boss.title }); misTick({ boss: 1 }); }
       if (bossWin) { inc('boss_' + boss.id); cashSum += boss.cash; }
     }
     const ups = addXp(xpSum);
@@ -818,6 +842,7 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
       ${S.events && S.events.pending ? '<button class="newsflash" id="evGo">📨 새 소식이 도착했어요! <b>확인하기 →</b></button>' : ''}
       <h3><span>${greeting()},<br>${esc(S.name)} ${r.title}님!</span><small>오늘 ${doneN}/${open.length} 완료<br>🔥 ${S.streak.count}일 연속 출근</small></h3>
       <button class="feedbar" id="feedBar"><b>📢 사내 소식</b><span id="feedTxt">${feedLine(0)}</span></button>
+      <button class="misbar ${misHot() ? 'hot' : ''}" id="misGo"><b>🎯 미션</b><span id="misTxt">${misSummary()}</span><i>›</i></button>
       ${evs.length ? `<div class="events">${evs.map((e) => `<div class="event">${e.icon} ${e.title}<small>${e.desc}</small></div>`).join('')}</div>` : ''}
       <div class="bosswrap">
         <button class="boss ${bd ? 'done' : ''}" id="bossBtn">
@@ -849,6 +874,7 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
     $('#officeGo').onclick = () => { Snd.tap(); openOffice(); };
     $('#duelGo').onclick = () => { Snd.tap(); duelHub(); };
     $('#feedBar').onclick = () => { Snd.tap(); feedModal(); };
+    $('#misGo').onclick = () => { Snd.tap(); missionModal(); };
     refreshFeed(); startFeedTicker();
     refreshDuels();
     $('#garageGo').onclick = () => { Snd.tap(); openGarage(); };
@@ -991,13 +1017,14 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
     els.dlg.classList.remove('asking'); els.meta.innerHTML = ''; S.seen[q.id] = dayNum();
     if (r.correct) {
       Snd.ok(); setChar(npc.spec, 'happy', 'hop'); fx('<div class="stamp ok">정답!</div>', 1100);
-      inc('correct'); inc('c_' + q.cat);
+      inc('correct'); inc('c_' + q.cat); misTick({ solved: 1, correct: 1, cat: q.cat });
       await say(whoOf(nk), pick(npc.ok), { extra: `<span class="exp">📘 ${esc(q.exp || '')}</span>` });
       els.choices.innerHTML = '';
       await grant(reward);
     } else {
       Snd.ng(); revealAnswer(q); setChar(npc.spec, 'worried', 'shake');
       S.wrong[q.id] = { n: ((S.wrong[q.id] || {}).n || 0) + 1, t: Date.now() };
+      misTick({ solved: 1 });
       await say(whoOf(nk), '아쉽다! 다음엔 맞혀 봐.', { extra: `<span class="exp">정답: <span class="ans">${esc(answerText(q))}</span>\n📘 ${esc(q.exp || '')}</span>` });
       els.choices.innerHTML = '';
     }
@@ -1029,6 +1056,7 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
     '음… 자료 확인해 보니 조금 다르네요. 그래도 같이 고민해 주셔서 고마워요!',
     '어? 방금 본부에 확인해 보니 답이 달라요. 헷갈리는 거 맞죠? 😂'
   ];
+  const PEER_PENALTY = 10; // 동료 전화에 틀리게 답하면 명예 감소
   async function peerVisit() {
     const p = await pickPeer();
     if (!p) { await say(NARR, '📞 전화가 울렸지만… 금방 끊겼다. 다들 바쁜가 보다!'); return grant({ honor: 5 }); }
@@ -1047,14 +1075,17 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
       inc('correct'); inc('c_' + q.cat);
       await say(who, nm(pick(PEER_THANKS)), { extra: `<span class="exp">📘 ${esc(q.exp || '')}</span>` });
       els.choices.innerHTML = '';
+      misTick({ solved: 1, correct: 1, cat: q.cat });
       inc('peerVisits'); await grant({ xp: 30, cash: 300, honor: 10 });
     } else {
       Snd.ng(); revealAnswer(q); setChar(spec, 'worried', 'shake');
       S.wrong[q.id] = { n: ((S.wrong[q.id] || {}).n || 0) + 1, t: Date.now() };
       await say(who, nm(pick(PEER_OOPS)), { extra: `<span class="exp">정답: <span class="ans">${esc(answerText(q))}</span>\n📘 ${esc(q.exp || '')}</span>` });
       els.choices.innerHTML = '';
-      setChar(spec, 'smile', 'hop'); await say(who, nm('그래도 전화 받아 주셔서 고마워요 {나}님! 다음에 또 여쭤볼게요 👋'));
-      inc('peerVisits'); await grant({ honor: 5 });
+      setChar(spec, 'worried', 'hop'); await say(who, nm('아… 고객님께 다시 설명드려야겠네요. 다음엔 꼭 부탁드려요 {나}님! 👋'));
+      misTick({ solved: 1 }); inc('peerVisits');
+      const lost = Math.min(S.honor, PEER_PENALTY); S.honor -= lost; save(); renderHud(); // 잘못 알려 줘서 명예 감소
+      toast(`📉 잘못된 안내로 명예 -${lost}`, 3000);
     }
     await say(NARR, '📴 뚝. 통화가 끝났다.');
   }
@@ -1232,7 +1263,7 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
       empty = acc ? `아직 ${min}문제 이상 푼 사람이 없어요.` : '아직 기록이 없어요.';
     }
     const showActs = rankMain === 'best';
-    body.innerHTML = note + (list.length ? list.map((x, i) => `<div class="rankrow ${x.me ? 'me' : ''}"><span class="rk">${medal(i)}</span><button class="rkav" data-av="${i}" aria-label="${esc(x.name)} 캐릭터 보기">${avatar(x)}</button><span class="nm" data-av="${i}">${esc(x.name)}${x.me ? ' (나)' : ''}<small>Lv.${x.lv} ${rankOf(x.lv).title}</small></span>
+    body.innerHTML = note + (list.length ? list.map((x, i) => `<div class="rankrow ${x.me ? 'me' : ''}"><span class="rk">${medal(i)}</span><button class="rkav" data-av="${i}" aria-label="${esc(x.name)} 캐릭터 보기">${avatar(x)}</button><span class="nm" data-av="${i}">${esc(x.name)}${x.me ? ' (나)' : ''}<small>Lv.${x.lv} ${rankOf(x.lv).title}${ttTag(x)}</small></span>
         ${showActs && !x.me ? `<span class="acts"><button class="btn mini" data-cheer="${esc(x.uid)}" data-nm="${esc(x.name)}" ${cheer.left <= 0 || cheer.to.includes(x.uid) ? 'disabled' : ''}>${cheer.to.includes(x.uid) ? '응원 완료' : '📣'}</button><button class="btn ghost mini" data-send="${esc(x.uid)}" data-nm="${esc(x.name)}">💸</button></span>` : ''}
         <b class="rk-val">${val(x)}</b></div>`).join('') : `<p class="muted" style="text-align:center;margin-top:30px">${empty}</p>`);
     els.screen.querySelectorAll('[data-rt]').forEach((b) => b.onclick = () => { rankTab = b.dataset.rt; Snd.tap(); drawRank(clone(rankData)); });
@@ -1534,7 +1565,7 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
     if (!has('vip')) list.unshift({ sample: 'vip', lv: SAMPLE.vip.from.lv, name: SAMPLE.vip.title });
     const label = (x) => x.sample
       ? `<span class="pk-av pk-lock">🔒</span><b>${esc(x.name)}</b><small>${esc(SAMPLE[x.sample].from.title)}부터 주차</small>`
-      : `${x.best ? `<em class="pk-best">${x.best}</em><span class="pk-avw">${LAUREL}<span class="pk-av">${avatar(x)}</span></span>` : `<span class="pk-av">${avatar(x)}</span>`}<b>${esc(x.name)}${x.me ? ' (나)' : ''}</b><small>Lv.${x.lv} ${rankOf(x.lv).title}</small>`;
+      : `${x.best ? `<em class="pk-best">${x.best}</em><span class="pk-avw">${LAUREL}<span class="pk-av">${avatar(x)}</span></span>` : `<span class="pk-av">${avatar(x)}</span>`}<b>${esc(x.name)}${x.me ? ' (나)' : ''}</b><small>Lv.${x.lv} ${rankOf(x.lv).title}</small>${titleText(ttOf(x)) ? `<small class="pk-tt">${titleText(ttOf(x))}</small>` : ''}`;
     el.querySelector('.pk-info').textContent = `BM ${list.filter((x) => !x.sample).length}명 · 레벨 높은 순서로 주차돼 있어요`;
     const mi = list.findIndex((x) => x.me), tb = el.querySelector('[data-time]');
     // 주차장 짓기 (꾸미기를 바꾸면 내 차 앞에서 다시 지음 — 차 모델은 받아 둔 것을 씀)
@@ -1593,10 +1624,10 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
   const carState = () => S.car || (S.car = { owned: {}, shown: {}, plate: '', glow: GLOW_COLORS[0][0] });
   function carCR() {
     const c = S && S.car; if (!c) return null;
-    const i = CAR_ITEMS.filter((it) => c.owned[it.id] && c.shown[it.id] !== false).map((it) => it.id);
+    const i = ALL_CAR.filter((it) => c.owned[it.id] && c.shown[it.id] !== false).map((it) => it.id);
     return i.length ? { i, p: c.plate || '', g: c.glow || GLOW_COLORS[0][0], l: c.light || LIGHT_COLORS[0][0] } : null;
   }
-  const carDecoText = (cr) => { const i = (cr && cr.i) || []; return i.length ? ' · 꾸밈 ' + i.map((id) => (CAR_ITEMS.find((t) => t.id === id) || {}).icon || '').join('') : ''; };
+  const carDecoText = (cr) => { const i = (cr && cr.i) || []; return i.length ? ' · 꾸밈 ' + i.map((id) => (ALL_CAR.find((t) => t.id === id) || {}).icon || '').join('') : ''; };
   const cleanPlate = (t) => String(t || '').replace(/[^0-9A-Za-z가-힣 ]/g, '').replace(/\s+/g, ' ').trim().slice(0, 8);
   async function buyCarItem(id) {
     const it = CAR_ITEMS.find((x) => x.id === id), c = carState();
@@ -1611,14 +1642,16 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
   function carDecoPanel(onDone) {
     const c = carState();
     const m = modal(`<h2 style="font-size:22px">🎨 내 차 꾸미기</h2><p class="muted" style="text-align:center">꾸민 모습은 🅿️ 회사 주차장에서 동료들도 볼 수 있어요.</p>
-      <div class="decolist">${CAR_ITEMS.map((it) => {
+      <div class="decolist">${ALL_CAR.filter((it) => !it.limited || c.owned[it.id]).map((it) => {
         const own = c.owned[it.id], on = own && c.shown[it.id] !== false;
         const colors = it.id === 'glow' ? [GLOW_COLORS, c.glow, 'glow'] : it.id === 'lightcolor' ? [LIGHT_COLORS, c.light || LIGHT_COLORS[0][0], 'light'] : null;
         return `<div class="decorow ${own ? '' : 'locked'}"><span class="di">${it.icon}</span><span class="dn"><b>${it.name}</b><small>${esc(it.desc)}</small></span>
-          ${own ? `<button class="btn mini cdtg ${on ? 'on' : ''}" data-tg="${it.id}">${on ? '✅ 장착 중' : '장착하기'}</button>` : `<button class="btn mini ${S.money >= it.price ? '' : 'ghost'}" data-cbuy="${it.id}">${won(it.price)}</button>`}
+          ${it.limited ? '<span class="ltd">한정</span>' : ''}${own ? `<button class="btn mini cdtg ${on ? 'on' : ''}" data-tg="${it.id}">${on ? '✅ 장착 중' : '장착하기'}</button>` : `<button class="btn mini ${S.money >= it.price ? '' : 'ghost'}" data-cbuy="${it.id}">${won(it.price)}</button>`}
           ${own && it.id === 'plate' ? `<div class="cdx cdplate"><input id="cdPlate" maxlength="8" value="${esc(c.plate || '')}" placeholder="예: 방카왕 1004"><button class="btn mini" data-plate>저장</button></div>` : ''}
           ${own && colors ? `<div class="cdx cdglow">${colors[0].map(([v, n]) => `<button class="${colors[1] === v ? 'on' : ''}" data-color="${colors[2]}" data-v="${v}" style="--g:${v}" aria-label="${n}" title="${n}"></button>`).join('')}</div>` : ''}</div>`;
-      }).join('')}</div><button class="btn full" data-close style="margin-top:10px">완료</button>`, () => { if (!reopening && onDone) onDone(); });
+      }).join('')}</div>
+      <p class="muted" style="text-align:center;margin:8px 0 0">🌟 보상 상자에서만 나오는 한정 아이템 ${LIMITED_ITEMS.filter((it) => c.owned[it.id]).length}/${LIMITED_ITEMS.length}개 보유</p>
+      <button class="btn full" data-close style="margin-top:10px">완료</button>`, () => { if (!reopening && onDone) onDone(); });
     let reopening = false;
     m.el.querySelectorAll('[data-tg]').forEach((b) => b.onclick = () => {
       const id = b.dataset.tg, on = c.shown[id] !== false;
@@ -1677,6 +1710,7 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
       if (!m.run.best || res.ms > m.run.best) { lines.push(m.run.best ? `🎉 최고 기록 경신! (이전 ${Mini.fmt(m.run.best)})` : '🎉 첫 기록!'); m.run.best = res.ms; }
     }
     const rw = MINI_REWARD[kind];
+    if (res.ok !== false && (kind !== 'run' || res.ms >= rw.need)) misTick({ mini: 1 });
     if (!m.reward[kind] && (kind !== 'run' || res.ms >= rw.need)) {
       m.reward[kind] = true; earn(rw.cash); const ups = addXp(rw.xp); inc('miniPlays');
       lines.push(`오늘의 드라이빙 보상 +${won(rw.cash)} · +${rw.xp}XP`);
@@ -1754,6 +1788,7 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
       else if (m.cash) { earn(m.cash, true); cash += m.cash; }
       if (m.honor) { S.honor += m.honor; honor += m.honor; }
       if (m.kind === '응원') inc('cheered');
+      if (m.kind === '대결결과' && /승리/.test(m.msg || '')) inc('duelWins'); // 내가 보낸 도전장에서 이긴 경우
       const who = esc(m.from || '동료');
       const body = m.kind === '응원' ? `📣 <b>${who}</b>님이 응원을 보냈어요!`
         : m.kind === '활동비' ? `💸 <b>${who}</b>님이 활동비 <b>${won(m.cash)}</b>을 보냈어요${m.msg ? `<br><span class="muted">"${esc(m.msg)}"</span>` : ''}`
@@ -1767,8 +1802,105 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
     modal(`<h2>📬 우편함</h2>${lines.join('')}<p class="muted" style="text-align:center">합계 ${won(cash)}${honor ? ` · 명예 +${honor}` : ''}</p><button class="btn full" data-close>받기</button>`);
   }
 
+  /* ---------------- 미션 · 보상 상자 ---------------- */
+  const ALL_CAR = [...CAR_ITEMS, ...LIMITED_ITEMS];
+  function misState() {
+    const d = today(), w = isoWeek(), m = S.mi || (S.mi = {});
+    if (m.d !== d) Object.assign(m, { d, dc: {}, dcl: {}, dbox: false });
+    if (m.w !== w) Object.assign(m, { w, wc: {}, wcl: {}, wbox: false });
+    return m;
+  }
+  // 오늘(이번 주) 미션 3개: 첫 줄은 항상, 나머지 2개는 날짜(주)마다 모두에게 같게
+  function misList(kind) {
+    const pool = MISSIONS[kind], key = kind === 'day' ? today() : isoWeek();
+    const rest = pool.slice(1).map((x) => ({ x, r: seeded(key + '|mis|' + x.id) })).sort((a, b) => a.r - b.r).slice(0, 2).map((o) => o.x);
+    const cat = CAT_ORDER[Math.floor(seeded(key + '|mcat') * CAT_ORDER.length)];
+    return [pool[0], ...rest].map((x) => ({ ...x, cat, t: x.t.replace('{cat}', CATS[cat].label) }));
+  }
+  function misProg(kind, x) {
+    const m = misState(), c = (kind === 'day' ? m.dc : m.wc) || {};
+    if (x.id === 'cat') return Math.min(x.goal, (c.cat || {})[x.cat] || 0);
+    if (x.id === 'allcat') return CAT_ORDER.filter((k) => ((c.cat || {})[k] || 0) >= 10).length;
+    return Math.min(x.goal, c[x.id] || 0);
+  }
+  function misTick(ev) {
+    if (!S) return;
+    const m = misState();
+    [m.dc, m.wc].forEach((c) => {
+      ['solved', 'correct', 'boss', 'duel', 'mini', 'perfect'].forEach((k) => { if (ev[k]) c[k] = (c[k] || 0) + ev[k]; });
+      if (ev.combo) c.combo = Math.max(c.combo || 0, ev.combo);
+      if (ev.cat && ev.correct) { c.cat = c.cat || {}; c.cat[ev.cat] = (c.cat[ev.cat] || 0) + 1; }
+    });
+    if (ev.solved) { S.boxProg = (S.boxProg || 0) + ev.solved; while (S.boxProg >= BOX.every) { S.boxProg -= BOX.every; addBox('normal', `문제 ${BOX.every}개 풀기`); } }
+    const b = $('#misTxt'); if (b) { b.innerHTML = misSummary(); $('#misGo').classList.toggle('hot', misHot()); }
+  }
+  function addBox(kind, why) { S.boxes = S.boxes || { normal: 0, gold: 0 }; S.boxes[kind] = (S.boxes[kind] || 0) + 1; toast(`${BOX[kind].icon} ${BOX[kind].name} 획득! (${why})`, 3000); }
+  const boxN = () => ((S.boxes || {}).normal || 0) + ((S.boxes || {}).gold || 0);
+  const misDone = (kind) => { const m = misState(), cl = kind === 'day' ? m.dcl : m.wcl; return misList(kind).filter((x) => cl[x.id]).length; };
+  const misReady = (kind) => { const m = misState(), cl = kind === 'day' ? m.dcl : m.wcl; return misList(kind).some((x) => !cl[x.id] && misProg(kind, x) >= x.goal); };
+  const misHot = () => misReady('day') || misReady('week') || boxN() > 0;
+  const misSummary = () => `오늘 ${misDone('day')}/3 · 이번 주 ${misDone('week')}/3${boxN() ? ` · <b>🎁 상자 ${boxN()}개</b>` : ''}${misReady('day') || misReady('week') ? ' · <b>받을 보상!</b>' : ''}`;
+  function misClaim(kind, id) {
+    const m = misState(), cl = kind === 'day' ? m.dcl : m.wcl, list = misList(kind), x = list.find((y) => y.id === id);
+    if (!x || cl[id] || misProg(kind, x) < x.goal) return;
+    cl[id] = Date.now(); const rw = MISSIONS.reward[kind]; earn(rw.cash); addXp(rw.xp); Snd.coin();
+    toast(`🎯 미션 완료! +${won(rw.cash)} · +${rw.xp}XP`);
+    if (list.every((y) => cl[y.id])) {
+      if (kind === 'day' && !m.dbox) { m.dbox = true; inc('missionDays'); addBox('normal', '오늘의 미션 모두 완료'); }
+      if (kind === 'week' && !m.wbox) { m.wbox = true; addBox('gold', '이번 주 미션 모두 완료'); }
+    }
+    checkAch(); save(); renderHud();
+  }
+  let misTab = 'day';
+  function missionModal() {
+    const draw = () => {
+      const m = misState(), cl = misTab === 'day' ? m.dcl : m.wcl, rw = MISSIONS.reward[misTab], bx = S.boxes || {};
+      const rows = misList(misTab).map((x) => {
+        const p = misProg(misTab, x), done = cl[x.id], ready = !done && p >= x.goal;
+        return `<div class="misrow ${done ? 'done' : ''}"><span class="mi">${x.icon}</span><span class="mt"><b>${esc(x.t)}</b><span class="mbar"><i style="width:${Math.round(p / x.goal * 100)}%"></i></span><small>${p} / ${x.goal}</small></span>
+          ${done ? '<span class="mok">✅ 완료</span>' : ready ? `<button class="btn mini" data-claim="${x.id}">받기</button>` : `<span class="mrw">+${won(rw.cash)}</span>`}</div>`;
+      }).join('');
+      return `<h2 style="font-size:22px">🎯 미션</h2>
+        <div class="seg" style="justify-content:center;margin-bottom:8px"><button data-mt="day" class="${misTab === 'day' ? 'on' : ''}">오늘의 미션</button><button data-mt="week" class="${misTab === 'week' ? 'on' : ''}">이번 주 미션</button></div>
+        ${rows}<p class="muted" style="text-align:center;margin:8px 0">미션 하나마다 +${won(rw.cash)} · +${rw.xp}XP · 3개 모두 완료하면 ${misTab === 'day' ? '🎁 보상 상자' : '🧧 황금 상자'}!</p>
+        <div class="boxarea"><div><b>🎁 보상 상자 ${bx.normal || 0}개</b><small>문제 ${BOX.every}개마다 1개 · 다음 상자까지 ${BOX.every - (S.boxProg || 0)}문제</small></div>${bx.normal ? '<button class="btn mini" data-open="normal">열기</button>' : ''}</div>
+        <div class="boxarea gold"><div><b>🧧 황금 상자 ${bx.gold || 0}개</b><small>한정 아이템이 나올 확률이 훨씬 높아요</small></div>${bx.gold ? '<button class="btn mini" data-open="gold">열기</button>' : ''}</div>
+        <button class="btn full ghost" data-close style="margin-top:10px">닫기</button>`;
+    };
+    const m = modal(draw());
+    const bind = () => {
+      m.el.querySelectorAll('[data-close]').forEach((b) => b.onclick = m.close);
+      m.el.querySelectorAll('[data-mt]').forEach((b) => b.onclick = () => { misTab = b.dataset.mt; Snd.tap(); m.el.innerHTML = draw(); bind(); });
+      m.el.querySelectorAll('[data-claim]').forEach((b) => b.onclick = () => { misClaim(misTab, b.dataset.claim); m.el.innerHTML = draw(); bind(); misTick({}); });
+      m.el.querySelectorAll('[data-open]').forEach((b) => b.onclick = () => { m.close(); openBox(b.dataset.open); });
+    };
+    bind();
+  }
+  function rollBox(kind) {
+    const t = BOX[kind].table, tot = t.reduce((a, r) => a + r[1], 0); let r = Math.random() * tot;
+    const row = t.find((x) => (r -= x[1]) < 0) || t[0], rnd = (a, b) => Math.round((a + Math.random() * (b - a)) / 10) * 10;
+    if (row[0] === 'cash') { const v = rnd(row[2], row[3]); earn(v); return { icon: '💰', text: `활동비 ${won(v)}` }; }
+    if (row[0] === 'xp') { const v = rnd(row[2], row[3]); addXp(v); return { icon: '⭐', text: `경험치 +${v} XP` }; }
+    if (row[0] === 'honor') { const v = rnd(row[2], row[3]); S.honor += v; return { icon: '🎖️', text: `명예 +${v}` }; }
+    if (row[0] === 'item') { const n = row[2] + Math.floor(Math.random() * (row[3] - row[2] + 1)), it = pick(ITEMS); S.items[it.id] = (S.items[it.id] || 0) + n; return { icon: it.icon, text: `${it.name} ${n}개` }; }
+    const c = carState(), left = LIMITED_ITEMS.filter((x) => !c.owned[x.id]);
+    if (!left.length) { earn(5000); return { icon: '💰', text: '한정 아이템을 모두 모아서 대신 활동비 5,000원' }; }
+    const it = pick(left); c.owned[it.id] = Date.now(); c.shown[it.id] = true; inc('limited'); feedEv('limited', { t: it.name });
+    return { icon: it.icon, text: `한정 아이템 「${it.name}」`, rare: true, sub: '내 차에 바로 달렸어요! 🅿️ 주차장에서 확인해 보세요' };
+  }
+  function openBox(kind) {
+    if (!((S.boxes || {})[kind] > 0)) return;
+    S.boxes[kind]--; const res = rollBox(kind); checkAch(); save(); renderHud();
+    const m = modal(`<div class="boxopen"><div class="bx ${kind}">${BOX[kind].icon}</div>
+      <div class="bxres ${res.rare ? 'rare' : ''}"><span>${res.icon}</span><b>${res.rare ? '🌟 ' : ''}${esc(res.text)}</b>${res.sub ? `<small>${res.sub}</small>` : ''}</div></div>
+      <div class="row" style="margin-top:12px">${S.boxes[kind] > 0 ? `<button class="btn ghost full" data-more>하나 더 열기 (${S.boxes[kind]})</button>` : ''}<button class="btn full" data-close>확인</button></div>`);
+    Snd.tap(); setTimeout(() => { if (res.rare) { confetti(110); Snd.lv(); } else Snd.coin(); }, 950);
+    const more = m.el.querySelector('[data-more]'); if (more) more.onclick = () => { m.close(); openBox(kind); };
+    misTick({});
+  }
+
   /* ---------------- 사내 소식 피드 ---------------- */
-  const FEED_ICON = { 승진: '🎉', 레벨: '⬆️', 대결: '⚔️', boss: '👹', perfect: '💯', egg: '💰', park: '🅿️', buy: '✨', streak: '🔥', best: '👑' };
+  const FEED_ICON = { 승진: '🎉', 레벨: '⬆️', 대결: '⚔️', boss: '👹', perfect: '💯', egg: '💰', park: '🅿️', buy: '✨', streak: '🔥', best: '👑', title: '🏅', limited: '🌟' };
   let feedItems = null, feedAt = 0, feedTick = null, feedIdx = 0;
   try { const c = JSON.parse(localStorage.getItem('bmq_feed')); if (c) feedItems = c; } catch (e) { }
   const ago = (t) => { const m = Math.floor((Date.now() - t) / 60000); return m < 1 ? '방금' : m < 60 ? `${m}분 전` : m < 1440 ? `${Math.floor(m / 60)}시간 전` : `${Math.floor(m / 1440)}일 전`; };
@@ -1848,7 +1980,7 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
   }
   async function duelFinish(info, ok, n, ms) {
     if (info.mode === 'create') {
-      try { await Api.duelCreate(info.uid, info.qids, ok, ms); inc('duels'); }
+      try { await Api.duelCreate(info.uid, info.qids, ok, ms); inc('duels'); misTick({ duel: 1 }); }
       catch (e) { return void modal(`<h2>⚠️ 도전장을 못 보냈어요</h2><p style="text-align:center">${esc(e.message)}</p><button class="btn full" data-close>확인</button>`); }
       duelAt = 0;
       await new Promise((res) => modal(`<h2>📨 도전장을 보냈어요!</h2><div class="grade" style="font-size:44px">${ok} / ${n}</div><p style="text-align:center">내 기록 · ${fmtMs(ms)}<br><b>${esc(info.name)}</b>님이 같은 문제를 풀면 결과가 우편함으로 와요.</p><p class="muted" style="text-align:center">${DUEL.days}일 안에 답이 없으면 사라져요.</p><button class="btn full" data-close>확인</button>`, res));
@@ -1857,7 +1989,7 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
     let r;
     try { r = await Api.duelAnswer(info.id, ok, ms); }
     catch (e) { return void modal(`<h2>⚠️ 결과를 저장하지 못했어요</h2><p style="text-align:center">${esc(e.message)}</p><button class="btn full" data-close>확인</button>`); }
-    duelAt = 0; inc('duels'); if (r.res === 'win') inc('duelWins');
+    duelAt = 0; inc('duels'); misTick({ duel: 1 }); if (r.res === 'win') inc('duelWins');
     earn(r.reward.cash); S.honor += r.reward.honor; save(); renderHud();
     if (r.res === 'win') { confetti(90); Snd.lv(); } else Snd.coin();
     const title = { win: '🏆 승리!', lose: '😢 아쉽게 패배', draw: '🤝 무승부!' }[r.res];
@@ -2212,6 +2344,10 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
           <div class="xpbar" style="margin-top:10px;height:9px"><i style="width:${S.lv >= MAX_LV ? 100 : Math.round((S.xp / xpNeed(S.lv)) * 100)}%"></i></div>
           <div class="muted" style="margin-top:4px">${S.lv >= MAX_LV ? 'MAX' : `다음 레벨까지 ${xpNeed(S.lv) - S.xp} XP`}</div>
         </div></div></div>
+      <div class="box"><h4>🏅 칭호 <small class="muted">${Object.keys(S.titles || {}).length}/${TITLES.length}개 · 고른 칭호는 RANK · 주차장에 보여요</small></h4><div class="titles">
+        ${TITLES.slice().sort((a, b) => !!(S.titles || {})[b.id] - !!(S.titles || {})[a.id]).map((t) => { const got = (S.titles || {})[t.id], v = Math.min(t.goal, titleVal(t.stat)), on = S.tt === t.id;
+          return `<button class="ttcard ${got ? 'got' : ''} ${on ? 'on' : ''}" ${got ? `data-tt="${t.id}"` : 'disabled'}><span class="ti">${got ? t.icon : '🔒'}</span><b>${t.name}</b><small>${esc(t.desc)}</small>${got ? `<em>${on ? '✅ 달고 있음' : '달기'}</em>` : `<span class="mbar"><i style="width:${Math.round(v / t.goal * 100)}%"></i></span><em>${v.toLocaleString()} / ${t.goal.toLocaleString()}</em>`}</button>`; }).join('')}
+      </div></div>
       <div class="box"><h4>👔 옷장 <small class="muted">승진하면 새 의상이 지급돼요</small></h4><div class="wardrobe">
         <button class="wcard ${!S.costume ? 'on' : ''}" data-cos="0"><span class="wi">✨</span><b>직급에 맞춤</b><small>지금: ${COSTUMES.find((c) => c.st === costumeStage(S.lv)).name}</small></button>
         ${COSTUMES.map((c) => {
@@ -2237,6 +2373,7 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
         }).join('')}</div></div>
     </div>`;
     els.screen.querySelectorAll('[data-ag]').forEach((b) => b.onclick = () => { achGroup = b.dataset.ag; pageChar(); });
+    els.screen.querySelectorAll('[data-tt]').forEach((b) => b.onclick = () => { S.tt = S.tt === b.dataset.tt ? '' : b.dataset.tt; Snd.tap(); save(); pageChar(); });
     els.screen.querySelectorAll('[data-cos]').forEach((b) => b.onclick = () => {
       const st = +b.dataset.cos; S.costume = st || null; Snd.tap(); save(); renderHud();
       toast(st ? `${COSTUMES.find((c) => c.st === st).icon} ${COSTUMES.find((c) => c.st === st).name} 의상으로 갈아입었어요` : '직급에 맞는 의상을 입어요'); pageChar();

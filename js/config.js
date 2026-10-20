@@ -351,6 +351,61 @@ const CAR_ITEMS = [
   { id: 'driver', icon: '🧑‍✈️', name: '전속 기사님 고용', price: 50000, desc: '운전석 옆에서 기사님이 대기하고 있어요' },
   { id: 'guards', icon: '🕴️', name: '경호원 고용', price: 80000, desc: '검은 정장 · 선글라스 경호원이 차 옆을 지켜요' }
 ];
+/* 상자에서만 나오는 한정 차 꾸밈 (매점에서 살 수 없음) */
+const LIMITED_ITEMS = [
+  { id: 'rainbow', icon: '🌈', name: '무지개 네온', limited: true, desc: '차 아래 네온이 무지개색으로 계속 바뀌어요' },
+  { id: 'diamond', icon: '💎', name: '다이아 왕관', limited: true, desc: '지붕 위에서 반짝이며 도는 투명한 다이아 왕관' },
+  { id: 'goldplate', icon: '🥇', name: '황금 번호판', limited: true, desc: '번쩍이는 황금 번호판 (번호판 문구 그대로)' },
+  { id: 'wings', icon: '🪽', name: '천사 날개', limited: true, desc: '지붕 양옆에서 천천히 파닥이는 하얀 날개' },
+  { id: 'halo', icon: '😇', name: '천사 고리', limited: true, desc: '지붕 위에 둥실 떠 있는 황금 고리' }
+];
+/* 미션 — 오늘 3개 · 이번 주 3개 (모두에게 같은 미션, 첫 줄은 항상 포함) */
+const MISSIONS = {
+  day: [
+    { id: 'solved', icon: '📝', t: '문제 20개 풀기', goal: 20 },
+    { id: 'correct', icon: '✅', t: '정답 15개 맞히기', goal: 15 },
+    { id: 'combo', icon: '🔥', t: '5문제 연속 정답', goal: 5, max: true },
+    { id: 'cat', icon: '📚', t: '「{cat}」 정답 8개', goal: 8 },
+    { id: 'boss', icon: '👹', t: '오늘의 보스 격파', goal: 1 },
+    { id: 'duel', icon: '⚔️', t: '퀴즈 대결 1번 하기', goal: 1 },
+    { id: 'mini', icon: '🚗', t: 'BM 드라이빙 1번 성공', goal: 1 },
+    { id: 'perfect', icon: '💯', t: '일정 1개 만점', goal: 1 }
+  ],
+  week: [
+    { id: 'solved', icon: '📝', t: '문제 120개 풀기', goal: 120 },
+    { id: 'correct', icon: '✅', t: '정답 90개 맞히기', goal: 90 },
+    { id: 'perfect', icon: '💯', t: '일정 만점 3번', goal: 3 },
+    { id: 'duel', icon: '⚔️', t: '퀴즈 대결 3번 하기', goal: 3 },
+    { id: 'boss', icon: '👹', t: '오늘의 보스 3번 격파', goal: 3 },
+    { id: 'allcat', icon: '🌐', t: '6과목 모두 정답 10개씩', goal: 6 }
+  ],
+  reward: { day: { cash: 200, xp: 20 }, week: { cash: 1000, xp: 100 } }
+};
+/* 보상 상자: 문제 25개마다 일반 상자 1개 · 오늘 미션 모두 → 일반 상자 · 이번 주 미션 모두 → 황금 상자 */
+const BOX = {
+  every: 25,
+  normal: { name: '보상 상자', icon: '🎁', table: [['cash', 45, 300, 1500], ['xp', 25, 30, 100], ['item', 20, 1, 1], ['honor', 8, 10, 30], ['limited', 2]] },
+  gold: { name: '황금 상자', icon: '🧧', table: [['cash', 30, 2000, 6000], ['xp', 20, 150, 400], ['item', 20, 2, 3], ['honor', 10, 40, 80], ['limited', 20]] }
+};
+/* 칭호 — 조건을 채우면 얻고, 하나를 골라 이름 옆에 달아요 (RANK · 주차장에 보임) */
+const TITLES = [
+  { id: 'q1000', icon: '📚', name: '천 문제', desc: '문제 1,000개 풀기', stat: 'solved', goal: 1000 },
+  { id: 'sniper', icon: '🎯', name: '저격수', desc: '100문제 이상 · 정답률 90% 이상', stat: 'rate90', goal: 1 },
+  { id: 'banca_general', icon: '🏦', name: '방카 박사', desc: '방카슈랑스 전반 정답 200개', stat: 'c_banca_general', goal: 200 },
+  { id: 'banca_product', icon: '📦', name: '상품 마스터', desc: '방카 상품 정답 200개', stat: 'c_banca_product', goal: 200 },
+  { id: 'banca_backoffice', icon: '🗂️', name: '백오피스 장인', desc: '백오피스 정답 200개', stat: 'c_banca_backoffice', goal: 200 },
+  { id: 'market', icon: '📰', name: '시장 분석가', desc: '경제환경 정답 200개', stat: 'c_market', goal: 200 },
+  { id: 'econ', icon: '🎓', name: '경제학자', desc: '경제학 정답 200개', stat: 'c_econ', goal: 200 },
+  { id: 'term', icon: '📖', name: '걸어 다니는 용어사전', desc: '경제용어 정답 200개', stat: 'c_term', goal: 200 },
+  { id: 'perfect', icon: '💯', name: '퍼펙트', desc: '일정 만점 20번', stat: 'perfect', goal: 20 },
+  { id: 'boss', icon: '👹', name: '보스 헌터', desc: '오늘의 보스 20번 격파', stat: 'bossWins', goal: 20 },
+  { id: 'duel', icon: '⚔️', name: '대결왕', desc: '퀴즈 대결 10승', stat: 'duelWins', goal: 10 },
+  { id: 'streak', icon: '🔥', name: '개근왕', desc: '14일 연속 출근', stat: 'streakBest', goal: 14 },
+  { id: 'park', icon: '🅿️', name: '무사고 드라이버', desc: '주차왕 무사고 10번', stat: 'parkClean', goal: 10 },
+  { id: 'egg', icon: '💰', name: '금고털이', desc: '비밀 금고 10번 찾기', stat: 'eggs', goal: 10 },
+  { id: 'lucky', icon: '🍀', name: '행운아', desc: '한정 아이템 3개 모으기', stat: 'limited', goal: 3 },
+  { id: 'mission', icon: '🎯', name: '미션 수행자', desc: '오늘의 미션 30번 완료', stat: 'missionDays', goal: 30 }
+];
 const LIGHT_COLORS = [['#7fc8ff', '아이스 블루'], ['#ffd23f', '옐로'], ['#ff5ab4', '핑크'], ['#7dffb2', '민트'], ['#c49bff', '퍼플']];
 const GLOW_COLORS = [['#ff4fa3', '핑크'], ['#3fa9ff', '블루'], ['#3ee08f', '그린'], ['#ffc93c', '골드'], ['#b26bff', '퍼플']];
 /* 사무실 꾸밈 물품 (매점에서 구매 → 사무실에 비치 · 보관 선택) */

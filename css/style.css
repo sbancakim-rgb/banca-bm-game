@@ -762,3 +762,38 @@ img.sprite.bust.illust { width: 135%; left: -17%; top: -3%; }
 .shophead i { font-style: normal; font-size: 12.5px; font-weight: 800; color: var(--pink); }
 .shophead.open { box-shadow: 0 2px 8px rgba(60,20,60,.08), inset 0 0 0 2px var(--pink); }
 .shopfold { display: none; } .shopfold.open { display: block; animation: pop .25s; }
+
+/* 미션 · 보상 상자 */
+.misbar { display: flex; align-items: center; gap: 8px; width: 100%; margin: 6px 0 2px; padding: 10px 12px; border: 0; border-radius: 12px; background: linear-gradient(90deg, #eef4ff, #fff); box-shadow: inset 0 0 0 2px #c9dbff; font: inherit; text-align: left; cursor: pointer; }
+.misbar > b { flex: none; font-size: 12.5px; color: #2f56b0; }
+.misbar #misTxt { flex: 1; min-width: 0; font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--ink2); }
+.misbar #misTxt b { color: #e8467c; }
+.misbar > i { font-style: normal; font-size: 18px; color: #2f56b0; }
+.misbar.hot { animation: duelhot 1.6s ease-in-out infinite; box-shadow: inset 0 0 0 2px #7aa2ff; }
+.misrow { display: flex; align-items: center; gap: 10px; padding: 10px 6px; border-bottom: 1px solid #f1e4ea; }
+.misrow .mi { font-size: 24px; width: 32px; text-align: center; } .misrow .mt { flex: 1; display: flex; flex-direction: column; gap: 3px; font-size: 14px; }
+.misrow .mt small { font-size: 11.5px; color: var(--ink2); }
+.mbar { display: block; height: 7px; border-radius: 99px; background: #f1e6ec; overflow: hidden; } .mbar i { display: block; height: 100%; background: linear-gradient(90deg, #ff9ab8, #ff6f91); border-radius: 99px; }
+.misrow .mok { font-size: 12.5px; font-weight: 800; color: var(--ok); } .misrow .mrw { font-size: 12px; color: var(--ink2); white-space: nowrap; }
+.misrow.done { opacity: .6; }
+.boxarea { display: flex; align-items: center; gap: 10px; justify-content: space-between; padding: 10px 12px; margin-top: 8px; border-radius: 12px; background: #fff5f8; box-shadow: inset 0 0 0 2px #ffd0de; }
+.boxarea div { display: flex; flex-direction: column; font-size: 14px; } .boxarea small { font-size: 11.5px; color: var(--ink2); }
+.boxarea.gold { background: #fff8e1; box-shadow: inset 0 0 0 2px #ffd66b; }
+.boxopen { display: flex; flex-direction: column; align-items: center; padding: 10px 0 4px; min-height: 200px; position: relative; }
+.boxopen .bx { font-size: 96px; animation: bxshake .9s ease both; }
+.boxopen .bx.gold { filter: drop-shadow(0 0 18px rgba(255,200,60,.9)); }
+.boxopen .bxres { position: absolute; top: 20px; display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; animation: bxres .5s .9s cubic-bezier(.2,1.6,.4,1) both; }
+.boxopen .bxres span { font-size: 72px; } .boxopen .bxres b { font-family: 'Jua', sans-serif; font-weight: 400; font-size: 22px; } .boxopen .bxres small { font-size: 12.5px; color: var(--ink2); }
+.boxopen .bxres.rare b { color: #c47b00; text-shadow: 0 0 12px rgba(255,210,90,.9); }
+@keyframes bxshake { 0% { transform: scale(.6); } 20% { transform: scale(1); } 30%, 50%, 70% { transform: rotate(-12deg); } 40%, 60%, 80% { transform: rotate(12deg); } 95% { transform: scale(1.3); opacity: 1; } 100% { transform: scale(1.6); opacity: 0; } }
+@keyframes bxres { from { opacity: 0; transform: scale(.3); } to { opacity: 1; transform: none; } }
+.decorow .ltd { flex: none; font-size: 11px; font-weight: 900; color: #fff; background: linear-gradient(135deg, #ffb347, #ff6f91); padding: 2px 7px; border-radius: 99px; }
+/* 칭호 */
+.titles { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+.ttcard { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; padding: 10px; border: 0; border-radius: 12px; background: #f8f4f6; font: inherit; text-align: left; color: var(--ink2); }
+.ttcard .ti { font-size: 22px; } .ttcard b { font-size: 13.5px; color: var(--ink); } .ttcard small { font-size: 11px; line-height: 1.35; }
+.ttcard em { font-style: normal; font-size: 11.5px; font-weight: 800; color: var(--ink2); } .ttcard .mbar { width: 100%; }
+.ttcard.got { background: #fff; box-shadow: inset 0 0 0 2px #ffd66b; cursor: pointer; } .ttcard.got em { color: #c47b00; }
+.ttcard.on { background: #fff8e1; box-shadow: inset 0 0 0 3px #f2b632; } .ttcard.on em { color: #2fb67c; }
+.rankrow .tt { color: #c47b00; font-weight: 800; }
+.pk-label small.pk-tt { background: linear-gradient(135deg, #ffe08a, #f2b632); color: #4a2a00; font-weight: 900; }

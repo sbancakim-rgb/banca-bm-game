@@ -312,6 +312,6 @@ function rankingFrom(rows, k, myEmail) {
 /* 캐릭터 겉모습만 (데모 — 서버는 Code.gs lookOf_) */
 function demoLook(p) {
   if (!p || !p.name) return null;
-  const o = {}; ['gender', 'hairStyle', 'hairColor', 'skin', 'face', 'age', 'glasses', 'glassesColor', 'illust', 'oc', 'cs', 'cr'].forEach((k) => { if (p[k] != null) o[k] = p[k]; });
+  const o = {}; ['gender', 'hairStyle', 'hairColor', 'skin', 'face', 'age', 'glasses', 'glassesColor', 'illust', 'oc', 'cs', 'cr', 'tt'].forEach((k) => { if (p[k] != null) o[k] = p[k]; });
   return o;
 }

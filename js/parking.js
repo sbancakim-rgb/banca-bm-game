@@ -251,9 +251,10 @@ const Parking = (() => {
     const headTex = radial([[0, 'rgba(255,255,255,1)'], [0.2, 'rgba(255,250,225,.8)'], [1, 'rgba(255,240,200,0)']]);
     const beamGround = canvasTex(128, 256, (g, w, h) => { const l = g.createLinearGradient(0, h, 0, 0); l.addColorStop(0, 'rgba(255,246,214,.32)'); l.addColorStop(1, 'rgba(255,246,214,0)'); g.fillStyle = l; g.beginPath(); g.moveTo(w * 0.35, h); g.lineTo(w * 0.65, h); g.lineTo(w, 0); g.lineTo(0, 0); g.closePath(); g.fill(); });
     const glowTexs = {};
-    const plateTex = (txt) => canvasTex(512, 112, (g, w, h) => {
-      g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h); g.strokeStyle = '#222'; g.lineWidth = 8; g.strokeRect(5, 5, w - 10, h - 10);
-      g.fillStyle = '#111'; g.font = 'bold 66px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, w / 2, h / 2 + 4);
+    const plateTex = (txt, gold) => canvasTex(512, 112, (g, w, h) => {
+      if (gold) { const l = g.createLinearGradient(0, 0, w, h); l.addColorStop(0, '#fff3b0'); l.addColorStop(0.5, '#e8b923'); l.addColorStop(1, '#a8740a'); g.fillStyle = l; } else g.fillStyle = '#ffffff';
+      g.fillRect(0, 0, w, h); g.strokeStyle = gold ? '#6b4500' : '#222'; g.lineWidth = 8; g.strokeRect(5, 5, w - 10, h - 10);
+      g.fillStyle = gold ? '#3a2400' : '#111'; g.font = 'bold 66px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, w / 2, h / 2 + 4);
     });
     const flagTex = canvasTex(256, 160, (g, w, h) => { g.fillStyle = '#1f2a44'; g.fillRect(0, 0, w, h); g.fillStyle = '#ffd66b'; g.font = 'bold 54px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('BANCA', w / 2, h / 2 + 3); });
     const ribbonMat = std({ color: '#e8243c', roughness: 0.35, metalness: 0.1 });
@@ -281,13 +282,18 @@ const Parking = (() => {
       const cr = s.p.cr || {}, has = new Set(cr.i || []);
       let extra = 0;
       wrap.add(flat(Wd * 1.25, L * 1.12, blobM, 0, 0.02, 0));
-      if (has.has('glow')) {
+      if (has.has('rainbow')) { // 한정: 무지개 네온 (색이 계속 바뀜)
+        const rb = flat(Wd * 1.75, L * 1.28, glowMat(radial([[0, 'rgba(255,255,255,.95)'], [0.55, 'rgba(255,255,255,.55)'], [1, 'rgba(255,255,255,0)']])), 0, 0.03, 0); wrap.add(rb); s.glow = rb;
+        const ph = Math.random(); anims.push((t) => rb.material.color.setHSL((t * 0.15 + ph) % 1, 1, 0.55));
+      } else if (has.has('glow')) {
         const col = /^#[0-9a-f]{6}$/i.test(cr.g || '') ? cr.g : '#ff4fa3';
         glowTexs[col] = glowTexs[col] || radial([[0, col + 'ee'], [0.55, col + '88'], [1, col + '00']]);
         s.glow = flat(Wd * 1.7, L * 1.25, glowMat(glowTexs[col]), 0, 0.03, 0); wrap.add(s.glow);
       }
-      if (has.has('plate') && cr.p) {
-        const pl = new T.Mesh(new T.PlaneGeometry(0.78, 0.17), basic({ map: plateTex(String(cr.p).slice(0, 8)) })); pl.position.set(0, H * 0.27, L / 2 + 0.03); wrap.add(pl);
+      if ((has.has('plate') && cr.p) || has.has('goldplate')) { // 황금 번호판(한정)은 문구가 없으면 BANCA
+        const gold = has.has('goldplate'), txt = String((has.has('plate') && cr.p) || 'BANCA VIP').slice(0, 9);
+        const pl = new T.Mesh(new T.PlaneGeometry(0.78, 0.17), gold ? std({ map: plateTex(txt, true), metalness: 0.7, roughness: 0.25, emissive: '#5a3a00', emissiveIntensity: 0.25 }) : basic({ map: plateTex(txt) }));
+        pl.position.set(0, H * 0.27, L / 2 + 0.03); wrap.add(pl);
       }
       if (has.has('roofbox')) {
         const bx = new T.Mesh(new T.BoxGeometry(Wd * 0.52, 0.3, L * 0.42), std({ color: '#16181d', roughness: 0.35, metalness: 0.3 })); bx.position.set(0, H + 0.12, -L * 0.06); wrap.add(bx); extra = Math.max(extra, 0.35);
@@ -412,6 +418,34 @@ const Parking = (() => {
         ['#e8243c', '#2a6bff', '#2fb67c', '#e8243c'].forEach((c, k) => { const a = k / 4 * Math.PI * 2 + 0.4; add(new T.SphereGeometry(0.045, 10, 8), gem(c), Math.cos(a) * 0.3, 0.08, Math.sin(a) * 0.3, g); });
         const sp = Math.random() * 6; anims.push((t) => { g.rotation.y = t * 0.6 + sp; });
         mid += 0.4;
+      }
+      if (has.has('diamond')) { // 한정: 다이아 왕관
+        const gem = std({ color: '#bff3ff', metalness: 0.1, roughness: 0.05, transparent: true, opacity: 0.78, emissive: '#5fd8ff', emissiveIntensity: 0.35 });
+        const g = new T.Group(); g.position.set(0, mid, 0); wrap.add(g);
+        add(new T.CylinderGeometry(0.3, 0.27, 0.15, 6, 1, true), std({ color: '#bff3ff', metalness: 0.1, roughness: 0.05, transparent: true, opacity: 0.7, emissive: '#5fd8ff', emissiveIntensity: 0.3, side: T.DoubleSide }), 0, 0.075, 0, g);
+        for (let k = 0; k < 6; k++) { const a = k / 6 * Math.PI * 2; add(new T.OctahedronGeometry(0.09), gem, Math.cos(a) * 0.29, 0.26, Math.sin(a) * 0.29, g).scale.y = 1.6; }
+        add(new T.OctahedronGeometry(0.13), gem, 0, 0.42, 0, g).scale.y = 1.5;
+        const sp = noPick(new T.Sprite(new T.SpriteMaterial({ map: starTex, transparent: true, depthWrite: false, blending: T.AdditiveBlending }))); sp.position.set(0.15, 0.45, 0.1); g.add(sp);
+        const ph = Math.random() * 6; anims.push((t) => { g.rotation.y = -t * 0.7 + ph; sp.scale.setScalar(0.1 + Math.max(0, Math.sin(t * 3 + ph)) * 0.45); });
+        mid += 0.55;
+      }
+      if (has.has('halo')) { // 한정: 천사 고리 (둥실둥실)
+        const ring = add(new T.TorusGeometry(0.34, 0.045, 10, 40), std({ color: '#ffe27a', emissive: '#ffcf3a', emissiveIntensity: 0.9, metalness: 0.6, roughness: 0.25 }), 0, mid + 0.35, 0);
+        ring.rotation.x = Math.PI / 2; const glow = noPick(new T.Sprite(new T.SpriteMaterial({ map: headTex, color: '#ffe27a', transparent: true, opacity: 0.5, depthWrite: false, blending: T.AdditiveBlending }))); glow.scale.set(1.2, 0.5, 1); glow.position.set(0, mid + 0.35, 0); wrap.add(glow);
+        const y0 = mid + 0.35, ph = Math.random() * 6; anims.push((t) => { const y = y0 + Math.sin(t * 1.8 + ph) * 0.07; ring.position.y = y; glow.position.y = y; });
+        mid += 0.55;
+      }
+      if (has.has('wings')) { // 한정: 천사 날개 (양옆에서 파닥)
+        const fea = std({ color: '#ffffff', roughness: 0.6, side: T.DoubleSide }), wingsG = [];
+        [-1, 1].forEach((d) => {
+          const pivot = new T.Group(); pivot.position.set(d * (Wd / 2 - 0.05), H * 0.82, -L * 0.12); wrap.add(pivot);
+          [[0.55, 0.22, 0.18], [0.45, 0.16, 0.0], [0.35, 0.12, -0.16]].forEach(([len, w, y], k) => {
+            const f = add(new T.SphereGeometry(1, 14, 8), fea, d * len * 0.55, y + 0.12, -k * 0.05, pivot); f.scale.set(len * 0.6, w, 0.05); f.rotation.z = d * (0.35 - k * 0.15);
+          });
+          wingsG.push([pivot, d]);
+        });
+        const ph = Math.random() * 6; anims.push((t) => wingsG.forEach(([pv, d]) => { pv.rotation.y = d * (0.35 + Math.sin(t * 2.2 + ph) * 0.3); }));
+        extra = Math.max(extra, 0.4);
       }
       extra = Math.max(extra, mid - H);
       if (has.has('eyes')) { // 보닛 위 왕눈이 (눈동자가 데굴데굴)
