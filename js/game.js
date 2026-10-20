@@ -970,7 +970,8 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
   let peerCache = null; // 최우수BM · 주차장에서 받아 둔 회원 목록 재사용
   async function pickPeer() {
     let list = peerCache;
-    if (!list) { try { list = peerCache = (await Api.ranking(periodKeys())).week.list; } catch (e) { return null; } }
+    if (!list) { const c = rankCached(10 * 60000); if (c) list = peerCache = c.week.list; }
+    if (!list) { try { list = (await rankFetch()).week.list; } catch (e) { return null; } }
     const others = (list || []).filter((x) => !x.me && x.name && x.name !== S.name); // 본인 제외 (관리자는 서버에서 이미 빠짐)
     return others.length ? pick(others) : null;
   }
@@ -1102,13 +1103,33 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
 
   /* ---------------- 최우수BM 랭킹 ---------------- */
   let rankTab = 'week';
+  // 순위 응답 기억 (이 기기) — 다시 열 때 바로 보여 주고 뒤에서 새로 받음
+  const RK_KEY = 'bmq_rank_cache';
+  let rankMem = null;
+  function rankCached(maxAge = Infinity) {
+    if (!rankMem) { try { rankMem = JSON.parse(localStorage.getItem(RK_KEY)); } catch (e) { } }
+    const k = JSON.stringify(periodKeys());
+    return rankMem && rankMem.k === k && rankMem.email === S.email && Date.now() - rankMem.t < maxAge ? clone(rankMem.v) : null;
+  }
+  async function rankFetch() {
+    syncNow().catch(() => { }); // 저장은 기다리지 않음 (내 최신 실적은 이 기기 값으로 반영하니까)
+    const v = await Api.ranking(periodKeys());
+    rankMem = { k: JSON.stringify(periodKeys()), email: S.email, t: Date.now(), v };
+    try { localStorage.setItem(RK_KEY, JSON.stringify(rankMem)); } catch (e) { }
+    peerCache = v.week.list;
+    return clone(v);
+  }
   async function pageRank() {
     setNav('home');
-    els.screen.innerHTML = `<div class="page">${backBtn('home', '오늘 일정')}<h2>🏆 최우수BM</h2><div class="loading"><div class="spin"></div>순위를 불러오는 중…</div></div>`;
+    els.screen.innerHTML = `<div class="page">${backBtn('home', '오늘 일정')}<h2>🏆 최우수BM</h2><div id="rankBody"><div class="loading"><div class="spin"></div>순위를 불러오는 중…</div></div></div>`;
     bindBack();
+    const old = rankCached();
+    if (old) { peerCache = old.week.list; drawRank(old); }
     let r;
-    try { [, r] = await Promise.all([syncNow(), Api.ranking(periodKeys())]); } catch (e) { toast(e.message); return; }
-    peerCache = r.week.list;
+    try { r = await rankFetch(); } catch (e) { if (!old) toast(e.message); return; }
+    if (curPage === 'rank' && $('#rankBody')) drawRank(r);
+  }
+  async function drawRank(r) {
     // 저장과 동시에 불러왔으니 내 최신 실적은 이 기기 값으로 반영
     const pd = ensurePeriod();
     [[r.week, pd.week === r.week.key ? pd.weekXp : 0], [r.month, pd.month === r.month.key ? pd.monthXp : 0]].forEach(([box, xp]) => {
@@ -1131,8 +1152,8 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
     primePeerFaces(cur.list);
     const cheer = r.cheer || { left: 0, to: [] };
     const medal = (i) => ['🥇', '🥈', '🥉'][i] || `${i + 1}`;
-    const page = els.screen.querySelector('.page'); if (!page) return;
-    page.querySelector('.loading').outerHTML = `
+    const body = $('#rankBody'); if (!body) return;
+    body.innerHTML = `
       <div class="seg"><button data-rt="week" class="${rankTab === 'week' ? 'on' : ''}">주간 (${esc(r.week.key)})</button><button data-rt="month" class="${rankTab === 'month' ? 'on' : ''}">월간 (${esc(r.month.key)})</button></div>
       <div class="box winner">${last.winner ? `👑 지난 ${rankTab === 'week' ? '주' : '달'} 최우수BM <b>${esc(last.winner.name)}</b> <span class="muted">Lv.${last.winner.lv} · ${last.winner.xp.toLocaleString()} XP</span>` : `<span class="muted">지난 ${rankTab === 'week' ? '주' : '달'} 기록이 아직 없어요.</span>`}</div>
       <p class="muted">이번 ${rankTab === 'week' ? '주' : '달'}에 얻은 경험치로 순위를 매겨요. 1위는 다음 ${rankTab === 'week' ? '주' : '달'}에 최우수BM으로 선정돼 명예 +${BEST_BM[rankTab].honor} · ${won(BEST_BM[rankTab].cash)}을 받아요.</p>
@@ -1140,7 +1161,7 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
       ${cur.list.length ? cur.list.map((x, i) => `<div class="rankrow ${x.me ? 'me' : ''}"><span class="rk">${x.xp > 0 ? medal(i) : '·'}</span><button class="rkav" data-av="${i}" aria-label="${esc(x.name)} 캐릭터 보기">${avatar(x)}</button><span class="nm" data-av="${i}">${esc(x.name)}${x.me ? ' (나)' : ''}<small>Lv.${x.lv} ${rankOf(x.lv).title} · ${x.xp.toLocaleString()} XP</small></span>
         ${x.me ? '' : `<span class="acts"><button class="btn mini" data-cheer="${esc(x.uid)}" data-nm="${esc(x.name)}" ${cheer.left <= 0 || cheer.to.includes(x.uid) ? 'disabled' : ''}>${cheer.to.includes(x.uid) ? '응원 완료' : '📣 응원'}</button><button class="btn ghost mini" data-send="${esc(x.uid)}" data-nm="${esc(x.name)}">💸</button></span>`}</div>`).join('')
         : '<p class="muted" style="text-align:center;margin-top:30px">아직 이번 기간 기록이 없어요. 첫 1위를 노려 보세요!</p>'}`;
-    els.screen.querySelectorAll('[data-rt]').forEach((b) => b.onclick = () => { rankTab = b.dataset.rt; pageRank(); });
+    els.screen.querySelectorAll('[data-rt]').forEach((b) => b.onclick = () => { rankTab = b.dataset.rt; const c = rankCached(); if (c) drawRank(c); else pageRank(); });
     els.screen.querySelectorAll('[data-av]').forEach((b) => b.onclick = () => charViewer(cur.list[+b.dataset.av]));
     // 실물 캐릭터 사진은 기본 표정만 먼저 받아서 바꿔 끼운다
     const fl = needFull(cur.list);
@@ -1416,8 +1437,7 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
     const stage = el.querySelector('.pk-stage'), load = el.querySelector('.gv-load'), ltxt = load.querySelector('span');
     let list, rk;
     try {
-      await syncNow().catch(() => { });
-      rk = await Api.ranking(periodKeys()); peerCache = rk.week.list;
+      rk = rankCached(60000) || await rankFetch(); peerCache = rk.week.list;
       list = rk.week.list.filter((x) => !(admin && x.me)); // 관리자는 주차장에서 제외
     } catch (e) { if (!closed) { toast(e.message); close(); } return; }
     if (closed) return;
@@ -1630,10 +1650,16 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
       const fl = needFull(list); if (fl.length) loadPeerFaces(fl.map(pfid), ['normal']).then(show);
     };
     els.screen.querySelectorAll('[data-mr]').forEach((b) => b.onclick = () => { tab = b.dataset.mr; els.screen.querySelectorAll('[data-mr]').forEach((x) => x.classList.toggle('on', x === b)); show(); });
-    try { await syncNow(); data = await Api.miniRank(day); } catch (e) { const box = $('#miniRank'); if (box) box.innerHTML = `<p class="muted">${esc(e.message)}</p>`; return; }
     // 방금 낸 내 기록은 이 기기 값으로 바로 반영
     const mine = (list, ms, asc) => { if (!ms) return list; let me = list.find((x) => x.me); if (!me) { me = { name: S.name, lv: S.lv, me: true, uid: '', ms }; list.push(me); } me.ms = asc ? Math.min(me.ms, ms) : Math.max(me.ms, ms); return list.sort((a, b) => (asc ? a.ms - b.ms : b.ms - a.ms)).slice(0, 10); };
-    data.maze = mine(data.maze || [], m.maze.best, true); data.run = mine(data.run || [], m.run.best, false); data.park = mine(data.park || [], m.park.best, true);
+    const MK = 'bmq_minirank_cache';
+    let old = null; try { old = JSON.parse(localStorage.getItem(MK)); } catch (e) { }
+    const mineAll = (d) => { d.maze = mine(d.maze || [], m.maze.best, true); d.run = mine(d.run || [], m.run.best, false); d.park = mine(d.park || [], m.park.best, true); return d; };
+    if (old && old.day === day && old.email === S.email) { data = mineAll(old.v); show(); }
+    try { syncNow().catch(() => { }); const v = await Api.miniRank(day); try { localStorage.setItem(MK, JSON.stringify({ day, email: S.email, v })); } catch (e) { } data = v; }
+    catch (e) { const box = $('#miniRank'); if (box && !old) box.innerHTML = `<p class="muted">${esc(e.message)}</p>`; return; }
+    if (curPage !== 'drive') return;
+    mineAll(data);
     show();
   }
 
@@ -2610,7 +2636,12 @@ Lv.${S.lv} ${rankOf(S.lv).title} ${S.name}의 모든 기록(경험치 ${S.totalX
     try { const c = JSON.parse(localStorage.getItem(FK)); if (c) { regFace('face:me', c); hasFace = true; } else localStorage.removeItem(FVK); } catch (e) { }
     // 문제 · 진행 · 멘트 · 그림을 한 번의 요청으로
     let b = null, failed = false;
-    try { b = await Api.boot(); } catch (e) { failed = true; }
+    try { b = await Api.boot(); }
+    catch (e) {
+      // 로그인이 만료됐거나 중지된 계정 → 로그인 화면으로 (예전엔 시작 전에 따로 확인하던 것)
+      if (!Api.loggedIn() || /중지|만료|로그인/.test(e.message)) { Api.logout(); S = null; closeOpening(0); return loginScreen(e.message); }
+      failed = true; toast('오프라인: 저장된 기록으로 시작해요');
+    }
     if (failed) { try { await Api.questions(); } catch (e) { toast(e.message, 3500); } } // 오프라인이면 저장해 둔 문제로
     await spritesReady;
     loadTalk(b && b.talk);
@@ -2805,12 +2836,7 @@ Lv.${S.lv} ${rankOf(S.lv).title} ${S.name}의 모든 기록(경험치 ${S.totalX
     const allBgs = [...new Set([...Object.values(NPCS).map((n) => n.bg).filter(Boolean), ...RANKS.map((r) => r.bg), 'title'])];
     spritesReady = Sprites.init(allKeys, allBgs).catch(() => { }); // 그림 목록은 뒤에서 받고, 게임에 들어갈 때만 기다림
     if (!Api.loggedIn()) return loginScreen();
-    try { await Api.me(); }
-    catch (e) {
-      if (!Api.loggedIn() || /중지|만료/.test(e.message)) { Api.logout(); return loginScreen(e.message); }
-      if (!Api.user) return loginScreen(e.message);
-      toast('오프라인: 저장된 기록으로 시작해요');
-    }
+    if (!Api.user) { try { await Api.me(); } catch (e) { Api.logout(); return loginScreen(e.message); } } // 예전 기기에 회원 정보가 없을 때만
     await enterGame();
   }
   boot();

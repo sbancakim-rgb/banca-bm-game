@@ -45,6 +45,7 @@ const Api = (() => {
   }
 
   function absorbBoot(b) {
+    if (b.user) { user = b.user; ls.set(UK, user); } // 시작 데이터에 회원 정보도 들어 있음 → '로그인 확인'을 따로 묻지 않음
     if (b.opening) ls.set(OPK, { v: b.openingVer, d: b.opening }); else if (b.openingVer === '') ls.del(OPK);
     delete b.opening;
     const qc = ls.get(QC);
