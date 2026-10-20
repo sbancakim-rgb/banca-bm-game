@@ -41,7 +41,7 @@
     S.cs = myStage();  // 지금 입은 의상 단계 (동료 화면에서도 같은 의상으로)
     S.cr = carCR();    // 차 꾸밈 요약 (동료가 주차장에서 봄)
     S.updated = Date.now(); Store.save(S);
-    clearTimeout(syncTimer); syncTimer = setTimeout(syncNow, 4000);
+    clearTimeout(syncTimer); syncTimer = setTimeout(syncNow, 10000); // 서버 저장은 몰아서 (기기에는 바로 저장 · 앱을 내리면 즉시 저장)
   }
   let lastSynced = 0; // 마지막으로 서버에 저장한 시점 (바뀐 게 없으면 저장 요청을 보내지 않음)
   async function syncNow(reset) {
