@@ -1908,7 +1908,7 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
     if (!feedItems) return '소식을 불러오는 중…';
     if (!feedItems.length) return '아직 새 소식이 없어요. 첫 소식의 주인공이 되어 보세요!';
     const x = feedItems[i % feedItems.length];
-    return `${FEED_ICON[x.kind] || '📢'} <b>${esc(x.name)}</b>님이 ${esc(x.text)} <i>${ago(x.at)}</i>`;
+    return `${FEED_ICON[x.kind] || '📢'} <b>${esc(x.name)}</b>님이 ${esc(x.text)}`;
   }
   async function refreshFeed(force) {
     if (!force && Date.now() - feedAt < 60000) return;
@@ -1926,7 +1926,7 @@ ${car.glb ? '홈 화면 → 🚗 내 차고에서 360도로 돌려 볼 수 있�
   }
   async function feedModal() {
     const draw = () => `<h2 style="font-size:22px">📢 사내 소식</h2><p class="muted" style="text-align:center">최근 3일 동안 동료들의 소식이에요.</p>
-      <div class="feedlist">${feedItems && feedItems.length ? feedItems.map((x) => `<div class="feedrow"><span class="fi">${FEED_ICON[x.kind] || '📢'}</span><span><b>${esc(x.name)}</b>님이 ${esc(x.text)}<small>${ago(x.at)}</small></span></div>`).join('')
+      <div class="feedlist">${feedItems && feedItems.length ? feedItems.map((x) => `<div class="feedrow"><span class="fi">${FEED_ICON[x.kind] || '📢'}</span><span><b>${esc(x.name)}</b>님이 ${esc(x.text)}</span></div>`).join('')
         : '<p class="muted" style="text-align:center">아직 새 소식이 없어요.</p>'}</div><button class="btn full" data-close style="margin-top:10px">닫기</button>`;
     const m = modal(draw());
     await refreshFeed(true);
